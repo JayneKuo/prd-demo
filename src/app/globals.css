@@ -1,0 +1,101 @@
+@import 'tailwindcss';
+
+:root {
+  --background: #f5f7fb;
+  --foreground: #101828;
+  --surface: #ffffff;
+  --surface-subtle: #f6f8fc;
+  --surface-hover: #eef4ff;
+  --surface-strong: #ffffff;
+  --surface-strong-foreground: #101828;
+  --border: #e4e7ec;
+  --border-subtle: #eef2f6;
+  --muted: #667085;
+  --muted-foreground: #98a2b3;
+  --primary: #465fff;
+  --primary-foreground: #ffffff;
+  --primary-soft: #ecf2ff;
+  --success: #039855;
+  --warning: #dc6803;
+  --danger: #d92d20;
+  --info: #465fff;
+  --focus-ring: rgba(70, 95, 255, 0.22);
+  --shadow-soft: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-panel: 0 8px 24px rgba(16, 24, 40, 0.06);
+}
+
+:root[data-theme='dark'] {
+  --background: #0f172a;
+  --foreground: #f8fafc;
+  --surface: #111827;
+  --surface-subtle: #182230;
+  --surface-hover: #202b3c;
+  --surface-strong: #111827;
+  --surface-strong-foreground: #f8fafc;
+  --border: #263244;
+  --border-subtle: #1f2937;
+  --muted: #cbd5e1;
+  --muted-foreground: #94a3b8;
+  --primary: #7592ff;
+  --primary-foreground: #ffffff;
+  --primary-soft: #172554;
+  --success: #32d583;
+  --warning: #fdb022;
+  --danger: #f97066;
+  --info: #93c5fd;
+  --focus-ring: rgba(117, 146, 255, 0.3);
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.22);
+  --shadow-panel: 0 12px 32px rgba(0, 0, 0, 0.3);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Satoshi', 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button,
+a,
+input,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
