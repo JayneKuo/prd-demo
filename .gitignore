@@ -14,3 +14,7 @@ coverage/
 Thumbs.db
 .playwright-mcp/
 .playwright-cli/
+playwright-console-errors.txt
+*.png
+theme-*.txt
+theme-state-check.json
