@@ -10,7 +10,7 @@ const apps = [
 
 export default function AppsPage() {
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="mx-auto max-w-7xl pt-5 lg:pt-6">
       <PageHeader title="应用" description="管理应用市场、系统集成、Webhooks 和 API 密钥。" actions={[{ label: '安装应用', variant: 'primary' }]} />
       <SectionCard title="已连接应用" description="这些集成影响订单、库存、财务和事件日志。">
         <div className="divide-y divide-[var(--border-subtle)]">

@@ -19,7 +19,7 @@ const policies = [
 
 export default function AccessSettingsPage() {
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="mx-auto max-w-7xl pt-5 lg:pt-6">
       <PageHeader
         title="用户与角色"
         description="查看用户访问范围、角色分配和公司级权限策略。"

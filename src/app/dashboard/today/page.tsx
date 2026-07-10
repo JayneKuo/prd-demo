@@ -10,7 +10,7 @@ const workItems = [
 
 export default function TodayPage() {
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="mx-auto max-w-7xl pt-5 lg:pt-6">
       <PageHeader title="今日" description="汇总今天需要处理的订单、审批、到货、异常和 SLA 风险。" actions={[{ label: '查看全部任务', variant: 'secondary' }]} />
       <SectionCard title="今日工作队列" description="按优先级聚合跨模块待处理事项。">
         <div className="divide-y divide-[var(--border-subtle)]">

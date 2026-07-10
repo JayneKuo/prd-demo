@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 2,
+  "projectName": "项目 PRD",
+  "pageId": "dashboard-today",
+  "route": "/dashboard/today",
+  "rootNodes": [
+    {
+      "id": "page-dashboard-today-today-mr0frgqe-1",
+      "type": "page",
+      "title": "today",
+      "route": "/dashboard/today",
+      "pageId": "dashboard-today",
+      "order": 0,
+      "content": {
+        "description": "",
+        "actors": [],
+        "acceptanceCriteria": [],
+        "openQuestions": [],
+        "status": "draft"
+      },
+      "children": [
+        {
+          "id": "field-dashboard-today-node-mr0frgqf-2",
+          "type": "other",
+          "title": "今日汇总今天需要处理的订单、审批、到货、异常和 SLA 风险。查看全部任务今日工作队列按优先级聚合跨模块待处理事项。12 个订单等待分配仓库负责人：运营Revi",
+          "route": "/dashboard/today",
+          "pageId": "dashboard-today",
+          "order": 0,
+          "content": {
+            "description": "页面元素「今日汇总今天需要处理的订单、审批、到货、异常和 SLA 风险。查看全部任务今日工作队列按优先级聚合跨模块待处理事项。12 个订单等待分配仓库负责人：运营Revi」的需求说明。",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft"
+          },
+          "children": [],
+          "target": {
+            "selector": "main",
+            "label": "今日汇总今天需要处理的订单、审批、到货、异常和 SLA 风险。查看全部任务今日工作队列按优先级聚合跨模块待处理事项。12 个订单等待分配仓库负责人：运营Revi",
+            "elementType": "other"
+          }
+        }
+      ]
+    }
+  ],
+  "updatedAt": "2026-06-30T09:30:04.829Z"
+}

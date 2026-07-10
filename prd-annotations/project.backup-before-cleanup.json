@@ -1,0 +1,1381 @@
+{
+  "schemaVersion": 2,
+  "projectName": "Dashboard Outbound New",
+  "pageId": "dashboard-rules-fulfillment",
+  "route": "/dashboard/rules/fulfillment",
+  "rootNodes": [
+    {
+      "id": "module-node-node-mr4h2a01-78",
+      "type": "module",
+      "title": "首页",
+      "order": 0,
+      "content": {
+        "description": "",
+        "actors": [],
+        "acceptanceCriteria": [],
+        "openQuestions": [],
+        "status": "draft",
+        "rules": []
+      },
+      "children": [
+        {
+          "id": "page-dashboard-overview-node-mr4h2a01-79",
+          "type": "page",
+          "title": "概览",
+          "route": "/dashboard/overview",
+          "order": 0,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": [
+            {
+              "id": "field-dashboard-overview-node-mr4h2jc9-155",
+              "type": "other",
+              "title": "状态筛选",
+              "route": "/dashboard/overview",
+              "pageId": "dashboard-overview",
+              "order": 0,
+              "content": {
+                "description": "页面元素「状态筛选」的需求说明。",
+                "actors": [],
+                "acceptanceCriteria": [],
+                "openQuestions": [],
+                "status": "draft",
+                "rules": []
+              },
+              "children": [],
+              "target": {
+                "selector": "div:nth-of-type(2) > div > div > main > div",
+                "label": "状态筛选",
+                "elementType": "other"
+              },
+              "markerOffset": {
+                "x": 0,
+                "y": -0.666656494140625
+              }
+            },
+            {
+              "id": "field-dashboard-overview-node-mr4h2qc8-158",
+              "type": "action",
+              "title": "全部渠道",
+              "route": "/dashboard/overview",
+              "pageId": "dashboard-overview",
+              "order": 1,
+              "content": {
+                "description": "页面元素「全部渠道」的需求说明。",
+                "actors": [],
+                "acceptanceCriteria": [],
+                "openQuestions": [],
+                "status": "draft",
+                "rules": []
+              },
+              "children": [],
+              "target": {
+                "selector": "div > div:nth-of-type(1) > div > div:nth-of-type(1) > button:nth-of-type(1)",
+                "label": "全部渠道",
+                "elementType": "button"
+              }
+            }
+          ]
+        },
+        {
+          "id": "page-dashboard-today-node-mr4h2a01-80",
+          "type": "page",
+          "title": "工作台",
+          "route": "/dashboard/today",
+          "order": 1,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": [
+            {
+              "id": "field-dashboard-today-node-mr4h7o5a-317",
+              "type": "other",
+              "title": "状态筛选",
+              "route": "/dashboard/today",
+              "pageId": "dashboard-today",
+              "order": 0,
+              "content": {
+                "description": "页面元素「状态筛选」的需求说明。",
+                "actors": [],
+                "acceptanceCriteria": [],
+                "openQuestions": [],
+                "status": "draft",
+                "rules": []
+              },
+              "children": [],
+              "target": {
+                "selector": "div:nth-of-type(2) > div > div > main",
+                "label": "状态筛选",
+                "elementType": "other"
+              },
+              "markerOffset": {
+                "x": -486.666748046875,
+                "y": 55.333343505859375
+              }
+            },
+            {
+              "id": "field-dashboard-today-node-mr4h7xtm-318",
+              "type": "other",
+              "title": "页面区域",
+              "route": "/dashboard/today",
+              "pageId": "dashboard-today",
+              "order": 1,
+              "content": {
+                "description": "页面元素「页面区域」的需求说明。",
+                "actors": [],
+                "acceptanceCriteria": [],
+                "openQuestions": [],
+                "status": "draft",
+                "rules": []
+              },
+              "children": [],
+              "target": {
+                "selector": "div > section > div:nth-of-type(2) > div > div:nth-of-type(1)",
+                "label": "页面区域",
+                "elementType": "other"
+              }
+            },
+            {
+              "id": "field-dashboard-today-node-mr4h8fm1-319",
+              "type": "other",
+              "title": "页面区域",
+              "route": "/dashboard/today",
+              "pageId": "dashboard-today",
+              "order": 2,
+              "content": {
+                "description": "页面元素「页面区域」的需求说明。",
+                "actors": [],
+                "acceptanceCriteria": [],
+                "openQuestions": [],
+                "status": "draft",
+                "rules": []
+              },
+              "children": [],
+              "target": {
+                "selector": "div > section > div:nth-of-type(2) > div > div:nth-of-type(3)",
+                "label": "页面区域",
+                "elementType": "other"
+              },
+              "markerOffset": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "page-dashboard-messages-node-mr4h2a01-81",
+          "type": "page",
+          "title": "消息中心",
+          "route": "/dashboard/messages",
+          "order": 2,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "module-node-node-mr4h2a01-82",
+      "type": "module",
+      "title": "销售",
+      "order": 1,
+      "content": {
+        "description": "",
+        "actors": [],
+        "acceptanceCriteria": [],
+        "openQuestions": [],
+        "status": "draft",
+        "rules": []
+      },
+      "children": [
+        {
+          "id": "page-dashboard-orders-node-mr4h2a01-83",
+          "type": "page",
+          "title": "销售订单",
+          "route": "/dashboard/orders",
+          "order": 0,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-fulfillment-node-mr4h2a01-84",
+          "type": "page",
+          "title": "履约单",
+          "route": "/dashboard/fulfillment",
+          "order": 1,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-returns-node-mr4h2a01-85",
+          "type": "page",
+          "title": "退货/售后",
+          "route": "/dashboard/returns",
+          "order": 2,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-customers-node-mr4h2a01-86",
+          "type": "page",
+          "title": "客户",
+          "route": "/dashboard/customers",
+          "order": 3,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-tickets-node-mr4h2a01-87",
+          "type": "page",
+          "title": "工单",
+          "route": "/dashboard/tickets",
+          "order": 4,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "module-node-node-mr4h2a01-88",
+      "type": "module",
+      "title": "仓储",
+      "order": 2,
+      "content": {
+        "description": "",
+        "actors": [],
+        "acceptanceCriteria": [],
+        "openQuestions": [],
+        "status": "draft",
+        "rules": []
+      },
+      "children": [
+        {
+          "id": "page-dashboard-inbound-node-mr4h2a01-89",
+          "type": "page",
+          "title": "入库单",
+          "route": "/dashboard/inbound",
+          "order": 0,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-outbound-node-mr4h2a01-90",
+          "type": "page",
+          "title": "出库单",
+          "route": "/dashboard/outbound",
+          "order": 1,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-inventory-node-mr4h2a01-91",
+          "type": "page",
+          "title": "库存",
+          "route": "/dashboard/inventory",
+          "order": 2,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-warehouses-node-mr4h2a01-92",
+          "type": "page",
+          "title": "仓库/库位",
+          "route": "/dashboard/warehouses",
+          "order": 3,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-transfers-node-mr4h2a01-93",
+          "type": "page",
+          "title": "调拨",
+          "route": "/dashboard/transfers",
+          "order": 4,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-stocktake-node-mr4h2a01-94",
+          "type": "page",
+          "title": "盘点",
+          "route": "/dashboard/stocktake",
+          "order": 5,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "module-node-node-mr4h2a01-95",
+      "type": "module",
+      "title": "运输",
+      "order": 3,
+      "content": {
+        "description": "",
+        "actors": [],
+        "acceptanceCriteria": [],
+        "openQuestions": [],
+        "status": "draft",
+        "rules": []
+      },
+      "children": [
+        {
+          "id": "page-dashboard-shipments-node-mr4h2a01-96",
+          "type": "page",
+          "title": "运输单",
+          "route": "/dashboard/shipments",
+          "order": 0,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-tracking-node-mr4h2a02-97",
+          "type": "page",
+          "title": "物流跟踪",
+          "route": "/dashboard/tracking",
+          "order": 1,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-carriers-node-mr4h2a02-98",
+          "type": "page",
+          "title": "承运商",
+          "route": "/dashboard/carriers",
+          "order": 2,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-freight-node-mr4h2a02-99",
+          "type": "page",
+          "title": "运费管理",
+          "route": "/dashboard/freight",
+          "order": 3,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "module-node-node-mr4h2a02-100",
+      "type": "module",
+      "title": "采购",
+      "order": 4,
+      "content": {
+        "description": "",
+        "actors": [],
+        "acceptanceCriteria": [],
+        "openQuestions": [],
+        "status": "draft",
+        "rules": []
+      },
+      "children": [
+        {
+          "id": "page-dashboard-purchase-orders-node-mr4h2a02-101",
+          "type": "page",
+          "title": "采购订单",
+          "route": "/dashboard/purchase-orders",
+          "order": 0,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-purchase-returns-node-mr4h2a02-102",
+          "type": "page",
+          "title": "采购退货",
+          "route": "/dashboard/purchase-returns",
+          "order": 1,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-suppliers-node-mr4h2a02-103",
+          "type": "page",
+          "title": "供应商",
+          "route": "/dashboard/suppliers",
+          "order": 2,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-replenishment-node-mr4h2a02-104",
+          "type": "page",
+          "title": "采购建议",
+          "route": "/dashboard/replenishment",
+          "order": 3,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "module-node-node-mr4h2a02-105",
+      "type": "module",
+      "title": "商品",
+      "order": 5,
+      "content": {
+        "description": "",
+        "actors": [],
+        "acceptanceCriteria": [],
+        "openQuestions": [],
+        "status": "draft",
+        "rules": []
+      },
+      "children": [
+        {
+          "id": "page-dashboard-products-node-mr4h2a02-106",
+          "type": "page",
+          "title": "商品中心",
+          "route": "/dashboard/products",
+          "order": 0,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-categories-node-mr4h2a02-107",
+          "type": "page",
+          "title": "分类与属性",
+          "route": "/dashboard/categories",
+          "order": 1,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-product-mapping-node-mr4h2a02-108",
+          "type": "page",
+          "title": "商品映射",
+          "route": "/dashboard/product-mapping",
+          "order": 2,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-bundles-node-mr4h2a02-109",
+          "type": "page",
+          "title": "组合商品",
+          "route": "/dashboard/bundles",
+          "order": 3,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-publish-log-node-mr4h2a02-110",
+          "type": "page",
+          "title": "发布记录",
+          "route": "/dashboard/publish-log",
+          "order": 4,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "module-node-node-mr4h2a02-111",
+      "type": "module",
+      "title": "财务",
+      "order": 6,
+      "content": {
+        "description": "",
+        "actors": [],
+        "acceptanceCriteria": [],
+        "openQuestions": [],
+        "status": "draft",
+        "rules": []
+      },
+      "children": [
+        {
+          "id": "page-dashboard-receivables-node-mr4h2a02-112",
+          "type": "page",
+          "title": "应收",
+          "route": "/dashboard/receivables",
+          "order": 0,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-payables-node-mr4h2a02-113",
+          "type": "page",
+          "title": "应付",
+          "route": "/dashboard/payables",
+          "order": 1,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-expenses-node-mr4h2a02-114",
+          "type": "page",
+          "title": "费用",
+          "route": "/dashboard/expenses",
+          "order": 2,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-reconciliation-node-mr4h2a02-115",
+          "type": "page",
+          "title": "对账",
+          "route": "/dashboard/reconciliation",
+          "order": 3,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-settlement-node-mr4h2a02-116",
+          "type": "page",
+          "title": "结算",
+          "route": "/dashboard/settlement",
+          "order": 4,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "module-node-node-mr4h2a02-117",
+      "type": "module",
+      "title": "报表",
+      "order": 7,
+      "content": {
+        "description": "",
+        "actors": [],
+        "acceptanceCriteria": [],
+        "openQuestions": [],
+        "status": "draft",
+        "rules": []
+      },
+      "children": [
+        {
+          "id": "page-dashboard-reports-sales-node-mr4h2a02-118",
+          "type": "page",
+          "title": "销售报表",
+          "route": "/dashboard/reports/sales",
+          "order": 0,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-reports-inventory-node-mr4h2a02-119",
+          "type": "page",
+          "title": "库存报表",
+          "route": "/dashboard/reports/inventory",
+          "order": 1,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-reports-purchasing-node-mr4h2a02-120",
+          "type": "page",
+          "title": "采购报表",
+          "route": "/dashboard/reports/purchasing",
+          "order": 2,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-reports-fulfillment-node-mr4h2a02-121",
+          "type": "page",
+          "title": "履约报表",
+          "route": "/dashboard/reports/fulfillment",
+          "order": 3,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-reports-finance-node-mr4h2a02-122",
+          "type": "page",
+          "title": "财务报表",
+          "route": "/dashboard/reports/finance",
+          "order": 4,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "module-node-node-mr4h2a02-123",
+      "type": "module",
+      "title": "数据管理",
+      "order": 8,
+      "content": {
+        "description": "",
+        "actors": [],
+        "acceptanceCriteria": [],
+        "openQuestions": [],
+        "status": "draft",
+        "rules": []
+      },
+      "children": [
+        {
+          "id": "page-dashboard-data-import-node-mr4h2a02-124",
+          "type": "page",
+          "title": "数据导入",
+          "route": "/dashboard/data/import",
+          "order": 0,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-data-export-node-mr4h2a02-125",
+          "type": "page",
+          "title": "数据导出",
+          "route": "/dashboard/data/export",
+          "order": 1,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-data-audit-log-node-mr4h2a02-126",
+          "type": "page",
+          "title": "操作日志",
+          "route": "/dashboard/data/audit-log",
+          "order": 2,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "module-node-node-mr4h2a02-127",
+      "type": "module",
+      "title": "策略中心",
+      "order": 9,
+      "content": {
+        "description": "",
+        "actors": [],
+        "acceptanceCriteria": [],
+        "openQuestions": [],
+        "status": "draft",
+        "rules": []
+      },
+      "children": [
+        {
+          "id": "page-dashboard-rules-fulfillment-node-mr4h2a02-128",
+          "type": "page",
+          "title": "履约规则",
+          "route": "/dashboard/rules/fulfillment",
+          "order": 0,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-rules-inventory-sync-node-mr4h2a02-129",
+          "type": "page",
+          "title": "库存同步规则",
+          "route": "/dashboard/rules/inventory-sync",
+          "order": 1,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-rules-replenishment-node-mr4h2a02-130",
+          "type": "page",
+          "title": "补货规则",
+          "route": "/dashboard/rules/replenishment",
+          "order": 2,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-rules-pricing-node-mr4h2a02-131",
+          "type": "page",
+          "title": "价格规则",
+          "route": "/dashboard/rules/pricing",
+          "order": 3,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "module-node-node-mr4h2a02-132",
+      "type": "module",
+      "title": "插件",
+      "order": 10,
+      "content": {
+        "description": "",
+        "actors": [],
+        "acceptanceCriteria": [],
+        "openQuestions": [],
+        "status": "draft",
+        "rules": []
+      },
+      "children": [
+        {
+          "id": "page-dashboard-apps-app-store-mr4h2a02-133",
+          "type": "page",
+          "title": "App Store",
+          "route": "/dashboard/apps",
+          "order": 0,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "module-node-node-mr4h2a02-134",
+      "type": "module",
+      "title": "开发者",
+      "order": 11,
+      "content": {
+        "description": "",
+        "actors": [],
+        "acceptanceCriteria": [],
+        "openQuestions": [],
+        "status": "draft",
+        "rules": []
+      },
+      "children": [
+        {
+          "id": "page-dashboard-developers-logs-node-mr4h2a02-135",
+          "type": "page",
+          "title": "事件日志",
+          "route": "/dashboard/developers/logs",
+          "order": 0,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-developers-webhooks-webhooks-mr4h2a02-136",
+          "type": "page",
+          "title": "Webhooks",
+          "route": "/dashboard/developers/webhooks",
+          "order": 1,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-developers-api-keys-api-mr4h2a02-137",
+          "type": "page",
+          "title": "API 密钥",
+          "route": "/dashboard/developers/api-keys",
+          "order": 2,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-developers-mcp-mcp-agent-mr4h2a02-138",
+          "type": "page",
+          "title": "MCP / Agent",
+          "route": "/dashboard/developers/mcp",
+          "order": 3,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "module-node-node-mr4h2a02-139",
+      "type": "module",
+      "title": "组织",
+      "order": 12,
+      "content": {
+        "description": "",
+        "actors": [],
+        "acceptanceCriteria": [],
+        "openQuestions": [],
+        "status": "draft",
+        "rules": []
+      },
+      "children": [
+        {
+          "id": "page-dashboard-org-companies-node-mr4h2a02-140",
+          "type": "page",
+          "title": "公司管理",
+          "route": "/dashboard/org/companies",
+          "order": 0,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-org-merchants-merchant-mr4h2a02-141",
+          "type": "page",
+          "title": "Merchant 管理",
+          "route": "/dashboard/org/merchants",
+          "order": 1,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-org-users-node-mr4h2a02-142",
+          "type": "page",
+          "title": "用户管理",
+          "route": "/dashboard/org/users",
+          "order": 2,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-org-roles-node-mr4h2a02-143",
+          "type": "page",
+          "title": "角色管理",
+          "route": "/dashboard/org/roles",
+          "order": 3,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-org-menu-permissions-node-mr4h2a02-144",
+          "type": "page",
+          "title": "菜单权限",
+          "route": "/dashboard/org/menu-permissions",
+          "order": 4,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-org-teams-node-mr4h2a02-145",
+          "type": "page",
+          "title": "团队",
+          "route": "/dashboard/org/teams",
+          "order": 5,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-org-audit-node-mr4h2a02-146",
+          "type": "page",
+          "title": "审计日志",
+          "route": "/dashboard/org/audit",
+          "order": 6,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "module-node-node-mr4h2a02-147",
+      "type": "module",
+      "title": "设置",
+      "order": 13,
+      "content": {
+        "description": "",
+        "actors": [],
+        "acceptanceCriteria": [],
+        "openQuestions": [],
+        "status": "draft",
+        "rules": []
+      },
+      "children": [
+        {
+          "id": "page-dashboard-settings-channels-node-mr4h2a02-148",
+          "type": "page",
+          "title": "渠道配置",
+          "route": "/dashboard/settings/channels",
+          "order": 0,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-settings-notifications-node-mr4h2a02-149",
+          "type": "page",
+          "title": "通知与预警",
+          "route": "/dashboard/settings/notifications",
+          "order": 1,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-settings-approvals-node-mr4h2a02-150",
+          "type": "page",
+          "title": "审批流程",
+          "route": "/dashboard/settings/approvals",
+          "order": 2,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-settings-preferences-node-mr4h2a02-151",
+          "type": "page",
+          "title": "系统偏好",
+          "route": "/dashboard/settings/preferences",
+          "order": 3,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "module-node-node-mr4h2a02-152",
+      "type": "module",
+      "title": "帮助",
+      "order": 14,
+      "content": {
+        "description": "",
+        "actors": [],
+        "acceptanceCriteria": [],
+        "openQuestions": [],
+        "status": "draft",
+        "rules": []
+      },
+      "children": [
+        {
+          "id": "page-dashboard-help-node-mr4h2a02-153",
+          "type": "page",
+          "title": "帮助中心",
+          "route": "/dashboard/help",
+          "order": 0,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        },
+        {
+          "id": "page-dashboard-help-submit-ticket-node-mr4h2a02-154",
+          "type": "page",
+          "title": "提交工单",
+          "route": "/dashboard/help/submit-ticket",
+          "order": 1,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft",
+            "rules": []
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "module-dashboard-overview-node-mr4h31so-161",
+      "type": "module",
+      "title": "未分组",
+      "pageId": "dashboard-overview",
+      "order": 15,
+      "content": {
+        "description": "",
+        "actors": [],
+        "acceptanceCriteria": [],
+        "openQuestions": [],
+        "status": "draft",
+        "rules": []
+      },
+      "children": []
+    }
+  ],
+  "updatedAt": "2026-07-03T05:15:57.108Z"
+}

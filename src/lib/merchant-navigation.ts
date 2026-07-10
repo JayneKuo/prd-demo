@@ -62,6 +62,7 @@ export const merchantNavigationGroups: NavGroup[] = [
       { title: { 'zh-CN': '运输单', 'en-US': 'Shipments' }, href: '/dashboard/shipments', capabilities: ['orders:read'], icon: 'file-text' },
       { title: { 'zh-CN': '物流跟踪', 'en-US': 'Tracking' }, href: '/dashboard/tracking', capabilities: ['orders:read'], icon: 'map' },
       { title: { 'zh-CN': '承运商', 'en-US': 'Carriers' }, href: '/dashboard/carriers', capabilities: ['orders:read'], icon: 'building' },
+      { title: { 'zh-CN': '承运商映射', 'en-US': 'Carrier Mapping' }, href: '/dashboard/carriers/mapping', capabilities: ['orders:read'], icon: 'link' },
       { title: { 'zh-CN': '运费管理', 'en-US': 'Freight' }, href: '/dashboard/freight', capabilities: ['orders:read'], icon: 'circle-dollar-sign' }
     ]
   },

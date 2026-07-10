@@ -34,7 +34,7 @@ export function ListPageTemplate<T extends { id: string }>({
   rowHref?: (row: T) => string;
 }) {
   return (
-    <div className="mx-auto max-w-[1280px]">
+    <div className="mx-auto max-w-[1280px] pt-5 lg:pt-6">
       <PageHeader title={title} description={description} actions={actions} />
       <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)]">
         <div className="flex gap-4 border-b border-[var(--border)] px-4 pt-3">

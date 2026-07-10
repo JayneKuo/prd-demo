@@ -9,7 +9,7 @@ const schedule = [
 
 export default function CalendarPage() {
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="mx-auto max-w-7xl pt-5 lg:pt-6">
       <PageHeader title="日程" description="跟踪到货、出库、盘点、账期和审批 SLA 等时间驱动的运营事项。" actions={[{ label: '新建日程', variant: 'primary' }]} />
       <SectionCard title="今天" description="时间线视图会在后续接入真实日历组件。">
         <div className="divide-y divide-[var(--border-subtle)]">

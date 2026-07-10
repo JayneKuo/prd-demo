@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 2,
+  "projectName": "项目 PRD",
+  "pageId": "dashboard-overview",
+  "route": "/dashboard/overview",
+  "rootNodes": [
+    {
+      "id": "module-dashboard-overview-module-mr0fszr1-5",
+      "type": "module",
+      "title": "新的module",
+      "route": "/dashboard/overview",
+      "pageId": "dashboard-overview",
+      "order": 0,
+      "content": {
+        "description": "",
+        "actors": [],
+        "acceptanceCriteria": [],
+        "openQuestions": [],
+        "status": "draft"
+      },
+      "children": [
+        {
+          "id": "page-dashboard-overview-page-mr0ft1b8-6",
+          "type": "page",
+          "title": "新的page",
+          "route": "/dashboard/overview",
+          "pageId": "dashboard-overview",
+          "order": 0,
+          "content": {
+            "description": "",
+            "actors": [],
+            "acceptanceCriteria": [],
+            "openQuestions": [],
+            "status": "draft"
+          },
+          "children": [
+            {
+              "id": "field-dashboard-overview-node-mr0g1p0v-1",
+              "type": "other",
+              "title": "概览先判断 Northwind Trading Ltd. 全部 merchant 的经营态势，再看结构、异常和今天该收口的动作。Daily overview先看",
+              "route": "/dashboard/overview",
+              "pageId": "dashboard-overview",
+              "order": 0,
+              "content": {
+                "description": "页面元素「概览先判断 Northwind Trading Ltd. 全部 merchant 的经营态势，再看结构、异常和今天该收口的动作。Daily overview先看」的需求说明。",
+                "actors": [],
+                "acceptanceCriteria": [],
+                "openQuestions": [],
+                "status": "draft"
+              },
+              "children": [],
+              "target": {
+                "selector": "main",
+                "label": "概览先判断 Northwind Trading Ltd. 全部 merchant 的经营态势，再看结构、异常和今天该收口的动作。Daily overview先看",
+                "elementType": "other"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "updatedAt": "2026-06-30T09:28:08.871Z"
+}

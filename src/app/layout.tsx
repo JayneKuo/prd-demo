@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { RequirementAnnotator } from '@/components/requirement-annotator';
 import { ShellStateProvider } from '@/components/providers/shell-state-provider';
 import './globals.css';
 
@@ -12,6 +13,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="zh-CN">
       <body>
         <ShellStateProvider>{children}</ShellStateProvider>
+        <RequirementAnnotator />
       </body>
     </html>
   );

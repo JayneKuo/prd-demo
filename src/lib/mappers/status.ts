@@ -9,6 +9,33 @@ const statusMap: Record<string, { label: string; variant: StatusVariant }> = {
   '已取消': { label: '已取消', variant: 'neutral' },
   '已关闭': { label: '已关闭', variant: 'neutral' },
 
+  // Inbound status
+  '待入库': { label: '待入库', variant: 'neutral' },
+  '入库中': { label: '入库中', variant: 'info' },
+  '已入库': { label: '已入库', variant: 'success' },
+  '待收货': { label: '待收货', variant: 'neutral' },
+  '收货中': { label: '收货中', variant: 'info' },
+  '质检中': { label: '质检中', variant: 'info' },
+  '质检通过': { label: '质检通过', variant: 'success' },
+  '质检不通过': { label: '质检不通过', variant: 'danger' },
+  '上架中': { label: '上架中', variant: 'info' },
+  '已上架': { label: '已上架', variant: 'success' },
+  '待质检': { label: '待质检', variant: 'neutral' },
+
+  // Outbound status
+  '待出库': { label: '待出库', variant: 'neutral' },
+  '出库中': { label: '出库中', variant: 'info' },
+  '已出库': { label: '已出库', variant: 'success' },
+  '库位缺货': { label: '库位缺货', variant: 'danger' },
+  '商品破损': { label: '商品破损', variant: 'danger' },
+  '订单取消': { label: '订单取消', variant: 'neutral' },
+
+  // WMS status
+  '待作业': { label: '待作业', variant: 'neutral' },
+  '验货复核': { label: '验货复核', variant: 'info' },
+  '打包称重': { label: '打包称重', variant: 'info' },
+  '异常挂起': { label: '异常挂起', variant: 'danger' },
+
   // Fulfillment status
   '待生成': { label: '待生成', variant: 'neutral' },
   '待履约': { label: '待履约', variant: 'neutral' },
@@ -46,6 +73,13 @@ const statusMap: Record<string, { label: string; variant: StatusVariant }> = {
   'blocked': { label: 'Blocked', variant: 'danger' },
   'exception': { label: 'Exception', variant: 'danger' },
   'cancelled': { label: 'Cancelled', variant: 'neutral' },
+
+  // Carrier / Mapping status
+  '启用': { label: '启用', variant: 'success' },
+  '停用': { label: '停用', variant: 'neutral' },
+  '已映射': { label: '已映射', variant: 'success' },
+  '未映射': { label: '未映射', variant: 'warning' },
+  '已失效': { label: '已失效', variant: 'danger' },
 
   // Inventory
   'available': { label: 'Available', variant: 'success' },

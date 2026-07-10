@@ -1,0 +1,1279 @@
+{
+  "pageId": "dashboard-outbound-new",
+  "route": "/dashboard/outbound/new",
+  "title": "Dashboard Outbound New",
+  "actors": [],
+  "annotations": [
+    {
+      "id": "manual-dashboard-outbound-new-1782438281002",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "group": "模块说明",
+      "target": {
+        "elementType": "navigation",
+        "label": "新的模块说明"
+      },
+      "content": {
+        "title": "新的模块说明",
+        "description": "",
+        "acceptanceCriteria": [],
+        "openQuestions": []
+      },
+      "source": "manual",
+      "status": "draft",
+      "scope": "module"
+    },
+    {
+      "id": "manual-dashboard-outbound-new-1782438282044",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "group": "模块说明",
+      "target": {
+        "elementType": "navigation",
+        "label": "新的模块说明"
+      },
+      "content": {
+        "title": "新的模块说明",
+        "description": "",
+        "acceptanceCriteria": [],
+        "openQuestions": []
+      },
+      "source": "manual",
+      "status": "draft",
+      "scope": "module"
+    },
+    {
+      "id": "manual-dashboard-outbound-new-1782438283134",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "group": "页面说明",
+      "target": {
+        "elementType": "section",
+        "label": "新的页面说明"
+      },
+      "content": {
+        "title": "新的页面说明",
+        "description": "",
+        "acceptanceCriteria": [],
+        "openQuestions": []
+      },
+      "source": "manual",
+      "status": "draft",
+      "scope": "section"
+    },
+    {
+      "id": "manual-dashboard-outbound-new-1782438284826",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "group": "筛选区",
+      "target": {
+        "elementType": "field",
+        "label": "新的筛选区"
+      },
+      "content": {
+        "title": "新的筛选区",
+        "description": "",
+        "acceptanceCriteria": [],
+        "openQuestions": []
+      },
+      "source": "manual",
+      "status": "draft",
+      "scope": "field"
+    },
+    {
+      "id": "manual-dashboard-outbound-new-1782438285998",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "group": "表格字段",
+      "target": {
+        "elementType": "table-column",
+        "label": "新的表格字段"
+      },
+      "content": {
+        "title": "新的表格字段",
+        "description": "",
+        "acceptanceCriteria": [],
+        "openQuestions": []
+      },
+      "source": "manual",
+      "status": "draft",
+      "scope": "field"
+    },
+    {
+      "id": "manual-dashboard-outbound-new-1782438289795",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "group": "业务流程",
+      "target": {
+        "elementType": "other",
+        "label": "新的业务流程"
+      },
+      "content": {
+        "title": "新的业务流程",
+        "description": "",
+        "acceptanceCriteria": [],
+        "openQuestions": []
+      },
+      "source": "manual",
+      "status": "draft",
+      "scope": "other"
+    },
+    {
+      "id": "manual-dashboard-outbound-new-1782438293944",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "group": "其他",
+      "target": {
+        "elementType": "other",
+        "label": "新的其他"
+      },
+      "content": {
+        "title": "新的其他",
+        "description": "",
+        "acceptanceCriteria": [],
+        "openQuestions": []
+      },
+      "source": "manual",
+      "status": "draft",
+      "scope": "other"
+    },
+    {
+      "id": "manual-dashboard-outbound-new-1782438298205",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "group": "模块说明",
+      "target": {
+        "elementType": "navigation",
+        "label": "新的模块说明"
+      },
+      "content": {
+        "title": "新的模块说明",
+        "description": "",
+        "acceptanceCriteria": [],
+        "openQuestions": []
+      },
+      "source": "manual",
+      "status": "draft",
+      "scope": "module"
+    },
+    {
+      "id": "manual-dashboard-outbound-new-1782438299493",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "group": "模块说明",
+      "target": {
+        "elementType": "navigation",
+        "label": "新的模块说明"
+      },
+      "content": {
+        "title": "新的模块说明",
+        "description": "",
+        "acceptanceCriteria": [],
+        "openQuestions": []
+      },
+      "source": "manual",
+      "status": "draft",
+      "scope": "module"
+    },
+    {
+      "id": "manual-dashboard-outbound-new-1782438300119",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "group": "模块说明",
+      "target": {
+        "elementType": "navigation",
+        "label": "新的模块说明"
+      },
+      "content": {
+        "title": "新的模块说明",
+        "description": "",
+        "acceptanceCriteria": [],
+        "openQuestions": []
+      },
+      "source": "manual",
+      "status": "draft",
+      "scope": "module"
+    },
+    {
+      "id": "manual-dashboard-outbound-new-1782438300713",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "group": "模块说明",
+      "target": {
+        "elementType": "navigation",
+        "label": "新的模块说明"
+      },
+      "content": {
+        "title": "新的模块说明",
+        "description": "",
+        "acceptanceCriteria": [],
+        "openQuestions": []
+      },
+      "source": "manual",
+      "status": "draft",
+      "scope": "module"
+    },
+    {
+      "id": "manual-dashboard-outbound-new-1782438301083",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "group": "模块说明",
+      "target": {
+        "elementType": "navigation",
+        "label": "新的模块说明"
+      },
+      "content": {
+        "title": "新的模块说明",
+        "description": "",
+        "acceptanceCriteria": [],
+        "openQuestions": []
+      },
+      "source": "manual",
+      "status": "draft",
+      "scope": "module"
+    },
+    {
+      "id": "manual-dashboard-outbound-new-1782438309557",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "group": "页面说明",
+      "target": {
+        "elementType": "section",
+        "label": "新的页面说明"
+      },
+      "content": {
+        "title": "新的页面说明",
+        "description": "",
+        "acceptanceCriteria": [],
+        "openQuestions": []
+      },
+      "source": "manual",
+      "status": "draft",
+      "scope": "section"
+    },
+    {
+      "id": "annotation-1782438315600",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "target": {
+        "selector": "h1",
+        "label": "新建出库单",
+        "elementType": "other"
+      },
+      "content": {
+        "title": "新建出库单",
+        "description": "",
+        "acceptanceCriteria": [],
+        "openQuestions": []
+      },
+      "source": "manual",
+      "status": "draft"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-0",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 0,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-0\"]",
+        "label": "首页概览工作台消息中心销售销售订单履约单退货/售后客户工单仓储入库单出库单库存仓库/库位调拨盘点运输运输单物流跟踪承运商运费管理采购采购订单采购退货供应商采购建",
+        "elementType": "navigation"
+      },
+      "content": {
+        "title": "首页概览工作台消息中心销售销售订单履约单退货/售后客户工单仓储入库单出库单库存仓库/库位调拨盘点运输运输单物流跟踪承运商运费管理采购采购订单采购退货供应商采购建",
+        "description": "AI 草稿：请补充「首页概览工作台消息中心销售销售订单履约单退货/售后客户工单仓储入库单出库单库存仓库/库位调拨盘点运输运输单物流跟踪承运商运费管理采购采购订单采购退货供应商采购建」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「首页概览工作台消息中心销售销售订单履约单退货/售后客户工单仓储入库单出库单库存仓库/库位调拨盘点运输运输单物流跟踪承运商运费管理采购采购订单采购退货供应商采购建」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「首页概览工作台消息中心销售销售订单履约单退货/售后客户工单仓储入库单出库单库存仓库/库位调拨盘点运输运输单物流跟踪承运商运费管理采购采购订单采购退货供应商采购建」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "module",
+      "group": "模块说明"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-1",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 1,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-1\"]",
+        "label": "保存草稿",
+        "elementType": "button"
+      },
+      "content": {
+        "title": "保存草稿",
+        "description": "AI 草稿：请补充「保存草稿」在当前页面中的业务含义。",
+        "interactionRule": "点击「保存草稿」后应触发对应业务操作。",
+        "acceptanceCriteria": [
+          "确认「保存草稿」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「保存草稿」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "action",
+      "group": "页面操作"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-2",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 2,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-2\"]",
+        "label": "提交并推送",
+        "elementType": "button"
+      },
+      "content": {
+        "title": "提交并推送",
+        "description": "AI 草稿：请补充「提交并推送」在当前页面中的业务含义。",
+        "interactionRule": "点击「提交并推送」后应触发对应业务操作。",
+        "acceptanceCriteria": [
+          "确认「提交并推送」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「提交并推送」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "action",
+      "group": "页面操作"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-3",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 3,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-3\"]",
+        "label": "基本信息出库类型*销售出库调拨出库退供出库来源*销售订单调拨单退供单手动来源单号采购单号渠道单号店铺*US StoreSG StoreUK Store零售商",
+        "elementType": "section"
+      },
+      "content": {
+        "title": "基本信息出库类型*销售出库调拨出库退供出库来源*销售订单调拨单退供单手动来源单号采购单号渠道单号店铺*US StoreSG StoreUK Store零售商",
+        "description": "AI 草稿：请补充「基本信息出库类型*销售出库调拨出库退供出库来源*销售订单调拨单退供单手动来源单号采购单号渠道单号店铺*US StoreSG StoreUK Store零售商」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「基本信息出库类型*销售出库调拨出库退供出库来源*销售订单调拨单退供单手动来源单号采购单号渠道单号店铺*US StoreSG StoreUK Store零售商」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「基本信息出库类型*销售出库调拨出库退供出库来源*销售订单调拨单退供单手动来源单号采购单号渠道单号店铺*US StoreSG StoreUK Store零售商」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "section",
+      "group": "页面说明"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-4",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 4,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-4\"]",
+        "label": "销售出库调拨出库退供出库",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "销售出库调拨出库退供出库",
+        "description": "AI 草稿：请补充「销售出库调拨出库退供出库」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「销售出库调拨出库退供出库」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「销售出库调拨出库退供出库」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-5",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 5,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-5\"]",
+        "label": "销售订单调拨单退供单手动",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "销售订单调拨单退供单手动",
+        "description": "AI 草稿：请补充「销售订单调拨单退供单手动」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「销售订单调拨单退供单手动」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「销售订单调拨单退供单手动」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-6",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 6,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-6\"]",
+        "label": "input",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "input",
+        "description": "AI 草稿：请补充「input」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「input」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「input」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-7",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 7,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-7\"]",
+        "label": "input",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "input",
+        "description": "AI 草稿：请补充「input」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「input」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「input」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-8",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 8,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-8\"]",
+        "label": "input",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "input",
+        "description": "AI 草稿：请补充「input」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「input」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「input」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-9",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 9,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-9\"]",
+        "label": "US StoreSG StoreUK Store",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "US StoreSG StoreUK Store",
+        "description": "AI 草稿：请补充「US StoreSG StoreUK Store」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「US StoreSG StoreUK Store」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「US StoreSG StoreUK Store」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-10",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 10,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-10\"]",
+        "label": "input",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "input",
+        "description": "AI 草稿：请补充「input」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「input」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「input」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-11",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 11,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-11\"]",
+        "label": "收货地址收件人*电话国家*United StatesSingaporeUnited KingdomChina地址*城市*州/省邮编*",
+        "elementType": "section"
+      },
+      "content": {
+        "title": "收货地址收件人*电话国家*United StatesSingaporeUnited KingdomChina地址*城市*州/省邮编*",
+        "description": "AI 草稿：请补充「收货地址收件人*电话国家*United StatesSingaporeUnited KingdomChina地址*城市*州/省邮编*」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「收货地址收件人*电话国家*United StatesSingaporeUnited KingdomChina地址*城市*州/省邮编*」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「收货地址收件人*电话国家*United StatesSingaporeUnited KingdomChina地址*城市*州/省邮编*」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "section",
+      "group": "页面说明"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-12",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 12,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-12\"]",
+        "label": "input",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "input",
+        "description": "AI 草稿：请补充「input」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「input」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「input」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-13",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 13,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-13\"]",
+        "label": "input",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "input",
+        "description": "AI 草稿：请补充「input」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「input」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「input」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-14",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 14,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-14\"]",
+        "label": "United StatesSingaporeUnited KingdomChina",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "United StatesSingaporeUnited KingdomChina",
+        "description": "AI 草稿：请补充「United StatesSingaporeUnited KingdomChina」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「United StatesSingaporeUnited KingdomChina」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「United StatesSingaporeUnited KingdomChina」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-15",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 15,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-15\"]",
+        "label": "input",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "input",
+        "description": "AI 草稿：请补充「input」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「input」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「input」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-16",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 16,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-16\"]",
+        "label": "input",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "input",
+        "description": "AI 草稿：请补充「input」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「input」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「input」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-17",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 17,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-17\"]",
+        "label": "input",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "input",
+        "description": "AI 草稿：请补充「input」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「input」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「input」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-18",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 18,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-18\"]",
+        "label": "input",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "input",
+        "description": "AI 草稿：请补充「input」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「input」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「input」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-19",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 19,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-19\"]",
+        "label": "商品明细添加商品#商品ID / SKU商品名称数量单位批次号序列号1件箱板kg",
+        "elementType": "section"
+      },
+      "content": {
+        "title": "商品明细添加商品#商品ID / SKU商品名称数量单位批次号序列号1件箱板kg",
+        "description": "AI 草稿：请补充「商品明细添加商品#商品ID / SKU商品名称数量单位批次号序列号1件箱板kg」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「商品明细添加商品#商品ID / SKU商品名称数量单位批次号序列号1件箱板kg」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「商品明细添加商品#商品ID / SKU商品名称数量单位批次号序列号1件箱板kg」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "section",
+      "group": "页面说明"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-20",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 20,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-20\"]",
+        "label": "添加商品",
+        "elementType": "button"
+      },
+      "content": {
+        "title": "添加商品",
+        "description": "AI 草稿：请补充「添加商品」在当前页面中的业务含义。",
+        "interactionRule": "点击「添加商品」后应触发对应业务操作。",
+        "acceptanceCriteria": [
+          "确认「添加商品」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「添加商品」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "action",
+      "group": "页面操作"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-21",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 21,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-21\"]",
+        "label": "#",
+        "elementType": "table-column"
+      },
+      "content": {
+        "title": "#",
+        "description": "AI 草稿：请补充「#」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「#」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「#」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "表格字段"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-22",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 22,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-22\"]",
+        "label": "商品ID / SKU",
+        "elementType": "table-column"
+      },
+      "content": {
+        "title": "商品ID / SKU",
+        "description": "AI 草稿：请补充「商品ID / SKU」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「商品ID / SKU」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「商品ID / SKU」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "表格字段"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-23",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 23,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-23\"]",
+        "label": "商品名称",
+        "elementType": "table-column"
+      },
+      "content": {
+        "title": "商品名称",
+        "description": "AI 草稿：请补充「商品名称」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「商品名称」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「商品名称」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "表格字段"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-24",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 24,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-24\"]",
+        "label": "数量",
+        "elementType": "table-column"
+      },
+      "content": {
+        "title": "数量",
+        "description": "AI 草稿：请补充「数量」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「数量」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「数量」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "表格字段"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-25",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 25,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-25\"]",
+        "label": "单位",
+        "elementType": "table-column"
+      },
+      "content": {
+        "title": "单位",
+        "description": "AI 草稿：请补充「单位」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「单位」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「单位」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "表格字段"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-26",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 26,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-26\"]",
+        "label": "批次号",
+        "elementType": "table-column"
+      },
+      "content": {
+        "title": "批次号",
+        "description": "AI 草稿：请补充「批次号」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「批次号」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「批次号」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "表格字段"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-27",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 27,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-27\"]",
+        "label": "序列号",
+        "elementType": "table-column"
+      },
+      "content": {
+        "title": "序列号",
+        "description": "AI 草稿：请补充「序列号」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「序列号」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「序列号」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "表格字段"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-28",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 28,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-28\"]",
+        "label": "th",
+        "elementType": "table-column"
+      },
+      "content": {
+        "title": "th",
+        "description": "AI 草稿：请补充「th」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「th」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「th」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "表格字段"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-29",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 29,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-29\"]",
+        "label": "input",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "input",
+        "description": "AI 草稿：请补充「input」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「input」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「input」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-30",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 30,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-30\"]",
+        "label": "input",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "input",
+        "description": "AI 草稿：请补充「input」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「input」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「input」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-31",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 31,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-31\"]",
+        "label": "input",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "input",
+        "description": "AI 草稿：请补充「input」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「input」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「input」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-32",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 32,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-32\"]",
+        "label": "件箱板kg",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "件箱板kg",
+        "description": "AI 草稿：请补充「件箱板kg」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「件箱板kg」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「件箱板kg」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-33",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 33,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-33\"]",
+        "label": "input",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "input",
+        "description": "AI 草稿：请补充「input」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「input」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「input」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-34",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 34,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-34\"]",
+        "label": "input",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "input",
+        "description": "AI 草稿：请补充「input」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「input」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「input」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-35",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 35,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-35\"]",
+        "label": "button",
+        "elementType": "button"
+      },
+      "content": {
+        "title": "button",
+        "description": "AI 草稿：请补充「button」在当前页面中的业务含义。",
+        "interactionRule": "点击「button」后应触发对应业务操作。",
+        "acceptanceCriteria": [
+          "确认「button」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「button」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "action",
+      "group": "页面操作"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-36",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 36,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-36\"]",
+        "label": "仓库与物流发货仓库*请选择仓库US-West-LAXUS-East-EWRUS-Central-DFWUS-West-SEASG-CentralUK-Londo",
+        "elementType": "section"
+      },
+      "content": {
+        "title": "仓库与物流发货仓库*请选择仓库US-West-LAXUS-East-EWRUS-Central-DFWUS-West-SEASG-CentralUK-Londo",
+        "description": "AI 草稿：请补充「仓库与物流发货仓库*请选择仓库US-West-LAXUS-East-EWRUS-Central-DFWUS-West-SEASG-CentralUK-Londo」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「仓库与物流发货仓库*请选择仓库US-West-LAXUS-East-EWRUS-Central-DFWUS-West-SEASG-CentralUK-Londo」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「仓库与物流发货仓库*请选择仓库US-West-LAXUS-East-EWRUS-Central-DFWUS-West-SEASG-CentralUK-Londo」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "section",
+      "group": "页面说明"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-37",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 37,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-37\"]",
+        "label": "请选择仓库US-West-LAXUS-East-EWRUS-Central-DFWUS-West-SEASG-CentralUK-London",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "请选择仓库US-West-LAXUS-East-EWRUS-Central-DFWUS-West-SEASG-CentralUK-London",
+        "description": "AI 草稿：请补充「请选择仓库US-West-LAXUS-East-EWRUS-Central-DFWUS-West-SEASG-CentralUK-London」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「请选择仓库US-West-LAXUS-East-EWRUS-Central-DFWUS-West-SEASG-CentralUK-London」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「请选择仓库US-West-LAXUS-East-EWRUS-Central-DFWUS-West-SEASG-CentralUK-London」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-38",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 38,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-38\"]",
+        "label": "请选择承运商USPSFedExUPSDHL ExpressNinja VanRoyal MailCOSCO ShippingFedEx Freight",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "请选择承运商USPSFedExUPSDHL ExpressNinja VanRoyal MailCOSCO ShippingFedEx Freight",
+        "description": "AI 草稿：请补充「请选择承运商USPSFedExUPSDHL ExpressNinja VanRoyal MailCOSCO ShippingFedEx Freight」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「请选择承运商USPSFedExUPSDHL ExpressNinja VanRoyal MailCOSCO ShippingFedEx Freight」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「请选择承运商USPSFedExUPSDHL ExpressNinja VanRoyal MailCOSCO ShippingFedEx Freight」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    },
+    {
+      "id": "draft-dashboard-outbound-new-data-prd-auto-id-auto-39",
+      "pageId": "dashboard-outbound-new",
+      "route": "/dashboard/outbound/new",
+      "order": 39,
+      "target": {
+        "selector": "[data-prd-auto-id=\"auto-39\"]",
+        "label": "小包裹 (SP)零担 (LTL)整车 (TL)自提",
+        "elementType": "field"
+      },
+      "content": {
+        "title": "小包裹 (SP)零担 (LTL)整车 (TL)自提",
+        "description": "AI 草稿：请补充「小包裹 (SP)零担 (LTL)整车 (TL)自提」在当前页面中的业务含义。",
+        "acceptanceCriteria": [
+          "确认「小包裹 (SP)零担 (LTL)整车 (TL)自提」的展示、交互和异常状态符合业务预期。"
+        ],
+        "openQuestions": [
+          "「小包裹 (SP)零担 (LTL)整车 (TL)自提」的数据来源、权限或边界规则是否需要补充？"
+        ]
+      },
+      "source": "ai",
+      "status": "draft",
+      "scope": "field",
+      "group": "筛选区"
+    }
+  ],
+  "flows": [],
+  "updatedAt": "2026-06-26T01:46:18.698Z"
+}

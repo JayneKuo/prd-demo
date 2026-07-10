@@ -131,7 +131,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   if (!detail) {
     return (
-      <div className="mx-auto max-w-[1280px]">
+      <div className="mx-auto max-w-[1280px] pt-5 lg:pt-6">
         <Link href="/dashboard/orders" className="mb-4 inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--muted)] transition-colors hover:text-[var(--foreground)]">
           <ArrowLeft className="size-3.5" />返回订单列表
         </Link>
@@ -145,7 +145,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const sameAddress = isSameAddress(detail);
 
   return (
-    <div className="mx-auto max-w-[1440px]">
+    <div className="mx-auto max-w-[1440px] pt-5 lg:pt-6">
       <Link href="/dashboard/orders" className="mb-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--muted)] transition-colors hover:text-[var(--foreground)]">
         <ArrowLeft className="size-3.5" aria-hidden="true" />
         返回订单列表

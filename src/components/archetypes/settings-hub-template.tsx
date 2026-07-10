@@ -17,7 +17,7 @@ export type SettingsGroup = {
 
 export function SettingsHubTemplate({ groups, metadata }: { groups: SettingsGroup[]; metadata: MetadataItem[] }) {
   return (
-    <div className="mx-auto max-w-[1280px]">
+    <div className="mx-auto max-w-[1280px] pt-5 lg:pt-6">
       <PageHeader title="设置" description="管理组织、访问、运营、应用以及个人偏好等系统配置。" />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_300px]">
         <div className="space-y-7">

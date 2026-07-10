@@ -1,0 +1,46 @@
+{
+  "pageId": "dashboard-outbound",
+  "route": "/dashboard/outbound",
+  "title": "Dashboard Outbound",
+  "actors": [],
+  "annotations": [
+    {
+      "id": "annotation-1782374964575",
+      "pageId": "dashboard-outbound",
+      "route": "/dashboard/outbound",
+      "target": {
+        "selector": "button",
+        "label": "全部28",
+        "elementType": "button"
+      },
+      "content": {
+        "title": "全部28",
+        "description": "呜呜呜",
+        "acceptanceCriteria": [],
+        "openQuestions": []
+      },
+      "source": "manual",
+      "status": "draft"
+    }
+  ],
+  "flows": [
+    {
+      "id": "flow-1782374555498",
+      "pageId": "dashboard-outbound",
+      "title": "New business flow",
+      "actor": "",
+      "trigger": "",
+      "preconditions": [],
+      "steps": [
+        {
+          "order": 1,
+          "action": "",
+          "expectedResult": ""
+        }
+      ],
+      "endState": "",
+      "openQuestions": []
+    }
+  ],
+  "updatedAt": "2026-06-25T08:14:02.188Z"
+}

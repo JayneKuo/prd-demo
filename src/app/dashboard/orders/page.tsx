@@ -207,7 +207,7 @@ export default function OrdersPage() {
   };
 
   return (
-    <div className="mx-auto max-w-[1440px]">
+    <div className="mx-auto max-w-[1440px] pt-5 lg:pt-6">
       {/* Header */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -225,13 +225,13 @@ export default function OrdersPage() {
             <Download className="size-3.5" />
             导出
           </button>
-          <button
-            disabled={!canWriteOrders}
-            className="flex h-8 items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3 text-[13px] font-semibold text-white shadow-[var(--shadow-soft)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          <Link
+            href="/dashboard/orders/new"
+            className={cn("flex h-8 items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3 text-[13px] font-semibold text-white shadow-[var(--shadow-soft)] transition hover:opacity-90", !canWriteOrders && "pointer-events-none opacity-50")}
           >
             <Plus className="size-3.5" />
             新建
-          </button>
+          </Link>
         </div>
       </div>
 
