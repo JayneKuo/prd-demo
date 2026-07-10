@@ -293,7 +293,7 @@ export default function NewFulfillmentRulePage() {
       <div className="px-4 py-3 space-y-2">
         <div className="text-[13px] font-medium text-[var(--foreground)]">仓库排序</div>
         <div className="flex items-center gap-3 flex-wrap text-[12px]">
-          <select value={sortMode} onChange={e => setSortMode(e.target.value as any)} className="border border-[var(--border)] rounded px-2 py-1 text-[12px] bg-transparent outline-none focus:border-[var(--primary)]">
+          <select value={sortMode} onChange={e => setSortMode(e.target.value as 'distance' | 'priority' | 'stock')} className="border border-[var(--border)] rounded px-2 py-1 text-[12px] bg-transparent outline-none focus:border-[var(--primary)]">
             <option value="distance">距离优先</option>
             <option value="priority">仓库优先级</option>
             <option value="stock">库存深度</option>
@@ -376,7 +376,7 @@ export default function NewFulfillmentRulePage() {
     <>
       <div className="px-4 py-2.5 flex items-center gap-3 flex-wrap">
         <span className="text-[var(--foreground)] w-[72px] shrink-0">选择模式</span>
-        <select value={carrierSelectMode} onChange={e => setCarrierSelectMode(e.target.value as any)} className="border border-[var(--border)] rounded px-2 py-1 text-[12px] bg-transparent outline-none focus:border-[var(--primary)]">
+        <select value={carrierSelectMode} onChange={e => setCarrierSelectMode(e.target.value as 'cheapest' | 'fastest' | 'priority' | 'smart')} className="border border-[var(--border)] rounded px-2 py-1 text-[12px] bg-transparent outline-none focus:border-[var(--primary)]">
           <option value="smart">智能推荐</option>
           <option value="cheapest">最低运费</option>
           <option value="fastest">最快时效</option>
@@ -491,7 +491,7 @@ export default function NewFulfillmentRulePage() {
     <>
       <div className="px-4 py-2.5 flex items-center gap-3 flex-wrap">
         <span className="text-[var(--foreground)] w-[72px] shrink-0">处理方式</span>
-        <select value={exceptionAction} onChange={e => setExceptionAction(e.target.value as any)} className="border border-[var(--border)] rounded px-2 py-1 text-[12px] bg-transparent outline-none focus:border-[var(--primary)]">
+        <select value={exceptionAction} onChange={e => setExceptionAction(e.target.value as 'hold' | 'retry' | 'escalate' | 'cancel')} className="border border-[var(--border)] rounded px-2 py-1 text-[12px] bg-transparent outline-none focus:border-[var(--primary)]">
           <option value="hold">挂起等待</option>
           <option value="retry">自动重试</option>
           <option value="escalate">升级处理</option>

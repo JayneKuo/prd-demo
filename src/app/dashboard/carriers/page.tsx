@@ -1,13 +1,12 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Search, Plus, X, Check, ChevronDown, ExternalLink, Shield, Layers, Warehouse, Link2, ArrowDownToLine, ArrowUpFromLine, RotateCcw } from 'lucide-react';
+import { Search, Plus, X, Check, ExternalLink, Layers, Warehouse, Link2, ArrowDownToLine, ArrowUpFromLine, RotateCcw } from 'lucide-react';
 import { PageHeader } from '@/components/admin/page-header';
 import { StatusBadge } from '@/components/admin/status-badge';
 import { cn } from '@/lib/utils';
 import {
   systemCarriers,
-  carrierCategories,
   carrierMappings,
   carrierAuths,
   serviceProducts,
@@ -19,7 +18,6 @@ import {
   type ServiceProduct,
   type CarrierMapping,
   type CarrierWarehouseBinding,
-  type PlatformShippingBind,
 } from '@/lib/mock-data/carriers';
 
 // 右侧 Tab

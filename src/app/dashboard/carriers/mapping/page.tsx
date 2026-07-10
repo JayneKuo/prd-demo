@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Search, Plus, Save, X, Check } from 'lucide-react';
+import { Search, Plus, X, Check } from 'lucide-react';
 import { StatusBadge } from '@/components/admin/status-badge';
 import { cn } from '@/lib/utils';
 import {

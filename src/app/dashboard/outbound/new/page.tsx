@@ -460,7 +460,7 @@ export default function NewOutboundPage() {
           <div className="py-16 text-center">
             <Package className="mx-auto size-10 text-[var(--border)]" />
             <p className="mt-3 text-[14px] font-medium text-[var(--foreground)]">暂无商品</p>
-            <p className="mt-1 text-[12px] text-[var(--muted)]">"搜索添加"从商品库批量选择，或"手动添加"逐行录入</p>
+            <p className="mt-1 text-[12px] text-[var(--muted)]">&ldquo;搜索添加&rdquo;从商品库批量选择，或&ldquo;手动添加&rdquo;逐行录入</p>
             <button type="button" onClick={() => setShowProductModal(true)} className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3 py-2 text-[13px] font-semibold text-white transition hover:opacity-90"><Search className="size-3.5" />搜索添加商品</button>
           </div>
         )}
