@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
   "projectName": "Dashboard Outbound New",
-  "pageId": "dashboard-carriers",
-  "route": "/dashboard/carriers",
+  "pageId": "dashboard-rules-inventory-sync",
+  "route": "/dashboard/rules/inventory-sync",
   "rootNodes": [
     {
       "id": "module-node-node-mr4lx5x2-78",
@@ -1385,5 +1385,5 @@
       ]
     }
   ],
-  "updatedAt": "2026-07-09T09:15:22.106Z"
+  "updatedAt": "2026-07-20T08:07:40.403Z"
 }
