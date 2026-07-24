@@ -160,7 +160,10 @@ export const merchantNavigationGroups: NavGroup[] = [
     defaultOpen: false,
     separator: true,
     items: [
-      { title: { 'zh-CN': '事件日志', 'en-US': 'Event Logs' }, href: '/dashboard/developers/logs', capabilities: ['developer:read'], icon: 'activity' },
+      { title: { 'zh-CN': '销售订单 / 出库日志', 'en-US': 'Sales / Outbound Logs' }, href: '/dashboard/developers/logs', capabilities: ['developer:read'], icon: 'activity' },
+      { title: { 'zh-CN': 'PO / 入库日志', 'en-US': 'PO / Inbound Logs' }, href: '/dashboard/developers/logs/purchase-inbound', capabilities: ['developer:read'], icon: 'clipboard-list' },
+      { title: { 'zh-CN': '调拨日志', 'en-US': 'Transfer Logs' }, href: '/dashboard/developers/logs/transfers', capabilities: ['developer:read'], icon: 'arrow-left-right' },
+      { title: { 'zh-CN': '库存日志', 'en-US': 'Inventory Logs' }, href: '/dashboard/developers/logs/inventory', capabilities: ['developer:read'], icon: 'boxes' },
       { title: { 'zh-CN': 'Webhooks', 'en-US': 'Webhooks' }, href: '/dashboard/developers/webhooks', capabilities: ['developer:read'], icon: 'webhook' },
       { title: { 'zh-CN': 'API 密钥', 'en-US': 'API Keys' }, href: '/dashboard/developers/api-keys', capabilities: ['developer:read'], icon: 'key' },
       { title: { 'zh-CN': 'MCP / Agent', 'en-US': 'MCP / Agent' }, href: '/dashboard/developers/mcp', capabilities: ['developer:read'], icon: 'bot' }
