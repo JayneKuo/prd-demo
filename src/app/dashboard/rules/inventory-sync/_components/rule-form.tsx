@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, ChevronDown, ChevronLeft, Loader2, Play, Upload } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronLeft, Loader2, Play, Upload, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { parseSkuImportFile } from './sku-import';
 
@@ -19,6 +19,26 @@ const CHANNELS = [
   { id: 'ch-homedepot', name: 'Home Depot', type: 'EDI', status: 'paused' },
 ] as const;
 
+// 各平台的仓库/Location 列表（mock 数据）
+const PLATFORM_LOCATIONS: Record<string, { id: string; name: string; address: string }[]> = {
+  'ch-amazon': [
+    { id: 'ONT8',  name: 'Amazon FC Ontario',      address: 'Ontario, CA 91761, US' },
+    { id: 'BDL3',  name: 'Amazon FC Windsor',       address: 'Windsor, CT 06095, US' },
+    { id: 'MDW2',  name: 'Amazon FC Joliet',        address: 'Joliet, IL 60436, US' },
+    { id: 'DFW7',  name: 'Amazon FC Coppell',       address: 'Coppell, TX 75019, US' },
+    { id: 'SIN3',  name: 'Amazon FC Singapore',     address: 'Singapore 486000, SG' },
+  ],
+  'ch-shopify': [
+    { id: '12345678', name: 'LA Warehouse',         address: '1234 Commerce Ave, Los Angeles, CA 90001, US' },
+    { id: '23456789', name: 'NYC Fulfillment',      address: '56 Industrial Blvd, New York, NY 10001, US' },
+    { id: '34567890', name: 'Dallas Distribution',  address: '789 Logistics Dr, Dallas, TX 75201, US' },
+  ],
+  'ch-tiktok': [
+    { id: 'TKTK-US-W', name: 'TikTok WH West',     address: 'Los Angeles, CA 90001, US' },
+    { id: 'TKTK-US-E', name: 'TikTok WH East',     address: 'New Jersey, NJ 07001, US' },
+  ],
+};
+
 const WAREHOUSES = [
   { id: 'wh-lax', name: 'US 西部仓（洛杉矶）', tag: '自营' },
   { id: 'wh-ewr', name: 'US 东部仓（纽约）', tag: '自营' },
@@ -33,6 +53,15 @@ const WAREHOUSES = [
 const EXTRA_FIELDS = ['商品重量', '商品尺寸', '品牌名称', '原产国', '海关编码', '效期/保质期', '箱规数量', '自定义属性'] as const;
 const REALTIME_EVENTS = ['库存归零', 'SKU 状态变更', '库存超阈值', '入库完成'] as const;
 const ALERT_CHANNELS = ['站内通知', '邮件', '钉钉', 'Slack'] as const;
+
+type PlatformTargetLocation = {
+  // 'preset' = 从列表选的，'custom' = 自定义输入
+  mode: 'preset' | 'custom';
+  // 选择的预设 location id
+  presetId: string;
+  // 自定义输入的代码
+  customCode: string;
+};
 
 type QtyMode = 'full' | 'deduct' | 'ratio';
 type SkuMode = 'all' | 'include' | 'exclude';
@@ -79,6 +108,7 @@ type FormState = {
   diffCheck: boolean;
   diffTolerance: string;
   alertChannels: string[];
+  platformTargetLocation: PlatformTargetLocation;
 };
 
 const DEFAULT_FORM: FormState = {
@@ -122,6 +152,7 @@ const DEFAULT_FORM: FormState = {
   diffCheck: true,
   diffTolerance: '5',
   alertChannels: ['站内通知', '邮件'],
+  platformTargetLocation: { mode: 'preset', presetId: '', customCode: '' },
 };
 
 function Section({ title, desc, children, compact = false }: { title: string; desc?: string; children: React.ReactNode; compact?: boolean }) {
@@ -224,6 +255,190 @@ function CompactSummary({ title, items }: { title: string; items: string[] }) {
   );
 }
 
+// ─── 平台目标仓配置组件（折叠式，默认收起）───
+type PlatformChannel = { id: string; name: string; type: string; status: string };
+
+function PlatformTargetLocationSection({
+  channelId,
+  channelName,
+  value,
+  onChange,
+}: {
+  channelId: string;
+  channelName: string;
+  value: PlatformTargetLocation;
+  onChange: (val: PlatformTargetLocation) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const locations = PLATFORM_LOCATIONS[channelId] ?? [];
+  const selectedLocation = locations.find((l) => l.id === value.presetId);
+
+  const hasValue =
+    (value.mode === 'preset' && value.presetId !== '') ||
+    (value.mode === 'custom' && value.customCode.trim() !== '');
+
+  const displayLabel = hasValue
+    ? value.mode === 'preset'
+      ? `${selectedLocation?.name ?? value.presetId}（${value.presetId}）`
+      : value.customCode
+    : null;
+
+  return (
+    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)]">
+      {/* 折叠触发行 */}
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+      >
+        <div className="flex items-center gap-2.5">
+          <ChevronDown className={cn('size-4 shrink-0 text-[var(--muted)] transition-transform', expanded && 'rotate-180')} />
+          <span className="text-[13px] font-medium text-[var(--foreground)]">指定平台目标仓</span>
+          <span className="rounded-full bg-[var(--surface)] px-2 py-0.5 text-[10px] text-[var(--muted)] ring-1 ring-[var(--border)]">可选</span>
+        </div>
+        <span className="text-[11px] text-[var(--muted)]">
+          {displayLabel
+            ? <span className="font-medium text-[var(--foreground)]">{displayLabel}</span>
+            : '不配置则推送到平台默认仓'}
+        </span>
+      </button>
+
+      {/* 展开内容 */}
+      {expanded && (
+        <div className="space-y-3 border-t border-[var(--border-subtle)] px-4 pb-4 pt-3">
+          <p className="text-[11px] text-[var(--muted)]">
+            如果 {channelName} 有多个仓库 / Location，可在此指定将库存同步到哪个。不填则推送到平台默认仓。
+          </p>
+
+          {/* 下拉选择器 */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setDropdownOpen((v) => !v)}
+              className={cn(
+                'flex min-h-[40px] w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-[13px] transition-colors',
+                dropdownOpen
+                  ? 'border-[var(--primary)] ring-2 ring-[var(--primary)]/10'
+                  : 'border-[var(--border)] bg-[var(--surface)] hover:border-[var(--primary)]/40'
+              )}
+            >
+              {value.mode === 'preset' && selectedLocation ? (
+                <span className="flex-1 truncate text-[var(--foreground)]">
+                  <span className="font-medium">{selectedLocation.name}</span>
+                  <span className="ml-2 text-[11px] text-[var(--muted)]">{selectedLocation.id}</span>
+                </span>
+              ) : value.mode === 'custom' && value.customCode ? (
+                <span className="flex-1 truncate text-[var(--foreground)]">
+                  <span className="text-[11px] text-[var(--muted)] mr-1">自定义</span>
+                  {value.customCode}
+                </span>
+              ) : (
+                <span className="flex-1 text-[var(--muted)]">选择或输入目标仓…</span>
+              )}
+              <ChevronDown className={cn('size-4 shrink-0 text-[var(--muted)] transition-transform', dropdownOpen && 'rotate-180')} />
+            </button>
+
+            {dropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setDropdownOpen(false)} />
+                <div className="absolute left-0 top-full z-20 mt-1.5 w-full overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)]">
+                  {/* 预设选项 */}
+                  {locations.length > 0 && (
+                    <div className="border-b border-[var(--border-subtle)] py-1">
+                      <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+                        {channelName} 仓库
+                      </div>
+                      {locations.map((loc) => (
+                        <button
+                          key={loc.id}
+                          type="button"
+                          onClick={() => {
+                            onChange({ mode: 'preset', presetId: loc.id, customCode: '' });
+                            setDropdownOpen(false);
+                          }}
+                          className={cn(
+                            'flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[var(--surface-subtle)]',
+                            value.mode === 'preset' && value.presetId === loc.id && 'bg-[var(--primary-soft)]'
+                          )}
+                        >
+                          <MapPin className="mt-0.5 size-3.5 shrink-0 text-[var(--muted)]" />
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[12px] font-medium text-[var(--foreground)]">
+                              {loc.name}
+                              <span className="ml-2 font-mono text-[11px] text-[var(--muted)]">{loc.id}</span>
+                            </span>
+                            <span className="mt-0.5 block text-[11px] text-[var(--muted)]">{loc.address}</span>
+                          </span>
+                          {value.mode === 'preset' && value.presetId === loc.id && (
+                            <span className="mt-0.5 text-[10px] text-[var(--primary)]">✓</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 自定义输入 */}
+                  <div className="p-3">
+                    <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">自定义输入</div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={value.mode === 'custom' ? value.customCode : ''}
+                        onChange={(e) => onChange({ mode: 'custom', presetId: '', customCode: e.target.value })}
+                        placeholder="输入仓库 ID / Location Code"
+                        maxLength={64}
+                        className="h-9 flex-1 rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-3 text-[12px] text-[var(--foreground)] outline-none placeholder:text-[var(--muted)] focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/10"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (value.customCode.trim()) setDropdownOpen(false);
+                        }}
+                        className="h-9 rounded-lg bg-[var(--primary)] px-3 text-[12px] font-medium text-white transition-colors hover:opacity-90"
+                      >
+                        确认
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* 已选状态 + 清除 */}
+          {hasValue && (
+            <div className="flex items-center gap-2 rounded-lg bg-[var(--surface)] px-3 py-2 text-[12px]">
+              <MapPin className="size-3.5 shrink-0 text-[var(--primary)]" />
+              <span className="flex-1 text-[var(--foreground)]">
+                {value.mode === 'preset' && selectedLocation ? (
+                  <>
+                    <span className="font-medium">{selectedLocation.name}</span>
+                    <span className="mx-1.5 text-[var(--muted)]">·</span>
+                    <span className="font-mono text-[var(--muted)]">{selectedLocation.id}</span>
+                    <span className="mx-1.5 text-[var(--muted)]">·</span>
+                    <span className="text-[var(--muted)]">{selectedLocation.address}</span>
+                  </>
+                ) : (
+                  <span className="font-mono">{value.customCode}</span>
+                )}
+              </span>
+              <button
+                type="button"
+                onClick={() => onChange({ mode: 'preset', presetId: '', customCode: '' })}
+                className="text-[var(--muted)] hover:text-[var(--foreground)]"
+              >
+                ×
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function InventorySyncRuleForm({ editId }: { editId: string | null }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -239,6 +454,7 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
   const selectedChannels = useMemo(() => CHANNELS.filter((channel) => form.channelIds.includes(channel.id)), [form.channelIds]);
   const selectedWarehouses = useMemo(() => WAREHOUSES.filter((warehouse) => form.warehouseIds.includes(warehouse.id)), [form.warehouseIds]);
   const ediSelected = selectedChannels.some((channel) => channel.type === 'EDI');
+  const platformChannel = useMemo(() => selectedChannels.find((ch) => ch.type === '平台授权') ?? null, [selectedChannels]);
   const skuItems = useMemo(() => Array.from(new Set(form.skuList.split(',').map((item) => item.trim()).filter(Boolean))), [form.skuList]);
   const filteredSkuItems = useMemo(() => {
     if (!skuSearch.trim()) {
@@ -386,11 +602,14 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
                 onChange={(value) => {
                   const channels = CHANNELS.filter((channel) => value.includes(channel.id));
                   const hasEdi = channels.some((channel) => channel.type === 'EDI');
+                  const hasPlatform = channels.some((c) => c.type === '平台授权');
                   setForm((current) => ({
                     ...current,
                     channelIds: value,
                     retailerInput: hasEdi ? current.retailerInput : '',
                     ownerMode: hasEdi ? 'include' : current.ownerMode,
+                    // 切换掉平台授权渠道时清空目标仓选择
+                    platformTargetLocation: hasPlatform ? current.platformTargetLocation : { mode: 'preset', presetId: '', customCode: '' },
                   }));
                 }}
                 placeholder="全部渠道（不限）"
@@ -403,6 +622,14 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
                 </Field>
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-700">已选择 EDI 渠道时，目标渠道为必填项，且后续需要明确 retailer 与货主范围后才能参与同步。</div>
               </>
+            ) : null}
+            {platformChannel ? (
+              <PlatformTargetLocationSection
+                channelId={platformChannel.id}
+                channelName={platformChannel.name}
+                value={form.platformTargetLocation}
+                onChange={(val) => setField('platformTargetLocation', val)}
+              />
             ) : null}
           </div>
         </Section>
