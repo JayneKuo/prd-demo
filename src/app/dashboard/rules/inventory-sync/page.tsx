@@ -96,7 +96,7 @@ const mockRules: SyncRule[] = [
   {
     id: 'ISR-001', name: 'Walmart EDI 库存同步',
     category: 'retailer', status: 'active', priority: 1,
-    description: '每日凌晨 02:00 按 retailer 分组同步 SKU 库存至 Walmart EDI；不可用 SKU 强制为 0，0 库存 SKU 必须同步',
+    description: '每日凌晨 02:00 按 retailer 分组同步 SKU 库存至 Walmart EDI；不可用 SKU 按 0 库存输出，0 库存 SKU 保持同步',
     retailerIds: ['walmart'], retailerNames: ['Walmart'],
     ownerIds: [], ownerNames: [],
     syncFrequency: 'daily', syncTime: '02:00',
@@ -131,7 +131,7 @@ const mockRules: SyncRule[] = [
     inventoryBuffer: 0, inventoryRatio: 1,
     conditions: [
       'sku-aka 中 tag=retailer, organization=Target 的全部 SKU',
-      'SKU 不可用 → 库存强制为 0',
+      'SKU 不可用 → 按 0 库存输出',
       '0 库存 SKU 保持同步，不过滤',
     ],
     actions: [
@@ -243,7 +243,7 @@ const mockRules: SyncRule[] = [
     syncLogs: mockSyncLogsShort,
   },
   {
-    id: 'ISR-007', name: '不可用 SKU 强制同步 0',
+    id: 'ISR-007', name: '不可用 SKU 按 0 库存输出',
     category: 'sku', status: 'active', priority: 90,
     description: '任何 retailer 的不可用/停售/停产 SKU，无论实际库存多少，一律同步为 0',
     retailerIds: [], retailerNames: ['全部 retailer'],
@@ -713,7 +713,7 @@ export default function InventorySyncRulesPage() {
                             {rule.includeZeroInventory ? '含 0 库存 SKU' : '跳过 0 库存'}
                           </span>
                           <span className={cn('rounded px-2 py-0.5 text-[11px] font-medium', rule.includePreorder ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-500')}>
-                            {rule.includePreorder ? '含预售 SKU' : '不含预售'}
+                            {rule.includePreorder ? '包含预售 SKU' : '默认不含预售'}
                           </span>
                           {rule.inventoryBuffer !== undefined && rule.inventoryBuffer > 0 && (
                             <span className="rounded bg-orange-50 px-2 py-0.5 text-[11px] font-medium text-orange-700">

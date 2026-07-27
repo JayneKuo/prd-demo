@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, ChevronDown, ChevronLeft, Loader2, Play } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronLeft, Loader2, Play, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { parseSkuImportFile } from './sku-import';
 
 const CHANNELS = [
   { id: 'ch-walmart', name: 'Walmart', type: 'EDI', status: 'active' },
@@ -29,12 +30,6 @@ const WAREHOUSES = [
   { id: 'wh-drop', name: '供应商直发', tag: '直发' },
 ] as const;
 
-const OWNERS = [
-  { id: 'oa', name: '货主 A（品牌自营）' },
-  { id: 'ob', name: '货主 B（代工代管）' },
-  { id: 'oc', name: '货主 C（经销合作）' },
-] as const;
-
 const EXTRA_FIELDS = ['商品重量', '商品尺寸', '品牌名称', '原产国', '海关编码', '效期/保质期', '箱规数量', '自定义属性'] as const;
 const REALTIME_EVENTS = ['库存归零', 'SKU 状态变更', '库存超阈值', '入库完成'] as const;
 const ALERT_CHANNELS = ['站内通知', '邮件', '钉钉', 'Slack'] as const;
@@ -48,8 +43,9 @@ type FormState = {
   status: 'active' | 'inactive' | 'draft';
   priority: string;
   channelIds: string[];
+  retailerInput: string;
   ownerMode: OwnerMode;
-  ownerIds: string[];
+  ownerInput: string;
   warehouseMode: 'all' | 'specific';
   warehouseIds: string[];
   warehouseMerge: 'sum' | 'max';
@@ -58,6 +54,7 @@ type FormState = {
   skuList: string;
   skuTags: string;
   skuCategories: string;
+  dataPrepMode: 'direct' | 'query_first';
   qtyMode: QtyMode;
   deductReserved: boolean;
   deductSafety: boolean;
@@ -89,8 +86,9 @@ const DEFAULT_FORM: FormState = {
   status: 'active',
   priority: '50',
   channelIds: [],
+  retailerInput: '',
   ownerMode: 'include',
-  ownerIds: [],
+  ownerInput: '',
   warehouseMode: 'all',
   warehouseIds: [],
   warehouseMerge: 'sum',
@@ -99,6 +97,7 @@ const DEFAULT_FORM: FormState = {
   skuList: '',
   skuTags: '',
   skuCategories: '',
+  dataPrepMode: 'direct',
   qtyMode: 'full',
   deductReserved: true,
   deductSafety: false,
@@ -137,11 +136,14 @@ function Section({ title, desc, children, compact = false }: { title: string; de
   );
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({ label, hint, required = false, children }: { label: string; hint?: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
       <div>
-        <div className="text-[13px] font-medium text-[var(--foreground)]">{label}</div>
+        <div className="text-[13px] font-medium text-[var(--foreground)]">
+          {label}
+          {required ? <span className="ml-0.5 text-red-500">*</span> : null}
+        </div>
         {hint ? <div className="mt-0.5 text-[11px] text-[var(--muted)]">{hint}</div> : null}
       </div>
       {children}
@@ -224,40 +226,115 @@ function CompactSummary({ title, items }: { title: string; items: string[] }) {
 
 export default function InventorySyncRuleForm({ editId }: { editId: string | null }) {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [skuImportMessage, setSkuImportMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [skuSearch, setSkuSearch] = useState('');
+  const [skuDraft, setSkuDraft] = useState('');
 
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((current) => ({ ...current, [key]: value }));
 
   const selectedChannels = useMemo(() => CHANNELS.filter((channel) => form.channelIds.includes(channel.id)), [form.channelIds]);
-  const selectedOwners = useMemo(() => OWNERS.filter((owner) => form.ownerIds.includes(owner.id)), [form.ownerIds]);
   const selectedWarehouses = useMemo(() => WAREHOUSES.filter((warehouse) => form.warehouseIds.includes(warehouse.id)), [form.warehouseIds]);
   const ediSelected = selectedChannels.some((channel) => channel.type === 'EDI');
+  const skuItems = useMemo(() => Array.from(new Set(form.skuList.split(',').map((item) => item.trim()).filter(Boolean))), [form.skuList]);
+  const filteredSkuItems = useMemo(() => {
+    if (!skuSearch.trim()) {
+      return skuItems;
+    }
+    const keyword = skuSearch.trim().toLowerCase();
+    return skuItems.filter((item) => item.toLowerCase().includes(keyword));
+  }, [skuItems, skuSearch]);
 
   const scopeSummary = [
-    selectedChannels.length > 0 ? selectedChannels.map((channel) => channel.name).join('、') : '全部渠道',
-    form.ownerMode === 'all' ? '全部货主' : selectedOwners.length > 0 ? `${form.ownerMode === 'include' ? '指定' : '排除'} ${selectedOwners.map((owner) => owner.name).join('、')}` : '待选货主',
-    form.warehouseMode === 'all' ? '全部仓库' : selectedWarehouses.length > 0 ? `${selectedWarehouses.map((warehouse) => warehouse.name).join('、')}（${form.warehouseMerge === 'sum' ? '求和' : '取最大'}）` : '待选仓库',
-    form.skuMode === 'all' ? '全部 SKU' : `${form.skuMode === 'include' ? '白名单' : '黑名单'} ${form.skuBy === 'sku_list' ? (form.skuList || '待填') : form.skuBy === 'tag' ? (form.skuTags || '待填') : (form.skuCategories || '待填')}`,
+    `渠道：${selectedChannels.length > 0 ? selectedChannels.map((channel) => channel.name).join('、') : '全部渠道'}`,
+    ediSelected ? `Retailer：${form.retailerInput.trim() || '待填 retailer'}` : null,
+    `货主：${form.ownerMode === 'all' ? '全部货主' : form.ownerInput.trim() ? `${form.ownerMode === 'include' ? '指定' : '排除'} ${form.ownerInput.trim()}` : '待填货主'}`,
+    `仓库：${form.warehouseMode === 'all' ? '全部仓库' : selectedWarehouses.length > 0 ? `${selectedWarehouses.map((warehouse) => warehouse.name).join('、')}（${form.warehouseMerge === 'sum' ? '库存求和' : '取最大值'}）` : '待选仓库'}`,
+    `SKU 条件：${form.skuMode === 'all' ? '全部 SKU' : `${form.skuMode === 'include' ? '仅包含' : '排除'} ${form.skuBy === 'sku_list' ? 'SKU 列表' : form.skuBy === 'tag' ? '标签' : '品类'} ${form.skuBy === 'sku_list' ? (form.skuList || '待填') : form.skuBy === 'tag' ? (form.skuTags || '待填') : (form.skuCategories || '待填')}`}`,
+  ].filter(Boolean) as string[];
+
+  const dataPrepSummary = [
+    form.dataPrepMode === 'direct' ? '参与同步的 SKU 直接进入库存计算' : '先确认参与同步的 SKU，再执行库存查询',
   ];
 
   const quantitySummary = [
     form.qtyMode === 'full' ? '直接同步实际库存' : form.qtyMode === 'deduct' ? '扣减后同步' : `按 ${form.ratio}% 比例同步`,
-    form.deductReserved ? '扣已占用' : '不扣已占用',
-    form.deductSafety ? '扣安全库存' : '不扣安全库存',
-    form.inclInTransit === 'none' ? '不含在途' : `含 ${form.inclInTransit} 天在途`,
-    form.maxQty ? `上限 ${form.maxQty}` : '无上限',
+    form.deductReserved ? '扣减仓库预占库存' : '不扣减仓库预占库存',
+    form.deductSafety ? '扣除安全库存' : '不扣除安全库存',
+    form.inclInTransit === 'none' ? '不含在途库存' : `包含 ${form.inclInTransit} 天在途库存`,
+    form.maxQty ? `最大同步量 ${form.maxQty}` : '最大同步量不限',
   ];
 
   const outputSummary = [
     form.syncStatus ? '同步商品状态' : '仅同步库存数量',
-    form.includeZero ? '含 0 库存' : '跳过 0 库存',
-    form.unavailToZero ? '不可用归零' : '不可用保留原值',
-    form.includePreorder ? '含预售' : '不含预售',
-    form.includeBackorder ? '含 Backorder' : '不含 Backorder',
-    form.extraFields ? `附带 ${form.extraFieldKeys.length || 0} 个扩展字段` : '不带扩展字段',
+    form.includeZero ? '包含 0 库存 SKU' : '跳过 0 库存 SKU',
+    form.unavailToZero ? '不可用 SKU 按 0 库存输出' : '不可用 SKU 保留原库存结果',
+    form.includeBackorder ? '包含 Backorder SKU' : '不包含 Backorder SKU',
+    form.extraFields ? `附带 ${form.extraFieldKeys.length || 0} 个扩展字段` : '不附带扩展字段',
   ];
+
+  const isSkuListPathRequired = form.skuMode !== 'all' && form.skuBy === 'sku_list';
+
+  const syncSkuList = (items: string[]) => {
+    setField('skuList', Array.from(new Set(items.map((item) => item.trim()).filter(Boolean))).join(','));
+  };
+
+  const handleSkuFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      const parsed = await parseSkuImportFile(file);
+      syncSkuList(parsed.values);
+      setSkuImportMessage({
+        type: 'success',
+        text: `已导入 ${parsed.values.length} 个 SKU，来源列：${parsed.sourceColumn}${parsed.warnings.length ? `；${parsed.warnings.join('；')}` : ''}`
+      });
+      setSkuSearch('');
+      setSkuDraft('');
+    } catch (error) {
+      setSkuImportMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'SKU 文件导入失败'
+      });
+    } finally {
+      event.target.value = '';
+    }
+  };
+
+  const handleAddSkuDraft = () => {
+    const draftItems = skuDraft
+      .split(/[\n,，]/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (draftItems.length === 0) {
+      return;
+    }
+
+    syncSkuList([...skuItems, ...draftItems]);
+    setSkuDraft('');
+    setSkuImportMessage({
+      type: 'success',
+      text: `已补充 ${draftItems.length} 个 SKU`
+    });
+  };
+
+  const handleRemoveSku = (sku: string) => {
+    syncSkuList(skuItems.filter((item) => item !== sku));
+  };
+
+  const handleClearSkuList = () => {
+    syncSkuList([]);
+    setSkuSearch('');
+    setSkuDraft('');
+    setSkuImportMessage(null);
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -276,7 +353,7 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
         <div className="min-w-0 flex-1">
           <div>
             <h1 className="text-[22px] font-semibold tracking-tight text-[var(--foreground)]">{editId ? `编辑库存同步规则 · ${editId}` : '新建库存同步规则'}</h1>
-            <p className="mt-1 text-[13px] text-[var(--muted)]">先选同步对象，再定库存口径，最后设置同步结果和异常处理。</p>
+            <p className="mt-1 text-[13px] text-[var(--muted)]">先选择同步渠道，再定义参与同步的 SKU 范围与数据准备方式，最后配置库存计算、输出处理和执行策略。</p>
           </div>
         </div>
       </div>
@@ -284,8 +361,8 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
       <div className="space-y-4">
         <Section title="基本信息" compact>
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_220px_180px]">
-            <Field label="规则名称">
-              <Input value={form.name} onChange={(value) => setField('name', value)} placeholder="如：Walmart EDI · 货主 A · 每日库存同步" />
+            <Field label="规则名称" required>
+              <Input value={form.name} onChange={(value) => setField('name', value)} placeholder="如：Walmart EDI · 货主 A · 每日库存同步" className={!form.name ? 'border-red-200 focus:border-red-400 focus:ring-red-100' : undefined} />
             </Field>
             <Field label="状态">
               <Select value={form.status} onChange={(value) => setField('status', value as FormState['status'])}>
@@ -300,9 +377,9 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
           </div>
         </Section>
 
-        <Section title="同步对象" desc="商户先关心同步给谁、同步哪些货，这块优先配置。" compact>
+        <Section title="同步渠道" desc="先明确这条规则要把库存同步到哪些渠道。" compact>
           <div className="space-y-5">
-            <Field label="同步渠道">
+            <Field label="目标渠道" required>
               <MultiSelect
                 opts={CHANNELS.map((channel) => ({ id: channel.id, label: channel.name, sub: `${channel.type} · ${channel.status === 'active' ? '已启用' : channel.status === 'testing' ? '测试中' : '已暂停'}` }))}
                 value={form.channelIds}
@@ -312,27 +389,39 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
                   setForm((current) => ({
                     ...current,
                     channelIds: value,
+                    retailerInput: hasEdi ? current.retailerInput : '',
                     ownerMode: hasEdi ? 'include' : current.ownerMode,
                   }));
                 }}
                 placeholder="全部渠道（不限）"
               />
-              {ediSelected ? <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-700">EDI 同步按货主范围执行，非所选货主的 SKU 不进入同步结果。</div> : null}
             </Field>
+            {ediSelected ? (
+              <>
+                <Field label="Retailer" required hint="选择 EDI 渠道后，需要填写对应 retailer。">
+                  <Input value={form.retailerInput} onChange={(value) => setField('retailerInput', value)} placeholder="输入 retailer，如 Walmart US" className={!form.retailerInput ? 'border-red-200 focus:border-red-400 focus:ring-red-100' : undefined} />
+                </Field>
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-700">已选择 EDI 渠道时，目标渠道为必填项，且后续需要明确 retailer 与货主范围后才能参与同步。</div>
+              </>
+            ) : null}
+          </div>
+        </Section>
 
+        <Section title="参与同步的 SKU" desc="通过货主、仓库和 SKU 条件逐层筛选参与本次同步的商品范围。" compact>
+          <div className="space-y-5">
             <div className="grid gap-4 lg:grid-cols-2">
-              <Field label="货主范围">
+              <Field label="货主条件" hint="先限定哪些货主名下的 SKU 可以参与同步。">
                 <div className="space-y-3">
                   <div className="flex flex-wrap gap-2">
                     <ChipButton active={form.ownerMode === 'all'} onClick={() => setField('ownerMode', 'all')}>全部货主</ChipButton>
-                    <ChipButton active={form.ownerMode === 'include'} onClick={() => setField('ownerMode', 'include')}>指定货主</ChipButton>
+                    <ChipButton active={form.ownerMode === 'include'} onClick={() => setField('ownerMode', 'include')}>仅包含货主</ChipButton>
                     <ChipButton active={form.ownerMode === 'exclude'} onClick={() => setField('ownerMode', 'exclude')}>排除货主</ChipButton>
                   </div>
-                  {form.ownerMode !== 'all' ? <MultiSelect opts={OWNERS.map((owner) => ({ id: owner.id, label: owner.name }))} value={form.ownerIds} onChange={(value) => setField('ownerIds', value)} placeholder={form.ownerMode === 'include' ? '选择允许同步的货主…' : '选择排除的货主…'} /> : null}
+                  {form.ownerMode !== 'all' ? <Input value={form.ownerInput} onChange={(value) => setField('ownerInput', value)} placeholder={form.ownerMode === 'include' ? '输入允许参与同步的货主，如 货主A,货主B' : '输入要排除的货主，如 货主C'} /> : null}
                 </div>
               </Field>
 
-              <Field label="仓库范围">
+              <Field label="仓库条件" hint="定义这些 SKU 从哪些仓库汇总库存。">
                 <div className="space-y-3">
                   <div className="flex flex-wrap gap-2">
                     <ChipButton active={form.warehouseMode === 'all'} onClick={() => setField('warehouseMode', 'all')}>全部仓库</ChipButton>
@@ -340,7 +429,7 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
                   </div>
                   {form.warehouseMode === 'specific' ? (
                     <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px]">
-                      <MultiSelect opts={WAREHOUSES.map((warehouse) => ({ id: warehouse.id, label: warehouse.name, sub: warehouse.tag }))} value={form.warehouseIds} onChange={(value) => setField('warehouseIds', value)} placeholder="选择仓库…" />
+                      <MultiSelect opts={WAREHOUSES.map((warehouse) => ({ id: warehouse.id, label: warehouse.name, sub: warehouse.tag }))} value={form.warehouseIds} onChange={(value) => setField('warehouseIds', value)} placeholder="选择参与汇总的仓库…" />
                       <Select value={form.warehouseMerge} onChange={(value) => setField('warehouseMerge', value as FormState['warehouseMerge'])}>
                         <option value="sum">库存求和</option>
                         <option value="max">取最大值</option>
@@ -351,33 +440,119 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
               </Field>
             </div>
 
-            <Field label="SKU 范围">
+            <Field label="SKU 条件" required={isSkuListPathRequired} hint="可与货主、仓库条件叠加使用，进一步收窄参与同步的 SKU 范围。">
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
-                  <ChipButton active={form.skuMode === 'all'} onClick={() => setField('skuMode', 'all')}>全部 SKU</ChipButton>
-                  <ChipButton active={form.skuMode === 'include'} onClick={() => setField('skuMode', 'include')}>白名单</ChipButton>
-                  <ChipButton active={form.skuMode === 'exclude'} onClick={() => setField('skuMode', 'exclude')}>黑名单</ChipButton>
+                  <ChipButton active={form.skuMode === 'all'} onClick={() => { setField('skuMode', 'all'); setSkuImportMessage(null); }}>全部 SKU</ChipButton>
+                  <ChipButton active={form.skuMode === 'include'} onClick={() => setField('skuMode', 'include')}>仅包含</ChipButton>
+                  <ChipButton active={form.skuMode === 'exclude'} onClick={() => setField('skuMode', 'exclude')}>排除</ChipButton>
                 </div>
                 {form.skuMode !== 'all' ? (
-                  <div className="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)]">
-                    <Select value={form.skuBy} onChange={(value) => setField('skuBy', value as SkuBy)}>
-                      <option value="sku_list">SKU 列表</option>
-                      <option value="tag">Tag</option>
-                      <option value="category">品类</option>
-                    </Select>
-                    {form.skuBy === 'sku_list' ? <Input value={form.skuList} onChange={(value) => setField('skuList', value)} placeholder="逗号分隔，如 SKU001,SKU002" /> : null}
-                    {form.skuBy === 'tag' ? <Input value={form.skuTags} onChange={(value) => setField('skuTags', value)} placeholder="标签，如 no-sync,promo" /> : null}
-                    {form.skuBy === 'category' ? <Input value={form.skuCategories} onChange={(value) => setField('skuCategories', value)} placeholder="品类，如 Electronics,Apparel" /> : null}
+                  <div className="space-y-3">
+                    <div className="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)]">
+                      <Select value={form.skuBy} onChange={(value) => { setField('skuBy', value as SkuBy); setSkuImportMessage(null); setSkuSearch(''); setSkuDraft(''); }}>
+                        <option value="sku_list">SKU 列表</option>
+                        <option value="tag">标签</option>
+                        <option value="category">品类</option>
+                      </Select>
+                      {form.skuBy === 'sku_list' ? (
+                        <div className="space-y-3">
+                          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_110px]">
+                            <Input
+                              value={skuDraft}
+                              onChange={setSkuDraft}
+                              placeholder="粘贴或输入 SKU，支持逗号 / 换行分隔"
+                              className={!skuItems.length ? 'border-red-200 focus:border-red-400 focus:ring-red-100' : undefined}
+                            />
+                            <button type="button" onClick={handleAddSkuDraft} className="inline-flex h-10 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-[12px] font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-subtle)]">补充 SKU</button>
+                          </div>
+
+                          <div className="space-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-3">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div>
+                                <div className="text-[12px] font-medium text-[var(--foreground)]">文件导入<span className="ml-0.5 text-red-500">*</span></div>
+                                <div className="mt-0.5 text-[11px] text-[var(--muted)]">支持 Excel / CSV，导入会覆盖当前 SKU 列表，导入后仍可继续手动粘贴或编辑。</div>
+                              </div>
+                              <>
+                                <input
+                                  ref={fileInputRef}
+                                  type="file"
+                                  accept=".xlsx,.xls,.csv,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                  className="hidden"
+                                  onChange={handleSkuFileImport}
+                                />
+                                <button type="button" onClick={() => fileInputRef.current?.click()} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-[12px] font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-subtle)]">
+                                  <Upload className="size-3.5" />
+                                  导入文件
+                                </button>
+                              </>
+                            </div>
+                            {skuImportMessage ? (
+                              <div className={cn('text-[11px]', skuImportMessage.type === 'success' ? 'text-green-600' : 'text-red-500')}>
+                                {skuImportMessage.text}
+                              </div>
+                            ) : null}
+                          </div>
+
+                          <div className="space-y-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-3">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div className="text-[12px] text-[var(--muted)]">已选 SKU {skuItems.length} 个{skuSearch ? ` · 当前筛选 ${filteredSkuItems.length} 个` : ''}</div>
+                              <button type="button" onClick={handleClearSkuList} className="text-[12px] font-medium text-[var(--muted)] transition-colors hover:text-[var(--foreground)]">清空全部</button>
+                            </div>
+                            <Input value={skuSearch} onChange={setSkuSearch} placeholder="搜索已选 SKU" />
+                            <div className="max-h-52 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-3">
+                              {filteredSkuItems.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                  {filteredSkuItems.map((sku) => (
+                                    <span key={sku} className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-subtle)] px-3 py-1 text-[11px] font-medium text-[var(--foreground)]">
+                                      {sku}
+                                      <button type="button" onClick={() => handleRemoveSku(sku)} className="text-[var(--muted)] transition-colors hover:text-[var(--foreground)]">×</button>
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-[11px] text-[var(--muted)]">{skuItems.length > 0 ? '没有匹配当前搜索条件的 SKU' : '请导入文件或手动补充 SKU'}</div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                      {form.skuBy === 'tag' ? <Input value={form.skuTags} onChange={(value) => setField('skuTags', value)} placeholder="标签，如 no-sync,promo" /> : null}
+                      {form.skuBy === 'category' ? <Input value={form.skuCategories} onChange={(value) => setField('skuCategories', value)} placeholder="品类，如 Electronics,Apparel" /> : null}
+                    </div>
                   </div>
                 ) : null}
               </div>
             </Field>
 
-            <CompactSummary title="当前同步范围" items={scopeSummary} />
+            <CompactSummary title="当前参与范围" items={scopeSummary} />
           </div>
         </Section>
 
-        <Section title="同步库存" desc="这里决定商户最终同步多少库存，是最关键的业务配置区。" compact>
+        <Section title="数据准备" desc="确定参与同步的 SKU 后，选择进入库存计算前的数据准备方式。" compact>
+          <div className="space-y-5">
+            <Field label="准备方式">
+              <div className="flex flex-wrap gap-2">
+                <ChipButton active={form.dataPrepMode === 'direct'} onClick={() => setField('dataPrepMode', 'direct')}>直接同步库存</ChipButton>
+                <ChipButton active={form.dataPrepMode === 'query_first'} onClick={() => setField('dataPrepMode', 'query_first')}>先查询 SKU，再同步库存</ChipButton>
+              </div>
+            </Field>
+
+            {form.dataPrepMode === 'query_first' ? (
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-3 text-[12px] text-[var(--muted)]">
+                先根据上方条件确认参与同步的 SKU，再对确认后的 SKU 执行库存查询与后续输出处理。
+              </div>
+            ) : (
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-3 text-[12px] text-[var(--muted)]">
+                参与同步的 SKU 将直接进入库存计算。
+              </div>
+            )}
+
+            <CompactSummary title="当前数据准备策略" items={dataPrepSummary} />
+          </div>
+        </Section>
+
+        <Section title="库存计算" desc="定义参与同步的 SKU 最终输出库存数量的计算方式。" compact>
           <div className="space-y-5">
             <Field label="库存口径">
               <div className="flex flex-wrap gap-2">
@@ -389,7 +564,7 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
 
             {form.qtyMode !== 'full' ? (
               <div className="grid gap-3 lg:grid-cols-2">
-                <ToggleRow label="扣除已占用库存" checked={form.deductReserved} onChange={(value) => setField('deductReserved', value)} />
+                <ToggleRow label="扣减仓库预占库存" hint="从可同步库存中扣减仓库已预占但未释放的数量。" checked={form.deductReserved} onChange={(value) => setField('deductReserved', value)} />
                 <ToggleRow label="扣除安全库存" checked={form.deductSafety} onChange={(value) => setField('deductSafety', value)} />
               </div>
             ) : null}
@@ -421,28 +596,27 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
               ) : null}
             </div>
 
-            <CompactSummary title="当前库存策略" items={quantitySummary} />
+            <CompactSummary title="当前库存计算策略" items={quantitySummary} />
           </div>
         </Section>
 
-        <Section title="同步结果" desc="这里决定最终同步给渠道的数据里包含哪些内容和状态。" compact>
+        <Section title="输出处理" desc="定义同步报文中输出哪些字段，以及特殊状态的处理方式。" compact>
           <div className="space-y-5">
             <div className="grid gap-3 lg:grid-cols-2">
-              <ToggleRow label="同步商品状态" hint="除库存数量外，一并同步可用 / 不可用等状态。" checked={form.syncStatus} onChange={(value) => setField('syncStatus', value)} />
-              <ToggleRow label="不可用 SKU 强制归零" checked={form.unavailToZero} onChange={(value) => setField('unavailToZero', value)} />
+              <ToggleRow label="同步商品状态" hint="除库存数量外，一并输出可用 / 不可用等状态。" checked={form.syncStatus} onChange={(value) => setField('syncStatus', value)} />
+              <ToggleRow label="不可用 SKU 按 0 库存输出" hint="对已参与同步但当前不可用的 SKU，统一按 0 库存输出。" checked={form.unavailToZero} onChange={(value) => setField('unavailToZero', value)} />
               <ToggleRow label="包含 0 库存 SKU" checked={form.includeZero} onChange={(value) => setField('includeZero', value)} />
-              <ToggleRow label="包含预售 SKU" checked={form.includePreorder} onChange={(value) => setField('includePreorder', value)} />
               <ToggleRow label="包含 Backorder SKU" checked={form.includeBackorder} onChange={(value) => setField('includeBackorder', value)} />
             </div>
 
-            <Field label="附加字段">
+            <Field label="附加输出字段">
               <div className="space-y-3">
-                <ToggleRow label="同步额外商品字段" checked={form.extraFields} onChange={(value) => setField('extraFields', value)} />
+                <ToggleRow label="输出额外商品字段" checked={form.extraFields} onChange={(value) => setField('extraFields', value)} />
                 {form.extraFields ? <div className="flex flex-wrap gap-2">{EXTRA_FIELDS.map((field) => { const active = form.extraFieldKeys.includes(field); return <button key={field} type="button" onClick={() => setField('extraFieldKeys', active ? form.extraFieldKeys.filter((item) => item !== field) : [...form.extraFieldKeys, field])} className={cn('rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors', active ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]' : 'border-[var(--border)] text-[var(--muted)] hover:border-[var(--primary)]/40 hover:text-[var(--foreground)]')}>{field}</button>; })}</div> : null}
               </div>
             </Field>
 
-            <CompactSummary title="当前同步方式" items={outputSummary} />
+            <CompactSummary title="当前输出策略" items={outputSummary} />
           </div>
         </Section>
 
