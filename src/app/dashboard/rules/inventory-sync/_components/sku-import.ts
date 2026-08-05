@@ -35,7 +35,6 @@ export async function parseSkuImportFile(file: File): Promise<ParsedSkuImport> {
     throw new Error('仅支持 Excel 或 CSV 文件');
   }
 
-  // Dynamic import keeps xlsx out of the server-side bundle/trace
   const XLSX = await import('xlsx');
 
   const buffer = await file.arrayBuffer();
