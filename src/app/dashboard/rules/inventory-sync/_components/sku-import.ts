@@ -1,5 +1,3 @@
-import * as XLSX from 'xlsx';
-
 export type ParsedSkuImport = {
   values: string[];
   sourceColumn: string;
@@ -36,6 +34,9 @@ export async function parseSkuImportFile(file: File): Promise<ParsedSkuImport> {
   if (!extension) {
     throw new Error('仅支持 Excel 或 CSV 文件');
   }
+
+  // Dynamic import keeps xlsx out of the server-side bundle/trace
+  const XLSX = await import('xlsx');
 
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: 'array' });
