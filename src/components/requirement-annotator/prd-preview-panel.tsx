@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { generatePrdMarkdown } from './prd-generator';
-import { exportRequirementPrd } from './storage';
+import { downloadRequirementPrd } from './storage';
 import type { RequirementProjectDocument } from './types';
 
 function splitTableRow(line: string) {
@@ -135,9 +135,12 @@ export function PrdPreviewPanel({ document, onClose }: { document: RequirementPr
     setMessage('PRD 已复制。');
   }
 
-  async function exportMarkdown() {
-    const result = await exportRequirementPrd(document);
-    setMessage(`已导出 ${result.fileName}。`);
+  function exportMarkdown() {
+    try {
+      setMessage(`已导出 ${downloadRequirementPrd(document, markdown)}。`);
+    } catch {
+      setMessage('导出失败，请稍后重试。');
+    }
   }
 
   return (

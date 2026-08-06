@@ -1,39 +1,43 @@
-import type { RequirementProjectDocument } from './types';
+import { getPrdMarkdownFileName } from './page-id';
+import { generatePrdMarkdown } from './prd-generator';
+import { createEmptyProjectDocument, ensureDocumentRoute, migrateToProjectDocument, normalizeProjectDocument } from './tree-document';
+import type { RequirementDocument, RequirementProjectDocument } from './types';
+
+const storageKey = 'requirement-annotator:project-document:v2';
 
 export async function loadRequirementDocument(route: string): Promise<RequirementProjectDocument> {
-  const response = await fetch(`/api/prd-annotations?route=${encodeURIComponent(route)}`);
+  const fallback = () => createEmptyProjectDocument(route, new Date().toISOString());
 
-  if (!response.ok) {
-    throw new Error('Failed to load requirement annotations.');
+  try {
+    const stored = window.localStorage.getItem(storageKey);
+    if (!stored) return fallback();
+
+    return ensureDocumentRoute(migrateToProjectDocument(JSON.parse(stored) as RequirementDocument), route);
+  } catch {
+    return fallback();
   }
-
-  return response.json();
 }
 
 export async function saveRequirementDocument(document: RequirementProjectDocument): Promise<RequirementProjectDocument> {
-  const response = await fetch('/api/prd-annotations', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(document)
-  });
+  const saved = {
+    ...normalizeProjectDocument(migrateToProjectDocument(document)),
+    updatedAt: new Date().toISOString()
+  };
 
-  if (!response.ok) {
-    throw new Error('Failed to save requirement annotations.');
-  }
-
-  return response.json();
+  window.localStorage.setItem(storageKey, JSON.stringify(saved));
+  return saved;
 }
 
-export async function exportRequirementPrd(document: RequirementProjectDocument): Promise<{ markdown: string; fileName: string }> {
-  const response = await fetch('/api/prd-annotations/export', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(document)
-  });
+export function downloadRequirementPrd(document: RequirementProjectDocument, markdown = generatePrdMarkdown(document)) {
+  const fileName = getPrdMarkdownFileName(document.pageId);
+  const url = URL.createObjectURL(new Blob([markdown], { type: 'text/markdown;charset=utf-8' }));
+  const anchor = window.document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  window.document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 
-  if (!response.ok) {
-    throw new Error('Failed to export requirement PRD.');
-  }
-
-  return response.json();
+  return fileName;
 }

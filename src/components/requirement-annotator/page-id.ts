@@ -1,8 +1,5 @@
 import type { RequirementPageDocument } from './types';
 
-export const PRD_ANNOTATIONS_DIR = 'prd-annotations';
-export const PROJECT_ANNOTATIONS_FILE = 'project.json';
-
 export function sanitizePageId(value: string) {
   const sanitized = value
     .replace(/[\\/]+/g, '-')
@@ -44,10 +41,6 @@ export function createEmptyRequirementDocument(route: string, updatedAt: string)
     flows: [],
     updatedAt
   };
-}
-
-export function getAnnotationJsonFileName(pageId: string) {
-  return `${sanitizePageId(pageId)}.json`;
 }
 
 export function getPrdMarkdownFileName(pageId: string) {
