@@ -204,8 +204,77 @@ const CATEGORY_TREE: CatNode[] = [
   },
 ];
 
-// 需要显示尺码表的 L1 分类
-const SIZE_CHART_L1 = new Set(['服装', '鞋类', '背包 / 箱包', '旅行配件']);
+// 需要显示尺码表的 L1 分类（背包/旅行配件是产品尺寸，放物流字段；不是人体尺码表）
+const SIZE_CHART_L1 = new Set(['服装', '鞋类']);
+
+// 需要显示产品规格表的 L1 分类
+const SPEC_TABLE_L1 = new Set(['背包 / 箱包', '旅行配件']);
+
+/** 按 L1 分类返回尺码表的默认列和行 */
+function getSizeChartDefaults(l1: string): { cols: string[]; rows: { label: string }[] } {
+  if (l1 === '鞋类') {
+    return {
+      cols: ['35', '36', '37', '38', '39', '40', '41', '42', '43', '44'],
+      rows: [
+        { label: '脚长 (cm)' },
+        { label: '脚宽 (cm)' },
+        { label: 'US 码' },
+        { label: 'UK 码' },
+      ],
+    };
+  }
+  // 服装（含上衣、裤装、裙装、内衣等）
+  return {
+    cols: ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
+    rows: [
+      { label: '胸围 (cm)' },
+      { label: '腰围 (cm)' },
+      { label: '臀围 (cm)' },
+      { label: '肩宽 (cm)' },
+      { label: '身高参考 (cm)' },
+    ],
+  };
+}
+
+/** 按 L1/L2 返回产品规格表的默认列和行 */
+function getSpecTableDefaults(l1: string, l2: string): { cols: string[]; rows: { label: string }[] } {
+  if (l1 === '背包 / 箱包') {
+    if (l2 === '旅行箱') {
+      return {
+        cols: ['20寸', '24寸', '28寸'],
+        rows: [
+          { label: '箱体长 (cm)' },
+          { label: '箱体宽 (cm)' },
+          { label: '箱体高 (cm)' },
+          { label: '容积 (L)' },
+          { label: '净重 (kg)' },
+        ],
+      };
+    }
+    // 双肩包、单肩包、腰包等
+    return {
+      cols: ['S', 'M', 'L'],
+      rows: [
+        { label: '包体长 (cm)' },
+        { label: '包体宽 (cm)' },
+        { label: '包体厚 (cm)' },
+        { label: '主仓容积 (L)' },
+        { label: '背负高度 (cm)' },
+        { label: '净重 (g)' },
+      ],
+    };
+  }
+  // 旅行配件
+  return {
+    cols: ['尺寸一', '尺寸二'],
+    rows: [
+      { label: '展开长 (cm)' },
+      { label: '展开宽 (cm)' },
+      { label: '折叠后尺寸' },
+      { label: '净重 (g)' },
+    ],
+  };
+}
 
 /** 根据 L1 label 找节点 */
 function findCatNode(tree: CatNode[], label: string): CatNode | undefined {
@@ -393,14 +462,17 @@ export default function NewProductPage() {
   // ── Hazmat
   const [hazmat, setHazmat] = useState<HazmatInfo>({ enabled: false, unNumber: '', hazClass: '', packingGroup: '', note: '' });
 
-  // ── Size chart
-  const [sizeChartCols, setSizeChartCols] = useState<string[]>(DEFAULT_SIZE_COLS);
-  const [sizeChartRows, setSizeChartRows] = useState<SizeRow[]>([
-    { id: uid(), label: '胸围 (cm)' },
-    { id: uid(), label: '腰围 (cm)' },
-    { id: uid(), label: '臀围 (cm)' },
-    { id: uid(), label: '身高 (cm)' },
-  ]);
+  // ── Size chart — 初始化用服装默认值，切换分类时自动重置
+  const [sizeChartCols, setSizeChartCols] = useState<string[]>(() => getSizeChartDefaults('服装').cols);
+  const [sizeChartRows, setSizeChartRows] = useState<SizeRow[]>(() =>
+    getSizeChartDefaults('服装').rows.map((r) => ({ ...r, id: uid() }))
+  );
+
+  // ── Product spec table（背包/旅行配件专用）
+  const [specTableCols, setSpecTableCols] = useState<string[]>([]);
+  const [specTableRows, setSpecTableRows] = useState<SizeRow[]>([]);
+  const [newSpecColInput, setNewSpecColInput] = useState('');
+  const [newSpecRowInput, setNewSpecRowInput] = useState('');
   const [newColInput,  setNewColInput]  = useState('');
   const [newRowInput,  setNewRowInput]  = useState('');
 
@@ -420,8 +492,25 @@ export default function NewProductPage() {
 
   // Derived: show size chart only for relevant categories
   const showSizeChart  = SIZE_CHART_CATEGORIES.has(catSel.l1);
+  const showSpecTable  = SPEC_TABLE_L1.has(catSel.l1);
   // Virtual / service: no logistics needed — read from NATURE_OPTIONS
   const needsLogistics = NATURE_OPTIONS.find((o) => o.value === productNature)?.needsLogi ?? true;
+
+  // ── Auto-sync size chart when L1 category changes
+  useEffect(() => {
+    if (!catSel.l1 || !SIZE_CHART_CATEGORIES.has(catSel.l1)) return;
+    const defaults = getSizeChartDefaults(catSel.l1);
+    setSizeChartCols(defaults.cols);
+    setSizeChartRows(defaults.rows.map((r) => ({ ...r, id: uid() })));
+  }, [catSel.l1]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Auto-sync spec table when L1/L2 category changes
+  useEffect(() => {
+    if (!SPEC_TABLE_L1.has(catSel.l1)) return;
+    const defaults = getSpecTableDefaults(catSel.l1, catSel.l2);
+    setSpecTableCols(defaults.cols);
+    setSpecTableRows(defaults.rows.map((r) => ({ ...r, id: uid() })));
+  }, [catSel.l1, catSel.l2]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Auto-sync variants
   useEffect(() => {
@@ -944,7 +1033,11 @@ export default function NewProductPage() {
                 </div>
               }
             >
-              <p className="text-[12px] text-[var(--muted)]">填写各尺码对应的身体尺寸（cm / in），将显示在渠道商品页的尺码参考表中。</p>
+              <p className="text-[12px] text-[var(--muted)]">
+                {catSel.l1 === '鞋类'
+                  ? '填写各码号对应的脚长/脚宽数据，同步至渠道商品页的尺码参考表。'
+                  : '填写各尺码对应的身体围度（cm / in），同步至渠道商品页的尺码参考表。'}
+              </p>
               <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
                 <table className="min-w-full text-[12px]">
                   <thead className="bg-[var(--surface-subtle)] text-[10px] font-semibold uppercase tracking-[0.07em] text-[var(--muted-foreground)]">
@@ -1000,6 +1093,106 @@ export default function NewProductPage() {
                   placeholder="新增测量项目（如：袖长 cm）"
                   className="h-8 flex-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[12px] outline-none focus:border-[var(--primary)]" />
                 <button onClick={addSizeRow}
+                  className="flex h-8 items-center gap-1 rounded-lg border border-[var(--border)] px-3 text-[12px] hover:bg-[var(--surface-subtle)]">
+                  <Plus className="size-3.5" />添加行
+                </button>
+              </div>
+            </Section>
+          )}
+
+          {/* ── 5b · 产品规格表（背包/箱包/旅行配件专用）──────────────── */}
+          {showSpecTable && (
+            <Section
+              title="产品规格"
+              headerRight={
+                <div className="flex items-center gap-1.5 text-[11px] text-[var(--muted)]">
+                  <Ruler className="size-3.5" />
+                  因选择「{catSel.leafLabel}」分类自动显示
+                </div>
+              }
+            >
+              <p className="text-[12px] text-[var(--muted)]">
+                填写商品各规格型号的尺寸、容积等物理参数，帮助买家了解实际大小。
+                {catSel.l2 === '旅行箱' && '（列名建议用箱体规格如 20寸/24寸/28寸）'}
+              </p>
+              <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
+                <table className="min-w-full text-[12px]">
+                  <thead className="bg-[var(--surface-subtle)] text-[10px] font-semibold uppercase tracking-[0.07em] text-[var(--muted-foreground)]">
+                    <tr>
+                      <th className="whitespace-nowrap px-3 py-2 text-left">规格参数</th>
+                      {specTableCols.map((col) => (
+                        <th key={col} className="whitespace-nowrap px-2 py-2 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <span>{col}</span>
+                            <button
+                              onClick={() => {
+                                setSpecTableCols((p) => p.filter((c) => c !== col));
+                                setSpecTableRows((p) => p.map((r) => { const n = { ...r }; delete n[col]; return n; }));
+                              }}
+                              className="text-[var(--muted)] hover:text-[var(--danger)]"
+                            >
+                              <X className="size-2.5" />
+                            </button>
+                          </div>
+                        </th>
+                      ))}
+                      <th className="px-2 py-2">
+                        <input value={newSpecColInput} onChange={(e) => setNewSpecColInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const c = newSpecColInput.trim();
+                              if (c && !specTableCols.includes(c)) { setSpecTableCols((p) => [...p, c]); setNewSpecColInput(''); }
+                            }
+                          }}
+                          placeholder="+ 规格"
+                          className="h-6 w-16 rounded-md border border-[var(--border)] px-1.5 text-center text-[10px] outline-none focus:border-[var(--primary)]" />
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border-subtle)]">
+                    {specTableRows.map((row) => (
+                      <tr key={row.id} className="hover:bg-[var(--surface-subtle)]">
+                        <td className="whitespace-nowrap px-3 py-1.5">
+                          <input value={row.label}
+                            onChange={(e) => setSpecTableRows((p) => p.map((r) => r.id === row.id ? { ...r, label: e.target.value } : r))}
+                            className="h-7 w-32 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 text-[11px] outline-none focus:border-[var(--primary)]" />
+                        </td>
+                        {specTableCols.map((col) => (
+                          <td key={col} className="px-2 py-1.5 text-center">
+                            <input value={row[col] ?? ''}
+                              onChange={(e) => setSpecTableRows((p) => p.map((r) => r.id === row.id ? { ...r, [col]: e.target.value } : r))}
+                              placeholder="—"
+                              className="h-7 w-20 rounded-md border border-[var(--border)] px-1 text-center text-[11px] outline-none focus:border-[var(--primary)]" />
+                          </td>
+                        ))}
+                        <td className="px-2 py-1.5 text-right">
+                          <button onClick={() => setSpecTableRows((p) => p.filter((r) => r.id !== row.id))}
+                            className="rounded p-1 text-[var(--muted)] hover:text-[var(--danger)]">
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex items-center gap-2">
+                <input value={newSpecRowInput} onChange={(e) => setNewSpecRowInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const l = newSpecRowInput.trim();
+                      if (l) { setSpecTableRows((p) => [...p, { id: uid(), label: l }]); setNewSpecRowInput(''); }
+                    }
+                  }}
+                  placeholder="新增规格参数（如：容积 L）"
+                  className="h-8 flex-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[12px] outline-none focus:border-[var(--primary)]" />
+                <button
+                  onClick={() => {
+                    const l = newSpecRowInput.trim();
+                    if (l) { setSpecTableRows((p) => [...p, { id: uid(), label: l }]); setNewSpecRowInput(''); }
+                  }}
                   className="flex h-8 items-center gap-1 rounded-lg border border-[var(--border)] px-3 text-[12px] hover:bg-[var(--surface-subtle)]">
                   <Plus className="size-3.5" />添加行
                 </button>
