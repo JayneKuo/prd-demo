@@ -16,6 +16,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/dashboard/today': '今日看板',
   '/dashboard/orders': '订单管理',
   '/dashboard/orders/list': '订单列表',
+  '/dashboard/orders/new': '新建销售订单',
   '/dashboard/orders/pending': '待处理订单',
   '/dashboard/orders/exceptions': '异常订单',
   '/dashboard/inventory': '库存总览',

@@ -42,6 +42,7 @@ export const companies: Company[] = [
 export const merchants: Merchant[] = [
   { id: 'merchant_us_shopify', companyId: 'company_northwind', name: 'US Store', channel: 'Shopify', region: 'US', currency: 'USD' },
   { id: 'merchant_us_amazon', companyId: 'company_northwind', name: 'US Amazon', channel: 'Amazon', region: 'US', currency: 'USD' },
+  { id: 'merchant_us_shein', companyId: 'company_northwind', name: 'US SHEIN Store', channel: 'SHEIN', region: 'US', currency: 'USD' },
   { id: 'merchant_uk_shopify', companyId: 'company_northwind', name: 'UK Store', channel: 'Shopify', region: 'UK', currency: 'GBP' },
   { id: 'merchant_uk_tiktok', companyId: 'company_northwind', name: 'UK TikTok Shop', channel: 'TikTok Shop', region: 'UK', currency: 'GBP' },
   { id: 'merchant_sg_shopify', companyId: 'company_northwind', name: 'SG Store', channel: 'Shopify', region: 'SG', currency: 'SGD' }

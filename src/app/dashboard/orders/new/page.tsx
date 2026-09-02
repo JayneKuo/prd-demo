@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   ArrowLeft, Plus, Package, Search, X,
   ChevronDown, ChevronRight, Tag, User, AlertCircle,
   ShoppingBag, Edit3, MapPin, CreditCard, Settings2,
-  Truck, Info
+  Truck, Info, Loader2, CheckCircle2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -1051,6 +1052,16 @@ export default function NewSalesOrderPage() {
   const [referenceNo, setReferenceNo] = useState('');
   const [purchaseOrderNo, setPurchaseOrderNo] = useState('');
 
+  // 提交状态
+  const [submitting, setSubmitting] = useState(false);
+  const [submitMode, setSubmitMode] = useState<'normal' | 'paid' | null>(null);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [showValidation, setShowValidation] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [pendingMode, setPendingMode] = useState<'normal' | 'paid' | null>(null);
+  const [confirmMarkPaid, setConfirmMarkPaid] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+
   // 选中渠道时自动设置币种（用户未手改时）
   const [currencyTouched, setCurrencyTouched] = useState(false);
 
@@ -1076,6 +1087,53 @@ export default function NewSalesOrderPage() {
   const handleCreateNewCustomer = (name: string) => {
     setCreateCustomerPrefill({ name });
     setShowCreateCustomer(true);
+  };
+
+  // ─── 表单校验 ────────────────────────────────────────────────────────────
+
+  const validate = (): string[] => {
+    const errors: string[] = [];
+    if (!customer) errors.push('请选择客户');
+    if (items.length === 0) errors.push('至少添加一件商品');
+    items.forEach((item, i) => {
+      if (!item.sku && !item.productName) errors.push(`第 ${i + 1} 行商品请填写 SKU 或商品名称`);
+      if (item.qty < 1) errors.push(`第 ${i + 1} 行商品数量必须 ≥ 1`);
+      if (item.unitPrice < 0) errors.push(`第 ${i + 1} 行单价不能为负`);
+    });
+    if (!addr.shipToName) errors.push('收货人为必填项');
+    if (!addr.shipToPhone) errors.push('收货电话为必填项');
+    if (!addr.shipToCountry) errors.push('收货国家为必填项');
+    if (!addr.shipToStreet) errors.push('详细地址为必填项');
+    if (!addr.shipToPostalCode) errors.push('邮政编码为必填项');
+    return errors;
+  };
+
+  // ─── 提交处理 ────────────────────────────────────────────────────────────
+
+  // 第一步：校验 → 弹确认框
+  const handleSubmitClick = (mode: 'normal' | 'paid') => {
+    const errors = validate();
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      setShowValidation(true);
+      return;
+    }
+    setPendingMode(mode);
+    setConfirmMarkPaid(mode === 'paid'); // paid 模式默认勾选
+    setShowConfirm(true);
+  };
+
+  // 第二步：用户确认 → 真正提交
+  const handleConfirm = async () => {
+    if (!pendingMode) return;
+    const finalMode: 'normal' | 'paid' = confirmMarkPaid ? 'paid' : 'normal';
+    setShowConfirm(false);
+    setSubmitMode(finalMode);
+    setSubmitting(true);
+    await new Promise(r => setTimeout(r, 1200));
+    setSubmitting(false);
+    setSubmitMode(finalMode);
+    setShowSuccess(true);
   };
 
   const handleCustomerCreated = (c: Customer, addr?: CustomerAddress) => {
@@ -1145,6 +1203,8 @@ export default function NewSalesOrderPage() {
   const totalTax = items.reduce((s, i) => s + i.taxAmount, 0);
   const total = subtotal - totalDiscount + totalTax + shippingAmount;
   const totalQty = items.reduce((s, i) => s + i.qty, 0);
+
+  const router = useRouter();
 
   // ─── 渲染 ────────────────────────────────────────────────────────────────
 
@@ -1672,26 +1732,165 @@ export default function NewSalesOrderPage() {
             </Link>
             <button
               type="button"
-              className="inline-flex h-9 items-center rounded-lg border border-[var(--border)] px-4 text-[13px] font-medium text-[var(--foreground)] hover:bg-[var(--surface-hover)] transition"
+              disabled={submitting}
+              onClick={() => handleSubmitClick('paid')}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[var(--foreground)] px-5 text-[13px] font-semibold text-[var(--surface)] hover:opacity-85 disabled:opacity-50 transition"
             >
-              发送发票
+              {submitting && submitMode === 'paid'
+                ? <><Loader2 className="size-3.5 animate-spin" />处理中...</>
+                : '标记为已付款'
+              }
             </button>
             <button
               type="button"
-              className="inline-flex h-9 items-center rounded-lg bg-[var(--foreground)] px-5 text-[13px] font-semibold text-[var(--surface)] hover:opacity-85 transition"
+              disabled={submitting}
+              onClick={() => handleSubmitClick('normal')}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[var(--primary)] px-5 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-50 transition"
             >
-              标记为已付款
-            </button>
-            <button
-              type="button"
-              disabled={items.length === 0}
-              className="inline-flex h-9 items-center rounded-lg bg-[var(--primary)] px-5 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40 transition"
-            >
-              提交订单
+              {submitting && submitMode === 'normal'
+                ? <><Loader2 className="size-3.5 animate-spin" />提交中...</>
+                : '提交订单'
+              }
             </button>
           </div>
         </div>
       </div>
+
+      {/* 校验错误弹窗 */}
+      {showValidation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]" onClick={() => setShowValidation(false)}>
+          <div className="mx-4 w-full max-w-[400px] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 border-b border-[var(--border-subtle)] bg-red-50 px-5 py-4">
+              <AlertCircle className="size-5 shrink-0 text-[var(--danger)]" />
+              <h3 className="text-[14px] font-semibold text-[var(--danger)]">请修正以下问题</h3>
+            </div>
+            <ul className="space-y-2 px-5 py-4">
+              {validationErrors.map((err, i) => (
+                <li key={i} className="flex items-start gap-2 text-[13px] text-[var(--foreground)]">
+                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[var(--danger)]" />
+                  {err}
+                </li>
+              ))}
+            </ul>
+            <div className="flex justify-end border-t border-[var(--border-subtle)] px-5 py-3">
+              <button
+                type="button"
+                onClick={() => setShowValidation(false)}
+                className="h-8 rounded-lg bg-[var(--primary)] px-4 text-[13px] font-semibold text-white hover:opacity-90 transition"
+              >
+                知道了
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 提交确认弹窗 */}
+      {showConfirm && pendingMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]" onClick={() => setShowConfirm(false)}>
+          <div className="mx-4 w-full max-w-[420px] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl" onClick={e => e.stopPropagation()}>
+            {/* 弹窗标题 */}
+            <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-4">
+              <h3 className="text-[15px] font-semibold text-[var(--foreground)]">创建订单</h3>
+              <button type="button" onClick={() => setShowConfirm(false)} className="flex size-8 items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[var(--surface-subtle)] transition">
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {/* 弹窗内容 */}
+            <div className="px-5 py-5 space-y-4">
+              {/* 订单摘要 */}
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-4 py-3 space-y-2 text-[13px]">
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--muted)]">订单金额</span>
+                  <span className="font-semibold text-[var(--foreground)]">{currency} {total.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--muted)]">商品</span>
+                  <span className="text-[var(--foreground)]">{items.length} 行 · {totalQty} 件</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--muted)]">付款状态</span>
+                  {confirmMarkPaid
+                    ? <span className="rounded-full bg-green-50 border border-green-200 px-2 py-0.5 text-[11px] font-medium text-green-700">已付款</span>
+                    : <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[11px] font-medium text-amber-700">待支付</span>
+                  }
+                </div>
+              </div>
+
+              {/* 标记为已付款勾选 */}
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[var(--border)] p-3.5 transition hover:bg-[var(--surface-subtle)] select-none"
+                style={{ borderColor: confirmMarkPaid ? 'var(--primary)' : undefined, background: confirmMarkPaid ? 'var(--primary-soft)' : undefined }}>
+                <input
+                  type="checkbox"
+                  checked={confirmMarkPaid}
+                  onChange={e => setConfirmMarkPaid(e.target.checked)}
+                  className="mt-0.5 size-4 accent-[var(--primary)] shrink-0"
+                />
+                <div>
+                  <p className="text-[13px] font-medium text-[var(--foreground)]">标记为已付款</p>
+                  <p className="mt-0.5 text-[12px] text-[var(--muted)] leading-relaxed">
+                    如果您已通过其他方式收到{' '}
+                    <span className="font-medium text-[var(--foreground)]">{currency} {total.toFixed(2)}</span>，
+                    勾选此项将自动补记一笔等额收款流水。
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {/* 弹窗操作 */}
+            <div className="flex items-center justify-end gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-5 py-3">
+              <button
+                type="button"
+                onClick={() => setShowConfirm(false)}
+                className="h-9 rounded-lg border border-[var(--border)] px-4 text-[13px] font-medium text-[var(--foreground)] hover:bg-[var(--surface-hover)] transition"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirm}
+                className="h-9 rounded-lg bg-[var(--foreground)] px-5 text-[13px] font-semibold text-[var(--surface)] hover:opacity-85 transition"
+              >
+                创建订单
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 提交成功提示 */}
+      {showSuccess && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
+          <div className="mx-4 w-full max-w-[360px] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl text-center px-8 py-8">
+            <div className="mb-4 flex justify-center">
+              <div className="flex size-14 items-center justify-center rounded-full bg-green-50">
+                <CheckCircle2 className="size-8 text-green-600" />
+              </div>
+            </div>
+            <h3 className="mb-1.5 text-[16px] font-bold text-[var(--foreground)]">
+              {submitMode === 'paid' ? '订单已创建并标记为已付款' : '订单提交成功'}
+            </h3>
+            <p className="mb-6 text-[13px] text-[var(--muted)]">正在跳转到订单详情页...</p>
+            <div className="flex gap-2 justify-center">
+              <button
+                type="button"
+                onClick={() => { setShowSuccess(false); router.push('/dashboard/orders'); }}
+                className="h-9 rounded-lg border border-[var(--border)] px-4 text-[13px] font-medium text-[var(--foreground)] hover:bg-[var(--surface-hover)] transition"
+              >
+                返回列表
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowSuccess(false); router.push('/dashboard/orders'); }}
+                className="h-9 rounded-lg bg-[var(--primary)] px-4 text-[13px] font-semibold text-white hover:opacity-90 transition"
+              >
+                查看订单
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 弹窗 */}
       <ProductSearchModal

@@ -18,6 +18,17 @@ import type { OrderDetail } from './order-details';
  * so_016: 保留 / 已支付 / 部分履约 / 合规审查 (Amazon US, 部分发货+合规暂停)
  * so_017: 已发货 / 已支付 / 已发货 / 投递失败 (Shopify US, 物流异常)
  * so_018: 已完成 / 部分退款 / 已签收 (Shopify US, 商品瑕疵退款)
+ * ─── 新增 SKU 异常 & 风控场景 ───
+ * so_021: 保留 / 已支付 / 未开始 / SKU未识别 — SKU 未在商品中心创建，履约前置校验失败
+ * so_022: 保留 / 已支付 / 已暂停 / 仓库SKU未映射 — 商品档案有但 warehouseSku 为空，WMS 下单失败
+ * so_023: 保留 / 已支付 / 已暂停 / WMS货品不存在 — warehouseSku 有映射但 WMS 查不到该货品
+ * so_024: 保留 / 已支付 / 未开始 / 风控拦截 — Stripe Radar 高风险，AVS不匹配，进入人工审核
+ * ─── 新增补全场景 ───
+ * so_025: 保留 / 已支付 / 未开始 / 渠道SKU未映射 — Amazon ASIN未关联系统SKU，履约中断
+ * so_026: 处理中 / 已支付 / 已生成 — 总重152kg超包裹限制，自动切换XPO LTL White Glove
+ * so_027: 处理中 / 待收款 / 已发货 — COD货到付款(Lazada SG)，快递员收款前支付态为待收款
+ * so_028: 处理中 / 已支付 / 部分履约 — Walmart B2B 1200件分3批LTL发货，第1批已签收
+ * so_029: 已完成 / 已退款 / 已退货 — 客户因故障退货，RMA逆向物流+验货入库+全额退款
  */
 
 export const orderDetailsExtra: Record<string, OrderDetail> = {
@@ -1434,5 +1445,2028 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
     note: 'URGENT - client demo next week, need delivery by June 5',
     tags: ['B2B', 'urgent', 'air-freight', 'cross-border', 'uk'],
     platformMeta: { 'shopify_order_id': '5820173270300', 'landing_site': '/b2b/bulk-order', 'note_attributes': 'priority=urgent' }
+  },
+
+  /* ═══════════════════════════════════════════════════════════
+     so_021: SKU 未在商品中心创建
+     渠道传来的 SKU 在系统商品档案中完全找不到，
+     履约引擎前置校验即失败，订单挂起等待商品录入。
+  ════════════════════════════════════════════════════════════ */
+  so_021: {
+    id: 'so_021',
+    orderNo: 'SO-20260605-0021',
+    platformOrderNo: '#SH-7291350',
+    confirmationNumber: 'UXPQK0021',
+    referenceNo: '',
+    channel: 'Shopify',
+    merchant: 'US Store',
+    sourceType: 'web',
+    status: '保留',
+    financialStatus: '已支付',
+    fulfillmentStatus: '未开始',
+    riskLevel: 'low',
+    exception: 'SKU 未识别',
+    createdAt: '2026-06-05 10:12:08',
+    updatedAt: '2026-06-05 10:12:55',
+    currency: 'USD',
+    subtotal: '$158.00',
+    totalDiscount: '$0.00',
+    totalShipping: '$12.00',
+    totalTax: '$8.00',
+    totalPrice: '$178.00',
+    taxesIncluded: false,
+    paymentGateway: 'Stripe',
+    discountCodes: [],
+    lineItems: [
+      {
+        id: 'li_211',
+        // 渠道传来的 SKU，系统商品中心完全找不到
+        sku: 'FK-BT-KBD-01',
+        channelSku: 'SH-FK-BT-KBD-01',
+        // warehouseSku 为空，因为连商品档案都没有，无从映射
+        warehouseSku: undefined,
+        title: 'Foldable Bluetooth Keyboard',
+        variantTitle: 'Black / US Layout',
+        quantity: 1,
+        unit: '件',
+        unitPrice: '$89.00',
+        discount: '$0.00',
+        tax: '$4.45',
+        subtotal: '$93.45',
+        // 履约状态：异常 — 无法识别 SKU
+        fulfillmentStatus: '异常',
+        fulfillmentNote: 'SKU "FK-BT-KBD-01" 未在商品中心创建，无法处理',
+        weight: 320,
+        requiresShipping: true,
+        platformLineItemId: 'li_sh_93350'
+      },
+      {
+        id: 'li_212',
+        sku: 'WL-TRKPD-SIL',
+        channelSku: 'SH-WL-TRKPD-SIL',
+        warehouseSku: undefined,
+        title: 'Wireless Trackpad',
+        variantTitle: 'Silver / Multi-Touch',
+        quantity: 1,
+        unit: '件',
+        unitPrice: '$69.00',
+        discount: '$0.00',
+        tax: '$3.45',
+        subtotal: '$72.45',
+        fulfillmentStatus: '异常',
+        fulfillmentNote: 'SKU "WL-TRKPD-SIL" 未在商品中心创建，无法处理',
+        weight: 250,
+        requiresShipping: true,
+        platformLineItemId: 'li_sh_93351'
+      }
+    ],
+    customer: {
+      name: 'Brandon Yu',
+      email: 'brandon.yu@example.com',
+      phone: '+1 (512) 555-0213',
+      ordersCount: 2,
+      totalSpent: '$312.00',
+      tags: [],
+      acceptsMarketing: true
+    },
+    shippingAddress: {
+      name: 'Brandon Yu',
+      phone: '+1 (512) 555-0213',
+      address1: '1201 E 6th St',
+      city: 'Austin',
+      province: 'TX',
+      country: 'US',
+      zip: '78702',
+      formatted: '1201 E 6th St, Austin, TX 78702, US'
+    },
+    billingAddress: {
+      name: 'Brandon Yu',
+      phone: '+1 (512) 555-0213',
+      address1: '1201 E 6th St',
+      city: 'Austin',
+      province: 'TX',
+      country: 'US',
+      zip: '78702',
+      formatted: '1201 E 6th St, Austin, TX 78702, US'
+    },
+    shippingMethod: 'USPS Priority Mail (2-3 business days)',
+    fulfillments: [],
+    transactions: [
+      {
+        id: 'txn_211',
+        kind: 'sale',
+        gateway: 'Stripe',
+        method: 'Visa ****7731',
+        amount: '$178.00',
+        currency: 'USD',
+        status: 'success',
+        createdAt: '2026-06-05 10:12:30',
+        gatewayReference: 'ch_5Ap2M8KQ...',
+        riskLevel: 'normal',
+        avsResult: 'Y',
+        cvvResult: 'M'
+      }
+    ],
+    refunds: [],
+    events: [
+      {
+        id: 'evt_21_05',
+        time: '2026-06-05 10:12:55',
+        actor: '系统',
+        actorRole: 'automation',
+        title: '订单挂起 — 等待商品录入',
+        description: '2 个 SKU 未在商品中心创建，无法进入履约流。请在商品中心录入 FK-BT-KBD-01 / WL-TRKPD-SIL 后，手动触发重新处理。',
+        type: 'system'
+      },
+      {
+        id: 'evt_21_04',
+        time: '2026-06-05 10:12:52',
+        actor: '履约引擎',
+        actorRole: 'automation',
+        title: '履约前置校验失败 — SKU 未识别',
+        description: '商品中心查询: FK-BT-KBD-01 → 未找到 · WL-TRKPD-SIL → 未找到 · 2/2 个 SKU 无法识别，无法生成履约单',
+        type: 'fulfillment',
+        ruleName: '商品准入规则'
+      },
+      {
+        id: 'evt_21_03',
+        time: '2026-06-05 10:12:48',
+        actor: '系统',
+        actorRole: 'automation',
+        title: '订单自动确认',
+        description: '风控通过，进入履约前置校验',
+        type: 'system'
+      },
+      {
+        id: 'evt_21_02',
+        time: '2026-06-05 10:12:30',
+        actor: 'Stripe',
+        actorRole: 'payment_gateway',
+        title: '支付成功',
+        description: 'Visa ****7731 收款 $178.00 · 网关参考号 ch_5Ap2M8KQ...',
+        type: 'payment'
+      },
+      {
+        id: 'evt_21_01',
+        time: '2026-06-05 10:12:08',
+        actor: 'Brandon Yu',
+        actorRole: 'customer',
+        title: '订单创建',
+        description: '通过 Shopify Web Checkout 提交',
+        type: 'customer'
+      }
+    ],
+    note: '',
+    tags: ['sku-exception', 'pending-product-setup'],
+    platformMeta: { 'shopify_order_id': '5820173271350' }
+  },
+
+  /* ═══════════════════════════════════════════════════════════
+     so_022: SKU 已在商品中心创建，但未关联仓库 SKU
+     商品档案存在，但缺少 warehouseSku 映射，
+     履约单生成后尝试下发出库单时 WMS 接口报错。
+  ════════════════════════════════════════════════════════════ */
+  so_022: {
+    id: 'so_022',
+    orderNo: 'SO-20260605-0022',
+    platformOrderNo: '#SH-7291401',
+    confirmationNumber: 'UXPQK0022',
+    referenceNo: '',
+    channel: 'Shopify',
+    merchant: 'US Store',
+    sourceType: 'web',
+    status: '保留',
+    financialStatus: '已支付',
+    fulfillmentStatus: '已暂停',
+    riskLevel: 'low',
+    exception: '仓库 SKU 未映射',
+    createdAt: '2026-06-05 11:45:22',
+    updatedAt: '2026-06-05 12:03:15',
+    currency: 'USD',
+    subtotal: '$107.98',
+    totalDiscount: '$0.00',
+    totalShipping: '$8.00',
+    totalTax: '$4.00',
+    totalPrice: '$119.98',
+    taxesIncluded: false,
+    paymentGateway: 'Stripe',
+    discountCodes: [],
+    lineItems: [
+      {
+        id: 'li_221',
+        sku: 'SDL-SMART-W',
+        channelSku: 'SH-SDL-SMART-W-001',
+        // 商品中心有档案，但仓库 SKU 映射表中没有这个 SKU，warehouseSku 为空
+        warehouseSku: undefined,
+        title: 'Smart Desk Lamp',
+        variantTitle: 'White / Wi-Fi Enabled',
+        quantity: 2,
+        unit: '件',
+        unitPrice: '$53.99',
+        discount: '$0.00',
+        tax: '$2.00',
+        subtotal: '$109.98',
+        // 出库单下发失败
+        fulfillmentStatus: '异常',
+        fulfillmentNote: 'warehouseSku 未配置，出库单下发失败',
+        weight: 420,
+        requiresShipping: true,
+        platformLineItemId: 'li_sh_93401'
+      }
+    ],
+    customer: {
+      name: 'Chloe Bennett',
+      email: 'chloe.b@example.com',
+      phone: '+1 (615) 555-0177',
+      ordersCount: 4,
+      totalSpent: '$541.00',
+      tags: ['Repeat buyer'],
+      acceptsMarketing: false
+    },
+    shippingAddress: {
+      name: 'Chloe Bennett',
+      phone: '+1 (615) 555-0177',
+      address1: '500 Broadway',
+      city: 'Nashville',
+      province: 'TN',
+      country: 'US',
+      zip: '37203',
+      formatted: '500 Broadway, Nashville, TN 37203, US'
+    },
+    billingAddress: {
+      name: 'Chloe Bennett',
+      phone: '+1 (615) 555-0177',
+      address1: '500 Broadway',
+      city: 'Nashville',
+      province: 'TN',
+      country: 'US',
+      zip: '37203',
+      formatted: '500 Broadway, Nashville, TN 37203, US'
+    },
+    shippingMethod: 'UPS Ground (3-5 business days)',
+    fulfillments: [],
+    transactions: [
+      {
+        id: 'txn_221',
+        kind: 'sale',
+        gateway: 'Stripe',
+        method: 'Mastercard ****3341',
+        amount: '$119.98',
+        currency: 'USD',
+        status: 'success',
+        createdAt: '2026-06-05 11:45:40',
+        gatewayReference: 'ch_9Bq1T4LP...',
+        riskLevel: 'normal',
+        avsResult: 'Y',
+        cvvResult: 'M'
+      }
+    ],
+    refunds: [],
+    events: [
+      {
+        id: 'evt_22_07',
+        time: '2026-06-05 12:03:15',
+        actor: '系统',
+        actorRole: 'automation',
+        title: '履约单挂起 — 等待 SKU 映射补全',
+        description: 'FO-20260605-0221 挂起。SKU SDL-SMART-W 的 warehouseSku 未配置，无法推送至 WMS。请在商品中心 > SKU 映射管理中为该 SKU 添加仓库货品编码后，点击「重新履约」。',
+        type: 'system'
+      },
+      {
+        id: 'evt_22_06',
+        time: '2026-06-05 12:03:10',
+        actor: '履约引擎',
+        actorRole: 'automation',
+        title: '出库单下发失败 — warehouseSku 为空',
+        description: 'FO-20260605-0221 → 尝试推送出库单至 US-West-LAX · 商品 SDL-SMART-W 的 warehouseSku 字段为空 · WMS 接口拒绝，错误码 ERR_SKU_NOT_MAPPED',
+        type: 'fulfillment',
+        fulfillmentOrderNo: 'FO-20260605-0221'
+      },
+      {
+        id: 'evt_22_05',
+        time: '2026-06-05 12:03:00',
+        actor: '履约引擎',
+        actorRole: 'automation',
+        title: '选仓决策',
+        description: 'FO-20260605-0221: 收货地 Nashville TN · 候选仓 US-East-EWR(820km) / US-Central-DFW(660km) / US-West-LAX(1820km) · 库存校验 SDL-SMART-W×2: EWR=15 / DFW=8 / LAX=22 · 选定 US-Central-DFW',
+        type: 'fulfillment',
+        ruleName: '就近发货策略',
+        fulfillmentOrderNo: 'FO-20260605-0221'
+      },
+      {
+        id: 'evt_22_04',
+        time: '2026-06-05 12:02:50',
+        actor: '履约引擎',
+        actorRole: 'automation',
+        title: '履约单已生成',
+        description: 'FO-20260605-0221 生成，包含 SDL-SMART-W×2，进入选仓决策',
+        type: 'fulfillment',
+        fulfillmentOrderNo: 'FO-20260605-0221'
+      },
+      {
+        id: 'evt_22_03',
+        time: '2026-06-05 12:02:40',
+        actor: '履约引擎',
+        actorRole: 'automation',
+        title: '履约准入通过',
+        description: 'SKU SDL-SMART-W 在商品中心存在 · 商品档案完整 · requiresShipping=true · 支付已确认 · 准入通过',
+        type: 'fulfillment',
+        ruleName: '履约准入规则'
+      },
+      {
+        id: 'evt_22_02',
+        time: '2026-06-05 11:46:10',
+        actor: '系统',
+        actorRole: 'automation',
+        title: '订单自动确认',
+        description: '风控通过，进入履约流',
+        type: 'system'
+      },
+      {
+        id: 'evt_22_02p',
+        time: '2026-06-05 11:45:40',
+        actor: 'Stripe',
+        actorRole: 'payment_gateway',
+        title: '支付成功',
+        description: 'Mastercard ****3341 收款 $119.98 · 网关参考号 ch_9Bq1T4LP...',
+        type: 'payment'
+      },
+      {
+        id: 'evt_22_01',
+        time: '2026-06-05 11:45:22',
+        actor: 'Chloe Bennett',
+        actorRole: 'customer',
+        title: '订单创建',
+        description: '通过 Shopify Web Checkout 提交',
+        type: 'customer'
+      }
+    ],
+    note: '',
+    tags: ['sku-exception', 'missing-warehouse-sku'],
+    platformMeta: { 'shopify_order_id': '5820173271401' }
+  },
+
+  /* ═══════════════════════════════════════════════════════════
+     so_023: SKU 有仓库 SKU 映射，但 WMS 实际查不到该货品
+     warehouseSku 有值，出库单成功推送，
+     但 WMS 回调报错：货品编码在仓库系统中不存在（新品未在 WMS 建档）。
+  ════════════════════════════════════════════════════════════ */
+  so_023: {
+    id: 'so_023',
+    orderNo: 'SO-20260605-0023',
+    platformOrderNo: '#SH-7291488',
+    confirmationNumber: 'UXPQK0023',
+    referenceNo: '',
+    channel: 'Shopify',
+    merchant: 'US Store',
+    sourceType: 'web',
+    status: '保留',
+    financialStatus: '已支付',
+    fulfillmentStatus: '已暂停',
+    riskLevel: 'low',
+    exception: 'WMS 货品不存在',
+    createdAt: '2026-06-05 13:20:10',
+    updatedAt: '2026-06-05 13:45:08',
+    currency: 'USD',
+    subtotal: '$316.00',
+    totalDiscount: '$0.00',
+    totalShipping: '$18.00',
+    totalTax: '$12.00',
+    totalPrice: '$346.00',
+    taxesIncluded: false,
+    paymentGateway: 'Stripe',
+    discountCodes: [],
+    lineItems: [
+      {
+        id: 'li_231',
+        sku: 'PM-15-USB4',
+        channelSku: 'SH-PM-15-USB4-001',
+        // warehouseSku 有值（系统中已映射），但 WMS 那边货品档案尚未创建
+        warehouseSku: 'WMS-PM-15-USB4',
+        title: 'Portable Monitor 15"',
+        variantTitle: '15.6" / USB-C / 1080p',
+        quantity: 1,
+        unit: '件',
+        unitPrice: '$219.00',
+        discount: '$0.00',
+        tax: '$8.76',
+        subtotal: '$227.76',
+        fulfillmentStatus: '异常',
+        fulfillmentNote: 'WMS 回调: 货品编码 WMS-PM-15-USB4 在仓库系统中不存在',
+        weight: 780,
+        requiresShipping: true,
+        platformLineItemId: 'li_sh_93488'
+      },
+      {
+        id: 'li_232',
+        sku: 'MS-MINI-ALU',
+        channelSku: 'SH-MS-MINI-ALU-001',
+        warehouseSku: 'WMS-MS-MINI-ALU',
+        title: 'Monitor Stand Mini',
+        variantTitle: 'Aluminum / Adjustable',
+        quantity: 1,
+        unit: '件',
+        unitPrice: '$49.00',
+        discount: '$0.00',
+        tax: '$1.96',
+        subtotal: '$50.96',
+        // 该商品 WMS 有档案，正常
+        fulfillmentStatus: '待履约',
+        fulfillmentNote: '等待同批次 PM-15-USB4 异常解决后合并发货',
+        weight: 350,
+        requiresShipping: true,
+        platformLineItemId: 'li_sh_93489'
+      },
+      {
+        id: 'li_233',
+        sku: 'HDMI-ADP-4K',
+        channelSku: 'SH-HDMI-ADP-4K-001',
+        warehouseSku: 'WMS-HDMI-ADP-4K',
+        title: 'HDMI Adapter 4K',
+        variantTitle: 'USB-C to HDMI / 4K60Hz',
+        quantity: 1,
+        unit: '件',
+        unitPrice: '$29.00',
+        discount: '$0.00',
+        tax: '$1.16',
+        subtotal: '$30.16',
+        fulfillmentStatus: '待履约',
+        fulfillmentNote: '等待同批次 PM-15-USB4 异常解决后合并发货',
+        weight: 45,
+        requiresShipping: true,
+        platformLineItemId: 'li_sh_93490'
+      }
+    ],
+    customer: {
+      name: 'Tyler Brooks',
+      email: 'tyler.b@example.com',
+      phone: '+1 (612) 555-0289',
+      ordersCount: 1,
+      totalSpent: '$346.00',
+      tags: [],
+      acceptsMarketing: true
+    },
+    shippingAddress: {
+      name: 'Tyler Brooks',
+      phone: '+1 (612) 555-0289',
+      address1: '800 Nicollet Mall',
+      city: 'Minneapolis',
+      province: 'MN',
+      country: 'US',
+      zip: '55402',
+      formatted: '800 Nicollet Mall, Minneapolis, MN 55402, US'
+    },
+    billingAddress: {
+      name: 'Tyler Brooks',
+      phone: '+1 (612) 555-0289',
+      address1: '800 Nicollet Mall',
+      city: 'Minneapolis',
+      province: 'MN',
+      country: 'US',
+      zip: '55402',
+      formatted: '800 Nicollet Mall, Minneapolis, MN 55402, US'
+    },
+    shippingMethod: 'FedEx Ground (5-7 business days)',
+    fulfillments: [],
+    transactions: [
+      {
+        id: 'txn_231',
+        kind: 'sale',
+        gateway: 'Stripe',
+        method: 'Visa ****5598',
+        amount: '$346.00',
+        currency: 'USD',
+        status: 'success',
+        createdAt: '2026-06-05 13:20:35',
+        gatewayReference: 'ch_3Mz7K9NW...',
+        riskLevel: 'normal',
+        avsResult: 'Y',
+        cvvResult: 'M'
+      }
+    ],
+    refunds: [],
+    events: [
+      {
+        id: 'evt_23_08',
+        time: '2026-06-05 13:45:08',
+        actor: '系统',
+        actorRole: 'automation',
+        title: '履约单挂起 — 等待 WMS 货品建档',
+        description: 'FO-20260605-0231 挂起。WMS 反馈货品 WMS-PM-15-USB4 不存在，请联系仓库在 WMS 中为该货品完成建档入库，完成后点击「重新履约」恢复处理。',
+        type: 'system'
+      },
+      {
+        id: 'evt_23_07',
+        time: '2026-06-05 13:45:00',
+        actor: '履约引擎',
+        actorRole: 'automation',
+        title: 'WMS 回调异常 — 货品编码不存在',
+        description: 'FO-20260605-0231 → 出库单 OB-20260605-0231 推送至 US-Central-DFW · WMS 回调 ERR_ITEM_NOT_FOUND: 货品编码 WMS-PM-15-USB4 在仓库系统中不存在 · 可能原因: 新品上架后仓库尚未完成货品建档',
+        type: 'fulfillment',
+        fulfillmentOrderNo: 'FO-20260605-0231'
+      },
+      {
+        id: 'evt_23_06',
+        time: '2026-06-05 13:44:30',
+        actor: '系统',
+        actorRole: 'automation',
+        title: '出库单已下发',
+        description: '出库单 OB-20260605-0231 已推送至仓库 US-Central-DFW · 包含 PM-15-USB4×1 / MS-MINI-ALU×1 / HDMI-ADP-4K×1',
+        type: 'fulfillment',
+        fulfillmentOrderNo: 'FO-20260605-0231'
+      },
+      {
+        id: 'evt_23_05',
+        time: '2026-06-05 13:44:00',
+        actor: '履约引擎',
+        actorRole: 'automation',
+        title: '选仓决策',
+        description: 'FO-20260605-0231: 收货地 Minneapolis MN · 候选仓 US-Central-DFW(1580km) / US-East-EWR(1380km) · 库存校验 PM-15-USB4×1: DFW=5 / EWR=2 · 选定 US-Central-DFW（库存充足）',
+        type: 'fulfillment',
+        ruleName: '就近发货策略',
+        fulfillmentOrderNo: 'FO-20260605-0231'
+      },
+      {
+        id: 'evt_23_04',
+        time: '2026-06-05 13:43:30',
+        actor: '履约引擎',
+        actorRole: 'automation',
+        title: '履约单已生成',
+        description: 'FO-20260605-0231 生成，合单处理，包含 3 件商品',
+        type: 'fulfillment',
+        fulfillmentOrderNo: 'FO-20260605-0231'
+      },
+      {
+        id: 'evt_23_03',
+        time: '2026-06-05 13:43:20',
+        actor: '履约引擎',
+        actorRole: 'automation',
+        title: '履约准入通过',
+        description: '3 个 SKU 均在商品中心存在且已映射 warehouseSku · requiresShipping=true · 支付已确认 · 准入通过',
+        type: 'fulfillment',
+        ruleName: '履约准入规则'
+      },
+      {
+        id: 'evt_23_02',
+        time: '2026-06-05 13:21:00',
+        actor: '系统',
+        actorRole: 'automation',
+        title: '订单自动确认',
+        description: '风控通过，进入履约流',
+        type: 'system'
+      },
+      {
+        id: 'evt_23_02p',
+        time: '2026-06-05 13:20:35',
+        actor: 'Stripe',
+        actorRole: 'payment_gateway',
+        title: '支付成功',
+        description: 'Visa ****5598 收款 $346.00 · 网关参考号 ch_3Mz7K9NW...',
+        type: 'payment'
+      },
+      {
+        id: 'evt_23_01',
+        time: '2026-06-05 13:20:10',
+        actor: 'Tyler Brooks',
+        actorRole: 'customer',
+        title: '订单创建',
+        description: '通过 Shopify Web Checkout 提交',
+        type: 'customer'
+      }
+    ],
+    note: '',
+    tags: ['sku-exception', 'wms-item-not-found'],
+    platformMeta: { 'shopify_order_id': '5820173271488' }
+  },
+
+  /* ═══════════════════════════════════════════════════════════
+     so_024: 高风控拦截 — 支付成功但欺诈评分超阈值
+     Stripe Radar 返回 high risk，AVS 不匹配，
+     系统自动暂停履约，进入人工审核队列。
+  ════════════════════════════════════════════════════════════ */
+  so_024: {
+    id: 'so_024',
+    orderNo: 'SO-20260605-0024',
+    platformOrderNo: '#SH-7291530',
+    confirmationNumber: 'UXPQK0024',
+    referenceNo: '',
+    channel: 'Shopify',
+    merchant: 'US Store',
+    sourceType: 'web',
+    status: '保留',
+    financialStatus: '已支付',
+    fulfillmentStatus: '未开始',
+    riskLevel: 'high',
+    exception: '风控拦截',
+    createdAt: '2026-06-05 09:03:15',
+    updatedAt: '2026-06-05 09:03:58',
+    currency: 'USD',
+    subtotal: '$2,690.00',
+    totalDiscount: '$0.00',
+    totalShipping: '$0.00',
+    totalTax: '$200.00',
+    totalPrice: '$2,890.00',
+    taxesIncluded: false,
+    paymentGateway: 'Stripe',
+    discountCodes: [],
+    lineItems: [
+      {
+        id: 'li_241',
+        sku: 'GPU-RTX4080-16G',
+        channelSku: 'SH-GPU-RTX4080-16G',
+        warehouseSku: 'WMS-GPU-RTX4080-16G',
+        title: 'NVIDIA GeForce RTX 4080',
+        variantTitle: '16GB GDDR6X / Founders Edition',
+        quantity: 2,
+        unit: '件',
+        unitPrice: '$1,199.00',
+        discount: '$0.00',
+        tax: '$95.92',
+        subtotal: '$2,493.92',
+        // 高风控暂停，等待人工审核
+        fulfillmentStatus: '暂停',
+        fulfillmentNote: '风控评分 High，订单暂停等待人工审核',
+        weight: 1420,
+        requiresShipping: true,
+        platformLineItemId: 'li_sh_93530'
+      },
+      {
+        id: 'li_242',
+        sku: 'CPU-I9-14900K',
+        channelSku: 'SH-CPU-I9-14900K',
+        warehouseSku: 'WMS-CPU-I9-14900K',
+        title: 'Intel Core i9-14900K',
+        variantTitle: '24-Core / 6.0GHz / LGA1700',
+        quantity: 1,
+        unit: '件',
+        unitPrice: '$589.00',
+        discount: '$0.00',
+        tax: '$47.12',
+        subtotal: '$636.12',
+        fulfillmentStatus: '暂停',
+        fulfillmentNote: '风控评分 High，订单暂停等待人工审核',
+        weight: 320,
+        requiresShipping: true,
+        platformLineItemId: 'li_sh_93531'
+      }
+    ],
+    customer: {
+      name: 'Alex Morgan',
+      email: 'a.morgan.8821@protonmail.com',
+      phone: '+1 (702) 555-0392',
+      ordersCount: 1,
+      totalSpent: '$2,890.00',
+      tags: ['high-risk', 'new-customer'],
+      acceptsMarketing: false
+    },
+    shippingAddress: {
+      name: 'Alex Morgan',
+      phone: '+1 (702) 555-0392',
+      // 收货地址与账单地址不一致（风控信号）
+      address1: '3900 Las Vegas Blvd S',
+      city: 'Las Vegas',
+      province: 'NV',
+      country: 'US',
+      zip: '89119',
+      formatted: '3900 Las Vegas Blvd S, Las Vegas, NV 89119, US'
+    },
+    billingAddress: {
+      name: 'Alex Morgan',
+      phone: '+1 (702) 555-0392',
+      // 账单地址：不同城市（AVS 不匹配信号）
+      address1: '1 Finance Plaza',
+      city: 'New York',
+      province: 'NY',
+      country: 'US',
+      zip: '10005',
+      formatted: '1 Finance Plaza, New York, NY 10005, US'
+    },
+    shippingMethod: 'UPS Next Day Air (overnight)',
+    fulfillments: [],
+    transactions: [
+      {
+        id: 'txn_241',
+        kind: 'sale',
+        gateway: 'Stripe',
+        method: 'Mastercard ****0001',
+        amount: '$2,890.00',
+        currency: 'USD',
+        // 支付本身成功，但风控标记 high
+        status: 'success',
+        createdAt: '2026-06-05 09:03:40',
+        gatewayReference: 'ch_2Kx0J7ZP...',
+        riskLevel: 'high',
+        // AVS 不匹配：账单地址 ZIP 与发卡行不符
+        avsResult: 'N',
+        cvvResult: 'M'
+      }
+    ],
+    refunds: [],
+    events: [
+      {
+        id: 'evt_24_05',
+        time: '2026-06-05 09:03:58',
+        actor: '系统',
+        actorRole: 'automation',
+        title: '订单挂起 — 等待人工审核',
+        description: '风控评分超过自动放行阈值，订单已暂停履约。请在「风控审核」模块完成人工审核后，手动放行或取消订单。',
+        type: 'system'
+      },
+      {
+        id: 'evt_24_04',
+        time: '2026-06-05 09:03:55',
+        actor: '系统',
+        actorRole: 'automation',
+        title: '风控检查失败 — 人工介入',
+        description: 'Stripe Radar 评分: 87/100 (High Risk) · AVS: N (账单 ZIP 不匹配) · CVV: M · 设备指纹: 匹配历史欺诈黑名单 1 条 · 收货地 ≠ 账单地 (Las Vegas vs New York) · 首单高客单价($2890) · 命中规则: 高风险订单人工审核',
+        type: 'risk',
+        ruleName: '高风险订单拦截规则'
+      },
+      {
+        id: 'evt_24_03',
+        time: '2026-06-05 09:03:50',
+        actor: '系统',
+        actorRole: 'automation',
+        title: '订单自动确认（支付层）',
+        description: '支付授权成功，进入风控评估',
+        type: 'system'
+      },
+      {
+        id: 'evt_24_02',
+        time: '2026-06-05 09:03:40',
+        actor: 'Stripe',
+        actorRole: 'payment_gateway',
+        title: '支付成功',
+        description: 'Mastercard ****0001 收款 $2,890.00 · 网关参考号 ch_2Kx0J7ZP... · ⚠️ Stripe Radar: 高风险',
+        type: 'payment'
+      },
+      {
+        id: 'evt_24_01',
+        time: '2026-06-05 09:03:15',
+        actor: 'Alex Morgan',
+        actorRole: 'customer',
+        title: '订单创建',
+        description: '通过 Shopify Web Checkout 提交 · IP: 198.51.100.77 · 设备: Chrome/Windows · 匿名邮箱 ProtonMail',
+        type: 'customer'
+      }
+    ],
+    note: '',
+    tags: ['high-risk', 'fraud-review', 'manual-review-required'],
+    platformMeta: {
+      'shopify_order_id': '5820173271530',
+      'browser_ip': '198.51.100.77',
+      'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0',
+      'stripe_radar_score': '87'
+    }
+  },
+
+  /* ═══════════════════════════════════════════════════════════
+     so_025: channelSku 映射缺失
+     系统商品中心有 SKU 档案，但 Amazon 渠道侧的 ASIN/seller SKU
+     未在「渠道 SKU 映射表」中与系统 SKU 关联，
+     订单进来时无法解析出系统 SKU，履约前置校验失败。
+  ════════════════════════════════════════════════════════════ */
+  so_025: {
+    id: 'so_025',
+    orderNo: 'SO-20260606-0025',
+    platformOrderNo: '#AMZ-30483510',
+    confirmationNumber: '',
+    referenceNo: '',
+    channel: 'Amazon',
+    merchant: 'US Amazon',
+    sourceType: 'api',
+    status: '保留',
+    financialStatus: '已支付',
+    fulfillmentStatus: '未开始',
+    riskLevel: 'low',
+    exception: '渠道 SKU 未映射',
+    createdAt: '2026-06-06 08:30:12',
+    updatedAt: '2026-06-06 08:30:45',
+    currency: 'USD',
+    subtotal: '$62.00',
+    totalDiscount: '$0.00',
+    totalShipping: '$6.00',
+    totalTax: '$0.00',
+    totalPrice: '$68.00',
+    taxesIncluded: false,
+    paymentGateway: 'Amazon Pay',
+    discountCodes: [],
+    lineItems: [
+      {
+        id: 'li_251',
+        // 系统内部 SKU 为空 — 因为渠道 SKU 找不到映射，系统无法解析
+        sku: '',
+        // 渠道侧的 ASIN/seller SKU，是订单原始携带的
+        channelSku: 'AMZ-ASIN-B0CX8P2QRT',
+        warehouseSku: undefined,
+        title: 'Bamboo Aromatherapy Diffuser',
+        variantTitle: '200ml / USB / Natural Wood',
+        quantity: 1,
+        unit: '件',
+        unitPrice: '$42.00',
+        discount: '$0.00',
+        tax: '$0.00',
+        subtotal: '$42.00',
+        fulfillmentStatus: '异常',
+        fulfillmentNote: '渠道 SKU "AMZ-ASIN-B0CX8P2QRT" 未在渠道 SKU 映射表中配置，无法解析系统 SKU',
+        weight: 380,
+        requiresShipping: true,
+        platformLineItemId: 'amz_li_3048351001'
+      },
+      {
+        id: 'li_252',
+        sku: '',
+        channelSku: 'AMZ-ASIN-B0DZ3K7MSW',
+        warehouseSku: undefined,
+        title: 'Essential Oil Starter Set',
+        variantTitle: '6-pack / Lavender + Eucalyptus + Peppermint...',
+        quantity: 1,
+        unit: '套',
+        unitPrice: '$26.00',
+        discount: '$0.00',
+        tax: '$0.00',
+        subtotal: '$26.00',
+        fulfillmentStatus: '异常',
+        fulfillmentNote: '渠道 SKU "AMZ-ASIN-B0DZ3K7MSW" 未在渠道 SKU 映射表中配置，无法解析系统 SKU',
+        weight: 220,
+        requiresShipping: true,
+        platformLineItemId: 'amz_li_3048351002'
+      }
+    ],
+    customer: {
+      name: 'Diana Prince',
+      email: 'diana.p@example.com',
+      phone: '+1 (206) 555-0341',
+      ordersCount: 3,
+      totalSpent: '$210.00',
+      tags: [],
+      acceptsMarketing: true
+    },
+    shippingAddress: {
+      name: 'Diana Prince',
+      phone: '+1 (206) 555-0341',
+      address1: '400 Broad St',
+      city: 'Seattle',
+      province: 'WA',
+      country: 'US',
+      zip: '98109',
+      formatted: '400 Broad St, Seattle, WA 98109, US'
+    },
+    billingAddress: {
+      name: 'Diana Prince',
+      phone: '+1 (206) 555-0341',
+      address1: '400 Broad St',
+      city: 'Seattle',
+      province: 'WA',
+      country: 'US',
+      zip: '98109',
+      formatted: '400 Broad St, Seattle, WA 98109, US'
+    },
+    shippingMethod: 'Amazon Standard Shipping (3-5 days)',
+    fulfillments: [],
+    transactions: [
+      {
+        id: 'txn_251',
+        kind: 'sale',
+        gateway: 'Amazon Pay',
+        method: 'Amazon Pay',
+        amount: '$68.00',
+        currency: 'USD',
+        status: 'success',
+        createdAt: '2026-06-06 08:30:30',
+        gatewayReference: 'S01-AMZ-8801234',
+        riskLevel: 'normal'
+      }
+    ],
+    refunds: [],
+    events: [
+      {
+        id: 'evt_25_04',
+        time: '2026-06-06 08:30:45',
+        actor: '系统',
+        actorRole: 'automation',
+        title: '订单挂起 — 等待渠道 SKU 映射配置',
+        description: '2 个渠道 SKU 未在映射表中配置。请前往「渠道管理 > Amazon US Amazon > SKU 映射」，为 AMZ-ASIN-B0CX8P2QRT 和 AMZ-ASIN-B0DZ3K7MSW 关联对应的系统 SKU，保存后订单将自动重新处理。',
+        type: 'system'
+      },
+      {
+        id: 'evt_25_03',
+        time: '2026-06-06 08:30:42',
+        actor: '系统',
+        actorRole: 'automation',
+        title: '渠道 SKU 解析失败',
+        description: 'AMZ-ASIN-B0CX8P2QRT → 渠道 SKU 映射表无记录 · AMZ-ASIN-B0DZ3K7MSW → 渠道 SKU 映射表无记录 · 无法解析系统 SKU，履约流中断',
+        type: 'system'
+      },
+      {
+        id: 'evt_25_02',
+        time: '2026-06-06 08:30:30',
+        actor: 'Amazon Pay',
+        actorRole: 'payment_gateway',
+        title: '支付成功',
+        description: 'Amazon Pay 收款 $68.00 · 参考号 S01-AMZ-8801234',
+        type: 'payment'
+      },
+      {
+        id: 'evt_25_01',
+        time: '2026-06-06 08:30:12',
+        actor: 'Diana Prince',
+        actorRole: 'customer',
+        title: '订单创建',
+        description: '通过 Amazon 平台下单，Amazon API 推送至系统',
+        type: 'customer'
+      }
+    ],
+    note: '',
+    tags: ['sku-exception', 'channel-sku-unmapped', 'amazon'],
+    platformMeta: {
+      'amazon_order_id': '114-3048351-0012345',
+      'marketplace_id': 'ATVPDKIKX0DER',
+      'sales_channel': 'Amazon.com'
+    }
+  },
+
+  /* ═══════════════════════════════════════════════════════════
+     so_026: 重量/尺寸超承运商限制 — 自动切换 LTL 卡车运输
+     商品重量超过普通包裹承运商（UPS/FedEx Parcel）上限，
+     履约引擎自动匹配 LTL 规则，生成 LTL 卡车运单，
+     含托盘包装、PRO 号、预约派送等 LTL 特有流程。
+  ════════════════════════════════════════════════════════════ */
+  so_026: {
+    id: 'so_026',
+    orderNo: 'SO-20260606-0026',
+    platformOrderNo: '#SH-7291680',
+    confirmationNumber: 'UXPQK0026',
+    referenceNo: 'B2B-FURN-201',
+    channel: 'Shopify',
+    merchant: 'US Store',
+    sourceType: 'web',
+    status: '处理中',
+    financialStatus: '已支付',
+    fulfillmentStatus: '已生成',
+    riskLevel: 'low',
+    exception: '',
+    createdAt: '2026-06-06 09:15:00',
+    updatedAt: '2026-06-06 10:30:00',
+    currency: 'USD',
+    subtotal: '$1,500.00',
+    totalDiscount: '$0.00',
+    totalShipping: '$150.00',
+    totalTax: '$0.00',
+    totalPrice: '$1,650.00',
+    taxesIncluded: false,
+    paymentGateway: 'Stripe',
+    discountCodes: [],
+    lineItems: [
+      {
+        id: 'li_261',
+        sku: 'WB-IND-200',
+        channelSku: 'SH-WB-IND-200',
+        warehouseSku: 'WMS-WB-IND-200',
+        title: 'Industrial Workbench',
+        variantTitle: '200cm / Steel Frame / Maple Top',
+        quantity: 1,
+        unit: '张',
+        unitPrice: '$880.00',
+        discount: '$0.00',
+        tax: '$0.00',
+        subtotal: '$880.00',
+        fulfillmentStatus: '已生成',
+        fulfillmentNote: '超重超尺，已切换 LTL 卡车运输',
+        weight: 68000,   // 68kg
+        requiresShipping: true,
+        platformLineItemId: 'li_sh_91680'
+      },
+      {
+        id: 'li_262',
+        sku: 'SS-UNIT-5T',
+        channelSku: 'SH-SS-UNIT-5T',
+        warehouseSku: 'WMS-SS-UNIT-5T',
+        title: 'Steel Shelving Unit',
+        variantTitle: '5-tier / 200×90×40cm',
+        quantity: 2,
+        unit: '组',
+        unitPrice: '$310.00',
+        discount: '$0.00',
+        tax: '$0.00',
+        subtotal: '$620.00',
+        fulfillmentStatus: '已生成',
+        fulfillmentNote: '超重超尺，已切换 LTL 卡车运输',
+        weight: 42000,   // 42kg/件 × 2 = 84kg
+        requiresShipping: true,
+        platformLineItemId: 'li_sh_91681'
+      }
+    ],
+    customer: {
+      name: 'Nathan Wright',
+      email: 'n.wright@wrightmfg.com',
+      phone: '+1 (312) 555-0188',
+      ordersCount: 8,
+      totalSpent: '$22,400.00',
+      tags: ['B2B', 'Manufacturing'],
+      acceptsMarketing: false
+    },
+    shippingAddress: {
+      name: 'Wright Manufacturing',
+      company: 'Wright Manufacturing Inc.',
+      phone: '+1 (312) 555-0188',
+      address1: '2200 W Pershing Rd',
+      city: 'Chicago',
+      province: 'IL',
+      country: 'US',
+      zip: '60609',
+      formatted: '2200 W Pershing Rd, Chicago, IL 60609, US'
+    },
+    billingAddress: {
+      name: 'Nathan Wright',
+      phone: '+1 (312) 555-0188',
+      address1: '2200 W Pershing Rd',
+      city: 'Chicago',
+      province: 'IL',
+      country: 'US',
+      zip: '60609',
+      formatted: '2200 W Pershing Rd, Chicago, IL 60609, US'
+    },
+    shippingMethod: 'XPO Logistics LTL (5-8 business days) — White Glove',
+    fulfillments: [
+      {
+        id: 'ful_261',
+        status: 'in_progress',
+        carrier: 'XPO Logistics',
+        trackingNumber: '',
+        // LTL 特有字段
+        shippingMode: 'ltl',
+        serviceLevel: 'XPO White Glove — 预约派送 + 室内搬运',
+        proNumber: 'XPO-PRO-2026060600261',
+        bolNumber: 'BOL-20260606-WB201',
+        fulfillmentOrderNo: 'FO-20260606-0261',
+        outboundOrderNo: 'OB-20260606-0261',
+        outboundStatus: '打包中',
+        palletCount: 2,
+        palletNo: 'PLT-261-A / PLT-261-B',
+        totalWeight: '152 kg',
+        lineItemIds: ['li_261', 'li_262'],
+        warehouse: 'US-Central-DFW',
+        matchedRule: 'LTL 大件货运规则',
+        warehouseReason: '距 Chicago 最近的大件仓，XPO LTL 覆盖',
+        packages: [
+          { id: 'pkg_261_1', type: 'pallet', no: 'PLT-261-A', weight: '70 kg', dimensions: '210×100×120 cm', lineItemIds: ['li_261'], note: '工作台拆平板包装，需卸货叉车' },
+          { id: 'pkg_261_2', type: 'pallet', no: 'PLT-261-B', weight: '82 kg', dimensions: '210×100×100 cm', lineItemIds: ['li_262'], note: '钢架货架×2，托盘捆扎' }
+        ]
+      }
+    ],
+    transactions: [
+      {
+        id: 'txn_261',
+        kind: 'sale',
+        gateway: 'Stripe',
+        method: 'Visa Business ****4488',
+        amount: '$1,650.00',
+        currency: 'USD',
+        status: 'success',
+        createdAt: '2026-06-06 09:15:30',
+        gatewayReference: 'ch_8Yt3R5WN...',
+        riskLevel: 'normal',
+        avsResult: 'Y',
+        cvvResult: 'M'
+      }
+    ],
+    refunds: [],
+    events: [
+      {
+        id: 'evt_26_09',
+        time: '2026-06-06 10:30:00',
+        actor: '系统',
+        actorRole: 'automation',
+        title: '出库单已生成',
+        description: '出库单 OB-20260606-0261 下发至仓库 US-Central-DFW · 包含 2 个托盘 PLT-261-A / PLT-261-B · 当前状态: 打包中',
+        type: 'fulfillment',
+        fulfillmentOrderNo: 'FO-20260606-0261'
+      },
+      {
+        id: 'evt_26_08',
+        time: '2026-06-06 10:28:00',
+        actor: '履约引擎',
+        actorRole: 'automation',
+        title: 'LTL 托盘计划',
+        description: 'FO-20260606-0261: 总重量 152 kg · 计划 2 个托盘 PLT-A(工作台70kg) + PLT-B(货架82kg) · 已生成提单号 BOL-20260606-WB201 · PRO 号 XPO-PRO-2026060600261',
+        type: 'fulfillment',
+        ruleName: 'LTL 大件货运规则',
+        fulfillmentOrderNo: 'FO-20260606-0261'
+      },
+      {
+        id: 'evt_26_07',
+        time: '2026-06-06 10:25:00',
+        actor: '履约引擎',
+        actorRole: 'automation',
+        title: '承运商决策 — 切换 LTL',
+        description: 'FO-20260606-0261: 总重量 152kg，超过 FedEx/UPS 包裹上限 68kg · 命中规则「重量超限切 LTL」· 客户要求白手套服务 · 选定 XPO Logistics LTL White Glove',
+        type: 'fulfillment',
+        ruleName: '重量超限切 LTL 规则'
+      },
+      {
+        id: 'evt_26_06',
+        time: '2026-06-06 10:22:00',
+        actor: '履约引擎',
+        actorRole: 'automation',
+        title: '选仓决策',
+        description: 'FO-20260606-0261: 收货地 Chicago IL · 候选仓 US-Central-DFW(1400km, 大件仓) / US-East-EWR(1000km, 无大件仓资质) · 大件货物需匹配有 LTL 装卸资质的仓库 · 选定 US-Central-DFW',
+        type: 'fulfillment',
+        ruleName: '大件仓库匹配规则',
+        fulfillmentOrderNo: 'FO-20260606-0261'
+      },
+      {
+        id: 'evt_26_05',
+        time: '2026-06-06 10:20:00',
+        actor: '履约引擎',
+        actorRole: 'automation',
+        title: '履约单已生成',
+        description: 'FO-20260606-0261 生成，含 WB-IND-200×1 + SS-UNIT-5T×2，总重 152kg，进入大件履约流',
+        type: 'fulfillment',
+        fulfillmentOrderNo: 'FO-20260606-0261'
+      },
+      {
+        id: 'evt_26_04',
+        time: '2026-06-06 10:18:00',
+        actor: '履约引擎',
+        actorRole: 'automation',
+        title: '重量超限检测',
+        description: '商品总重量: WB-IND-200(68kg) + SS-UNIT-5T×2(84kg) = 152kg · 超过 FedEx/UPS 包裹最大限制 68kg/件 · 触发大件货运流程',
+        type: 'fulfillment',
+        ruleName: '重量超限切 LTL 规则'
+      },
+      {
+        id: 'evt_26_03',
+        time: '2026-06-06 10:15:00',
+        actor: '履约引擎',
+        actorRole: 'automation',
+        title: '履约准入通过',
+        description: '2 个 SKU 档案完整 · requiresShipping=true · 支付已确认 · 准入通过，进入大件履约决策',
+        type: 'fulfillment',
+        ruleName: '履约准入规则'
+      },
+      {
+        id: 'evt_26_02',
+        time: '2026-06-06 09:16:00',
+        actor: '系统',
+        actorRole: 'automation',
+        title: '订单自动确认',
+        description: '风控通过，进入履约流',
+        type: 'system'
+      },
+      {
+        id: 'evt_26_02p',
+        time: '2026-06-06 09:15:30',
+        actor: 'Stripe',
+        actorRole: 'payment_gateway',
+        title: '支付成功',
+        description: 'Visa Business ****4488 收款 $1,650.00 · 网关参考号 ch_8Yt3R5WN...',
+        type: 'payment'
+      },
+      {
+        id: 'evt_26_01',
+        time: '2026-06-06 09:15:00',
+        actor: 'Nathan Wright',
+        actorRole: 'customer',
+        title: '订单创建',
+        description: '通过 Shopify B2B 渠道提交 · 备注: White glove delivery required, loading dock available',
+        type: 'customer'
+      }
+    ],
+    note: 'White glove delivery required, loading dock available at delivery address',
+    tags: ['B2B', 'LTL', 'oversize', 'white-glove'],
+    platformMeta: { 'shopify_order_id': '5820173271680' }
+  },
+
+  /* ═══════════════════════════════════════════════════════════
+     so_027: COD 货到付款
+     支付方式为货到付款（Cash on Delivery），支付状态在签收前一直是「待收款」，
+     快递员上门收款后系统更新为「已支付」。
+     Lazada 东南亚电商常见场景。
+  ════════════════════════════════════════════════════════════ */
+  so_027: {
+    id: 'so_027',
+    orderNo: 'SO-20260606-0027',
+    platformOrderNo: '#LZ-8801234',
+    confirmationNumber: 'LZ-CONF-0027',
+    referenceNo: '',
+    channel: 'Lazada',
+    merchant: 'SG Store',
+    sourceType: 'web',
+    status: '处理中',
+    financialStatus: '待收款',
+    fulfillmentStatus: '已发货',
+    riskLevel: 'low',
+    exception: '',
+    createdAt: '2026-06-06 10:00:20',
+    updatedAt: '2026-06-06 15:30:00',
+    currency: 'SGD',
+    subtotal: 'S$174.00',
+    totalDiscount: '$0.00',
+    totalShipping: 'S$15.00',
+    totalTax: '$0.00',
+    totalPrice: 'S$189.00',
+    taxesIncluded: false,
+    paymentGateway: 'COD',
+    discountCodes: [],
+    lineItems: [
+      {
+        id: 'li_271',
+        sku: 'AF-5L-BLK',
+        channelSku: 'LZ-AF-5L-BLK-SG',
+        warehouseSku: 'WMS-AF-5L-BLK',
+        title: 'Air Fryer 5L',
+        variantTitle: 'Black / Digital Panel',
+        quantity: 1,
+        unit: '台',
+        unitPrice: 'S$129.00',
+        discount: '$0.00',
+        tax: '$0.00',
+        subtotal: 'S$129.00',
+        fulfillmentStatus: '已发货',
+        weight: 3800,
+        requiresShipping: true,
+        platformLineItemId: 'lz_li_880123401'
+      },
+      {
+        id: 'li_272',
+        sku: 'BT-SET-3PC',
+        channelSku: 'LZ-BT-SET-3PC-SG',
+        warehouseSku: 'WMS-BT-SET-3PC',
+        title: 'Non-stick Baking Tray Set',
+        variantTitle: '3-piece / Carbon Steel',
+        quantity: 1,
+        unit: '套',
+        unitPrice: 'S$45.00',
+        discount: '$0.00',
+        tax: '$0.00',
+        subtotal: 'S$45.00',
+        fulfillmentStatus: '已发货',
+        weight: 950,
+        requiresShipping: true,
+        platformLineItemId: 'lz_li_880123402'
+      }
+    ],
+    customer: {
+      name: 'Priya Sharma',
+      email: 'priya.s@example.sg',
+      phone: '+65 9123 4567',
+      ordersCount: 7,
+      totalSpent: 'S$890.00',
+      tags: ['COD preferred'],
+      acceptsMarketing: true
+    },
+    shippingAddress: {
+      name: 'Priya Sharma',
+      phone: '+65 9123 4567',
+      address1: '88 Tanglin Halt Road',
+      address2: '#05-22',
+      city: 'Singapore',
+      province: '',
+      country: 'SG',
+      zip: '141088',
+      formatted: '88 Tanglin Halt Road #05-22, Singapore 141088'
+    },
+    billingAddress: {
+      name: 'Priya Sharma',
+      phone: '+65 9123 4567',
+      address1: '88 Tanglin Halt Road',
+      address2: '#05-22',
+      city: 'Singapore',
+      province: '',
+      country: 'SG',
+      zip: '141088',
+      formatted: '88 Tanglin Halt Road #05-22, Singapore 141088'
+    },
+    shippingMethod: 'Ninja Van Standard (1-3 business days) — 货到付款',
+    fulfillments: [
+      {
+        id: 'ful_271',
+        status: 'in_transit',
+        carrier: 'Ninja Van',
+        trackingNumber: 'NVSG00227106321',
+        trackingUrl: 'https://www.ninjavan.co/en-sg/tracking?id=NVSG00227106321',
+        shippingMode: 'parcel',
+        serviceLevel: 'Ninja Van Standard COD',
+        fulfillmentOrderNo: 'FO-20260606-0271',
+        outboundOrderNo: 'OB-20260606-0271',
+        outboundStatus: '已出库',
+        packageCount: 1,
+        totalWeight: '4.75 kg',
+        lineItemIds: ['li_271', 'li_272'],
+        shippedAt: '2026-06-06 15:30:00',
+        estimatedDelivery: '2026-06-08',
+        warehouse: 'SG-Central-SIN',
+        matchedRule: 'COD 本地快递规则'
+      }
+    ],
+    // COD 订单：目前无支付交易记录，快递员收款后才会生成
+    transactions: [],
+    refunds: [],
+    events: [
+      {
+        id: 'evt_27_08',
+        time: '2026-06-06 15:30:00',
+        actor: 'Ninja Van',
+        actorRole: 'carrier',
+        title: '揽收成功',
+        description: '包裹已取件 · 发货仓 SG-Central-SIN · 跟踪号 NVSG00227106321 · COD 应收金额 S$189.00',
+        type: 'logistics',
+        trackingNode: 'picked_up',
+        fulfillmentOrderNo: 'FO-20260606-0271'
+      },
+      {
+        id: 'evt_27_07',
+        time: '2026-06-06 15:28:00',
+        actor: 'SG-Central-SIN',
+        actorRole: 'warehouse_staff',
+        title: '出库交接完成',
+        description: '出库单 OB-20260606-0271 交接 Ninja Van · 快递员已取件 · COD 金额 S$189.00 已登记',
+        type: 'fulfillment',
+        fulfillmentOrderNo: 'FO-20260606-0271'
+      },
+      {
+        id: 'evt_27_06',
+        time: '2026-06-06 15:00:00',
+        actor: 'SG-Central-SIN',
+        actorRole: 'warehouse_staff',
+        title: '打包完成',
+        description: '2 件商品打包完成 · 包裹重量 4.75kg · 标注 COD S$189.00',
+        type: 'fulfillment',
+        fulfillmentOrderNo: 'FO-20260606-0271'
+      },
+      {
+        id: 'evt_27_05',
+        time: '2026-06-06 14:30:00',
+        actor: 'SG-Central-SIN',
+        actorRole: 'warehouse_staff',
+        title: '拣货完成',
+        description: '出库单 OB-20260606-0271 拣货完成 · AF-5L-BLK×1 + BT-SET-3PC×1',
+        type: 'fulfillment',
+        fulfillmentOrderNo: 'FO-20260606-0271'
+      },
+      {
+        id: 'evt_27_04',
+        time: '2026-06-06 12:00:00',
+        actor: '系统',
+        actorRole: 'automation',
+        title: '出库单已生成',
+        description: '出库单 OB-20260606-0271 下发至仓库 SG-Central-SIN · COD 金额 S$189.00 随单下发',
+        type: 'fulfillment',
+        fulfillmentOrderNo: 'FO-20260606-0271'
+      },
+      {
+        id: 'evt_27_03',
+        time: '2026-06-06 11:55:00',
+        actor: '履约引擎',
+        actorRole: 'automation',
+        title: '履约单已生成',
+        description: 'FO-20260606-0271 生成 · COD 订单，无需等待支付确认即可进入履约 · 快递员上门收款 S$189.00',
+        type: 'fulfillment',
+        ruleName: 'COD 订单履约规则',
+        fulfillmentOrderNo: 'FO-20260606-0271'
+      },
+      {
+        id: 'evt_27_02',
+        time: '2026-06-06 10:02:00',
+        actor: '系统',
+        actorRole: 'automation',
+        title: '订单确认 — COD 模式',
+        description: '货到付款订单，支付状态「待收款」，无需等待支付回调即可确认，进入履约流',
+        type: 'system'
+      },
+      {
+        id: 'evt_27_01',
+        time: '2026-06-06 10:00:20',
+        actor: 'Priya Sharma',
+        actorRole: 'customer',
+        title: '订单创建',
+        description: '通过 Lazada 下单，支付方式: 货到付款 (COD)',
+        type: 'customer'
+      }
+    ],
+    note: 'COD — 快递员收款 S$189.00',
+    tags: ['COD', 'lazada', 'sg'],
+    platformMeta: {
+      'lazada_order_id': 'LZ-8801234',
+      'payment_method': 'COD',
+      'cod_amount': '189.00',
+      'cod_currency': 'SGD'
+    }
+  },
+
+  /* ═══════════════════════════════════════════════════════════
+     so_028: B2B 分批发货
+     Walmart 大宗采购 PO，1200 件商品按约定分 3 批次发货，
+     每批独立生成履约单+出库单，各批有独立物流跟踪。
+  ════════════════════════════════════════════════════════════ */
+  so_028: {
+    id: 'so_028',
+    orderNo: 'SO-20260604-0028',
+    platformOrderNo: '#WMT-90282200',
+    confirmationNumber: 'WMT-CONF-0028',
+    referenceNo: 'PO-WMT-2026-0601',
+    channel: 'Walmart',
+    merchant: 'US Store',
+    sourceType: 'api',
+    status: '处理中',
+    financialStatus: '已支付',
+    fulfillmentStatus: '部分履约',
+    riskLevel: 'low',
+    exception: '',
+    createdAt: '2026-06-04 08:00:00',
+    updatedAt: '2026-06-06 16:00:00',
+    currency: 'USD',
+    subtotal: '$54,000.00',
+    totalDiscount: '$0.00',
+    totalShipping: '$0.00',
+    totalTax: '$0.00',
+    totalPrice: '$54,000.00',
+    taxesIncluded: false,
+    paymentGateway: 'Walmart Payment',
+    discountCodes: [],
+    lineItems: [
+      {
+        id: 'li_281',
+        sku: 'BT-SPK-CPT',
+        channelSku: 'WMT-BT-SPK-CPT-001',
+        warehouseSku: 'WMS-BT-SPK-CPT',
+        title: 'Bluetooth Speaker Compact',
+        variantTitle: 'Black / 10W / IPX5',
+        quantity: 600,
+        unit: '件',
+        unitPrice: '$45.00',
+        discount: '$0.00',
+        tax: '$0.00',
+        subtotal: '$27,000.00',
+        fulfillmentStatus: '部分履约',
+        fulfillmentNote: '第1批200件已发货，第2批200件发货中，第3批200件待发',
+        weight: 320,
+        requiresShipping: true,
+        platformLineItemId: 'wmt_li_90282200_01'
+      },
+      {
+        id: 'li_282',
+        sku: 'SP-WIFI-WHT',
+        channelSku: 'WMT-SP-WIFI-WHT-001',
+        warehouseSku: 'WMS-SP-WIFI-WHT',
+        title: 'Smart Plug Wi-Fi',
+        variantTitle: 'White / 15A / Energy Monitor',
+        quantity: 600,
+        unit: '件',
+        unitPrice: '$45.00',
+        discount: '$0.00',
+        tax: '$0.00',
+        subtotal: '$27,000.00',
+        fulfillmentStatus: '部分履约',
+        fulfillmentNote: '第1批200件已发货，第2批200件发货中，第3批200件待发',
+        weight: 180,
+        requiresShipping: true,
+        platformLineItemId: 'wmt_li_90282200_02'
+      }
+    ],
+    customer: {
+      name: 'Walmart DC #4091',
+      email: 'replenishment@walmart-dc4091.com',
+      phone: '+1 (479) 555-0100',
+      ordersCount: 34,
+      totalSpent: '$1,820,000.00',
+      tags: ['B2B', 'Walmart', 'Key Account'],
+      acceptsMarketing: false
+    },
+    shippingAddress: {
+      name: 'Walmart Distribution Center #4091',
+      company: 'Walmart Inc.',
+      phone: '+1 (479) 555-0100',
+      address1: '2301 SE J St',
+      city: 'Bentonville',
+      province: 'AR',
+      country: 'US',
+      zip: '72716',
+      formatted: '2301 SE J St, Bentonville, AR 72716, US'
+    },
+    billingAddress: {
+      name: 'Walmart Inc.',
+      phone: '+1 (479) 555-0100',
+      address1: '702 SW 8th St',
+      city: 'Bentonville',
+      province: 'AR',
+      country: 'US',
+      zip: '72716',
+      formatted: '702 SW 8th St, Bentonville, AR 72716, US'
+    },
+    shippingMethod: 'FedEx Freight LTL — 分批发货 (3 批次)',
+    fulfillments: [
+      {
+        // 第1批：已签收
+        id: 'ful_281',
+        status: 'delivered',
+        carrier: 'FedEx Freight',
+        trackingNumber: 'FEDEX-FRT-281001',
+        shippingMode: 'ltl',
+        serviceLevel: 'FedEx Freight Priority',
+        bolNumber: 'BOL-20260604-WMT-01',
+        proNumber: 'FXFRT-PRO-0604001',
+        fulfillmentOrderNo: 'FO-20260604-0281',
+        outboundOrderNo: 'OB-20260604-0281',
+        outboundStatus: '已出库',
+        packageNo: 'BATCH-1/3',
+        palletCount: 8,
+        totalWeight: '1,280 kg',
+        lineItemIds: ['li_281', 'li_282'],
+        shippedAt: '2026-06-05 09:00:00',
+        deliveredAt: '2026-06-07 14:00:00',
+        warehouse: 'US-Central-DFW',
+        matchedRule: 'B2B 分批发货规则'
+      },
+      {
+        // 第2批：运输中
+        id: 'ful_282',
+        status: 'in_transit',
+        carrier: 'FedEx Freight',
+        trackingNumber: 'FEDEX-FRT-281002',
+        shippingMode: 'ltl',
+        serviceLevel: 'FedEx Freight Priority',
+        bolNumber: 'BOL-20260606-WMT-02',
+        proNumber: 'FXFRT-PRO-0606002',
+        fulfillmentOrderNo: 'FO-20260606-0282',
+        outboundOrderNo: 'OB-20260606-0282',
+        outboundStatus: '已出库',
+        packageNo: 'BATCH-2/3',
+        palletCount: 8,
+        totalWeight: '1,280 kg',
+        lineItemIds: ['li_281', 'li_282'],
+        shippedAt: '2026-06-06 16:00:00',
+        estimatedDelivery: '2026-06-09',
+        warehouse: 'US-Central-DFW',
+        matchedRule: 'B2B 分批发货规则'
+      },
+      {
+        // 第3批：等待发货
+        id: 'ful_283',
+        status: 'fulfilled',
+        carrier: 'FedEx Freight',
+        trackingNumber: '',
+        shippingMode: 'ltl',
+        serviceLevel: 'FedEx Freight Priority',
+        fulfillmentOrderNo: 'FO-20260608-0283',
+        outboundOrderNo: '',
+        outboundStatus: '待拣货',
+        packageNo: 'BATCH-3/3',
+        palletCount: 8,
+        totalWeight: '1,280 kg',
+        lineItemIds: ['li_281', 'li_282'],
+        estimatedDelivery: '2026-06-12',
+        warehouse: 'US-Central-DFW',
+        matchedRule: 'B2B 分批发货规则'
+      }
+    ],
+    transactions: [
+      {
+        id: 'txn_281',
+        kind: 'sale',
+        gateway: 'Walmart Payment',
+        method: 'Walmart Net-30 Invoice',
+        amount: '$54,000.00',
+        currency: 'USD',
+        status: 'success',
+        createdAt: '2026-06-04 08:05:00',
+        gatewayReference: 'WMT-INV-20260604-4091'
+      }
+    ],
+    refunds: [],
+    events: [
+      {
+        id: 'evt_28_12',
+        time: '2026-06-06 16:00:00',
+        actor: 'US-Central-DFW',
+        actorRole: 'warehouse_staff',
+        title: '第 2 批出库交接完成',
+        description: 'OB-20260606-0282 交接 FedEx Freight · 8 托盘 · BATCH-2/3 · 跟踪号 FEDEX-FRT-281002',
+        type: 'fulfillment',
+        fulfillmentOrderNo: 'FO-20260606-0282'
+      },
+      {
+        id: 'evt_28_11',
+        time: '2026-06-07 14:00:00',
+        actor: 'FedEx Freight',
+        actorRole: 'carrier',
+        title: '第 1 批签收完成',
+        description: 'BOL-20260604-WMT-01 · Walmart DC #4091 签收 · 8 托盘 400件已确认 · BATCH-1/3',
+        type: 'logistics',
+        trackingNode: 'delivered',
+        fulfillmentOrderNo: 'FO-20260604-0281'
+      },
+      {
+        id: 'evt_28_10',
+        time: '2026-06-06 10:00:00',
+        actor: '系统',
+        actorRole: 'automation',
+        title: '第 3 批履约单已生成',
+        description: 'FO-20260608-0283 生成，含 BT-SPK-CPT×200 + SP-WIFI-WHT×200 · 按 B2B 排期第 3 批次 · 计划发货日 2026-06-08',
+        type: 'fulfillment',
+        fulfillmentOrderNo: 'FO-20260608-0283'
+      },
+      {
+        id: 'evt_28_09',
+        time: '2026-06-05 09:00:00',
+        actor: 'US-Central-DFW',
+        actorRole: 'warehouse_staff',
+        title: '第 1 批出库交接完成',
+        description: 'OB-20260604-0281 交接 FedEx Freight · 8 托盘 · BATCH-1/3 · 跟踪号 FEDEX-FRT-281001',
+        type: 'fulfillment',
+        fulfillmentOrderNo: 'FO-20260604-0281'
+      },
+      {
+        id: 'evt_28_08',
+        time: '2026-06-04 16:00:00',
+        actor: '系统',
+        actorRole: 'automation',
+        title: '第 2 批履约单已生成',
+        description: 'FO-20260606-0282 生成，含 BT-SPK-CPT×200 + SP-WIFI-WHT×200 · 按 B2B 排期第 2 批次 · 计划发货日 2026-06-06',
+        type: 'fulfillment',
+        fulfillmentOrderNo: 'FO-20260606-0282'
+      },
+      {
+        id: 'evt_28_07',
+        time: '2026-06-04 14:00:00',
+        actor: '系统',
+        actorRole: 'automation',
+        title: '出库单已生成 (第 1 批)',
+        description: '出库单 OB-20260604-0281 下发至 US-Central-DFW · BT-SPK-CPT×200 + SP-WIFI-WHT×200 · 8 托盘 1,280kg',
+        type: 'fulfillment',
+        fulfillmentOrderNo: 'FO-20260604-0281'
+      },
+      {
+        id: 'evt_28_06',
+        time: '2026-06-04 12:00:00',
+        actor: '履约引擎',
+        actorRole: 'automation',
+        title: '分批发货计划确认',
+        description: '1200件 商品按 PO 协议分 3 批次发货 · 批次1(400件 2026-06-05) + 批次2(400件 2026-06-06) + 批次3(400件 2026-06-08) · 生成 3 个履约单',
+        type: 'fulfillment',
+        ruleName: 'B2B 分批发货规则'
+      },
+      {
+        id: 'evt_28_05',
+        time: '2026-06-04 11:00:00',
+        actor: '履约引擎',
+        actorRole: 'automation',
+        title: '第 1 批履约单已生成',
+        description: 'FO-20260604-0281 生成，含 BT-SPK-CPT×200 + SP-WIFI-WHT×200 · 按 B2B 排期第 1 批次 · 计划发货日 2026-06-05',
+        type: 'fulfillment',
+        fulfillmentOrderNo: 'FO-20260604-0281'
+      },
+      {
+        id: 'evt_28_04',
+        time: '2026-06-04 10:00:00',
+        actor: '履约引擎',
+        actorRole: 'automation',
+        title: '选仓决策',
+        description: '收货地 Bentonville AR · 全部商品集中 US-Central-DFW(750km, 有充足库存) · BT-SPK-CPT=1800 / SP-WIFI-WHT=2200 · FedEx Freight LTL 覆盖 · 选定 US-Central-DFW',
+        type: 'fulfillment',
+        ruleName: 'B2B 集中发货策略'
+      },
+      {
+        id: 'evt_28_03',
+        time: '2026-06-04 09:30:00',
+        actor: '履约引擎',
+        actorRole: 'automation',
+        title: '履约准入通过',
+        description: '1200 件商品 requiresShipping=true · 支付确认 (Net-30 Invoice) · B2B 客户资质验证通过 · 进入分批发货决策',
+        type: 'fulfillment',
+        ruleName: 'B2B 履约准入规则'
+      },
+      {
+        id: 'evt_28_02',
+        time: '2026-06-04 08:05:00',
+        actor: 'Walmart Payment',
+        actorRole: 'payment_gateway',
+        title: '支付确认',
+        description: 'Walmart Net-30 Invoice · $54,000.00 · 参考号 WMT-INV-20260604-4091',
+        type: 'payment'
+      },
+      {
+        id: 'evt_28_01',
+        time: '2026-06-04 08:00:00',
+        actor: 'Walmart DC #4091',
+        actorRole: 'customer',
+        title: '订单创建',
+        description: '通过 Walmart Supplier API 推送 · PO 号 PO-WMT-2026-0601 · 1200件分批交货协议',
+        type: 'customer'
+      }
+    ],
+    note: 'PO-WMT-2026-0601 — 分3批交货，每批400件。批次1：6/5，批次2：6/6，批次3：6/8。',
+    tags: ['B2B', 'Walmart', 'bulk-order', 'split-shipment', 'LTL'],
+    platformMeta: {
+      'walmart_po_number': 'PO-WMT-2026-0601',
+      'walmart_vendor_id': 'VND-00412',
+      'shipment_type': 'COLLECT'
+    }
+  },
+
+  /* ═══════════════════════════════════════════════════════════
+     so_029: 退货逆向物流
+     客户签收后因商品故障申请退货，平台生成 RMA 退货授权，
+     客户贴标寄回，仓库收到后完成验货入库，系统完成退款。
+  ════════════════════════════════════════════════════════════ */
+  so_029: {
+    id: 'so_029',
+    orderNo: 'SO-20260528-0029',
+    platformOrderNo: '#SH-7290120',
+    confirmationNumber: 'UXPQK0029',
+    referenceNo: '',
+    channel: 'Shopify',
+    merchant: 'US Store',
+    sourceType: 'web',
+    status: '已完成',
+    financialStatus: '已退款',
+    fulfillmentStatus: '已退货',
+    riskLevel: 'low',
+    exception: '退货处理中',
+    createdAt: '2026-05-28 16:45:00',
+    updatedAt: '2026-06-06 11:00:00',
+    currency: 'USD',
+    subtotal: '$419.00',
+    totalDiscount: '$0.00',
+    totalShipping: '$25.00',
+    totalTax: '$15.00',
+    totalPrice: '$459.00',
+    taxesIncluded: false,
+    paymentGateway: 'Stripe',
+    discountCodes: [],
+    lineItems: [
+      {
+        id: 'li_291',
+        sku: 'RV-LDS-X8',
+        channelSku: 'SH-RV-LDS-X8',
+        warehouseSku: 'WMS-RV-LDS-X8',
+        title: 'Robot Vacuum LiDAR X8',
+        variantTitle: 'White / LiDAR Navigation / Self-Empty',
+        quantity: 1,
+        unit: '台',
+        unitPrice: '$389.00',
+        discount: '$0.00',
+        tax: '$14.00',
+        subtotal: '$403.00',
+        fulfillmentStatus: '已退货',
+        fulfillmentNote: '客户反馈: 充电底座故障，充不进电 · RMA 已批准 · 已入库验货',
+        batchNo: 'BATCH-RV-2026050',
+        serialNumbers: ['SN-RVX8-06290012'],
+        weight: 4200,
+        requiresShipping: true,
+        platformLineItemId: 'li_sh_90120'
+      },
+      {
+        id: 'li_292',
+        sku: 'RV-MOP-ATT',
+        channelSku: 'SH-RV-MOP-ATT',
+        warehouseSku: 'WMS-RV-MOP-ATT',
+        title: 'Robot Vacuum Mop Attachment',
+        variantTitle: 'Compatible with X8 Series',
+        quantity: 1,
+        unit: '件',
+        unitPrice: '$55.00',
+        discount: '$0.00',
+        tax: '$2.20',
+        subtotal: '$57.20',
+        // 配件随主机一起退回
+        fulfillmentStatus: '已退货',
+        fulfillmentNote: '随主机一并退回',
+        weight: 280,
+        requiresShipping: true,
+        platformLineItemId: 'li_sh_90121'
+      }
+    ],
+    customer: {
+      name: 'Jessica Lane',
+      email: 'jessica.l@example.com',
+      phone: '+1 (602) 555-0251',
+      ordersCount: 9,
+      totalSpent: '$2,180.00',
+      tags: ['VIP', 'Repeat buyer'],
+      acceptsMarketing: true
+    },
+    shippingAddress: {
+      name: 'Jessica Lane',
+      phone: '+1 (602) 555-0251',
+      address1: '1 E Washington St',
+      city: 'Phoenix',
+      province: 'AZ',
+      country: 'US',
+      zip: '85004',
+      formatted: '1 E Washington St, Phoenix, AZ 85004, US'
+    },
+    billingAddress: {
+      name: 'Jessica Lane',
+      phone: '+1 (602) 555-0251',
+      address1: '1 E Washington St',
+      city: 'Phoenix',
+      province: 'AZ',
+      country: 'US',
+      zip: '85004',
+      formatted: '1 E Washington St, Phoenix, AZ 85004, US'
+    },
+    shippingMethod: 'FedEx Home Delivery (2-4 business days)',
+    fulfillments: [
+      {
+        // 正向发货记录（已完成）
+        id: 'ful_291_fwd',
+        status: 'delivered',
+        carrier: 'FedEx',
+        trackingNumber: '7734920183647',
+        shippingMode: 'parcel',
+        serviceLevel: 'FedEx Home Delivery',
+        fulfillmentOrderNo: 'FO-20260528-0291',
+        outboundOrderNo: 'OB-20260528-0291',
+        outboundStatus: '已出库',
+        packageCount: 1,
+        totalWeight: '4.48 kg',
+        lineItemIds: ['li_291', 'li_292'],
+        shippedAt: '2026-05-29 10:00:00',
+        deliveredAt: '2026-06-01 15:30:00',
+        warehouse: 'US-West-LAX',
+        matchedRule: '西海岸就近分仓'
+      },
+      {
+        // 逆向退货记录（入库中）
+        id: 'ful_291_ret',
+        status: 'in_transit',
+        carrier: 'FedEx',
+        // 退货运单号（系统生成的退货标签）
+        trackingNumber: 'RET-7731029384711',
+        shippingMode: 'parcel',
+        serviceLevel: 'FedEx Return Label (prepaid)',
+        fulfillmentOrderNo: 'RMA-20260604-0291',
+        outboundOrderNo: 'IB-20260606-0291',   // 入库单号（逆向）
+        outboundStatus: '待验货入库',
+        packageCount: 1,
+        lineItemIds: ['li_291', 'li_292'],
+        shippedAt: '2026-06-05 09:00:00',
+        estimatedDelivery: '2026-06-07',
+        warehouse: 'US-West-LAX'
+      }
+    ],
+    transactions: [
+      {
+        id: 'txn_291',
+        kind: 'sale',
+        gateway: 'Stripe',
+        method: 'Visa ****9912',
+        amount: '$459.00',
+        currency: 'USD',
+        status: 'success',
+        createdAt: '2026-05-28 16:46:00',
+        gatewayReference: 'ch_4Qr8V2MZ...',
+        riskLevel: 'normal',
+        avsResult: 'Y',
+        cvvResult: 'M'
+      },
+      {
+        // 退款交易
+        id: 'txn_291_ref',
+        kind: 'refund',
+        gateway: 'Stripe',
+        method: 'Visa ****9912',
+        amount: '$459.00',
+        currency: 'USD',
+        status: 'success',
+        createdAt: '2026-06-06 11:00:00',
+        gatewayReference: 're_6Lm9X3KY...'
+      }
+    ],
+    refunds: [
+      {
+        id: 'ref_291',
+        reason: '商品故障 — 充电底座无法充电',
+        amount: '$459.00',
+        lineItems: [
+          { lineItemId: 'li_291', quantity: 1 },
+          { lineItemId: 'li_292', quantity: 1 }
+        ],
+        createdAt: '2026-06-06 11:00:00',
+        note: '客服核实充电故障属实，全额退款'
+      }
+    ],
+    events: [
+      {
+        id: 'evt_29_12',
+        time: '2026-06-06 11:00:00',
+        actor: 'Stripe',
+        actorRole: 'payment_gateway',
+        title: '退款完成',
+        description: 'Visa ****9912 退款 $459.00 · 退款参考号 re_6Lm9X3KY... · 预计 5-10 个工作日到账',
+        type: 'payment'
+      },
+      {
+        id: 'evt_29_11',
+        time: '2026-06-06 10:55:00',
+        actor: 'Lisa Wang',
+        actorRole: 'ops_manager',
+        title: '退款审批通过',
+        description: '退货验货通过 · 全额退款 $459.00 已批准 · 触发 Stripe 退款',
+        type: 'edit'
+      },
+      {
+        id: 'evt_29_10',
+        time: '2026-06-06 10:30:00',
+        actor: 'US-West-LAX',
+        actorRole: 'warehouse_staff',
+        title: '退货验货完成',
+        description: 'IB-20260606-0291 收货验货 · Robot Vacuum SN-RVX8-06290012 检测: 充电底座主板损坏，属质量问题 · Mop Attachment: 全新未拆封 · 退货商品将进入维修/报废流程',
+        type: 'fulfillment',
+        fulfillmentOrderNo: 'RMA-20260604-0291'
+      },
+      {
+        id: 'evt_29_09',
+        time: '2026-06-06 09:00:00',
+        actor: 'US-West-LAX',
+        actorRole: 'warehouse_staff',
+        title: '退货包裹已到仓',
+        description: 'FedEx RET-7731029384711 到达 US-West-LAX · 1 个包裹 · 正在安排验货',
+        type: 'fulfillment',
+        fulfillmentOrderNo: 'RMA-20260604-0291'
+      },
+      {
+        id: 'evt_29_08',
+        time: '2026-06-05 09:00:00',
+        actor: 'FedEx',
+        actorRole: 'carrier',
+        title: '退货已揽收',
+        description: 'FedEx 揽收客户退货包裹 · 退货运单 RET-7731029384711 · 目的地: US-West-LAX',
+        type: 'logistics',
+        trackingNode: 'picked_up',
+        fulfillmentOrderNo: 'RMA-20260604-0291'
+      },
+      {
+        id: 'evt_29_07',
+        time: '2026-06-04 14:00:00',
+        actor: '系统',
+        actorRole: 'automation',
+        title: 'RMA 退货标签已发送',
+        description: 'RMA-20260604-0291 · 预付费 FedEx 退货面单已发送至 jessica.l@example.com · 退货运单 RET-7731029384711',
+        type: 'system'
+      },
+      {
+        id: 'evt_29_06',
+        time: '2026-06-04 13:30:00',
+        actor: 'Sarah Kim',
+        actorRole: 'ops_manager',
+        title: 'RMA 退货申请已批准',
+        description: '客服核实故障属实 (充电底座主板) · 批准全额退款方案 · 生成 RMA-20260604-0291 · 发送预付费退货标签',
+        type: 'edit'
+      },
+      {
+        id: 'evt_29_05',
+        time: '2026-06-04 11:00:00',
+        actor: 'Jessica Lane',
+        actorRole: 'customer',
+        title: '客户发起退货申请',
+        description: '反馈问题: 充电底座无法给机器人充电，已尝试重置无效 · 申请退货退款 · 工单 TK-20260604-0291',
+        type: 'customer'
+      },
+      {
+        id: 'evt_29_04',
+        time: '2026-06-01 15:30:00',
+        actor: 'FedEx',
+        actorRole: 'carrier',
+        title: '客户签收',
+        description: '签收人: J. Lane · 跟踪号 7734920183647 · 1 E Washington St, Phoenix AZ 85004',
+        type: 'logistics',
+        trackingNode: 'delivered',
+        fulfillmentOrderNo: 'FO-20260528-0291'
+      },
+      {
+        id: 'evt_29_03',
+        time: '2026-05-29 10:00:00',
+        actor: 'US-West-LAX',
+        actorRole: 'warehouse_staff',
+        title: '出库交接完成',
+        description: 'OB-20260528-0291 交接 FedEx Home Delivery · 跟踪号 7734920183647',
+        type: 'fulfillment',
+        fulfillmentOrderNo: 'FO-20260528-0291'
+      },
+      {
+        id: 'evt_29_02',
+        time: '2026-05-28 16:46:00',
+        actor: 'Stripe',
+        actorRole: 'payment_gateway',
+        title: '支付成功',
+        description: 'Visa ****9912 收款 $459.00 · 网关参考号 ch_4Qr8V2MZ...',
+        type: 'payment'
+      },
+      {
+        id: 'evt_29_01',
+        time: '2026-05-28 16:45:00',
+        actor: 'Jessica Lane',
+        actorRole: 'customer',
+        title: '订单创建',
+        description: '通过 Shopify Web Checkout 提交',
+        type: 'customer'
+      }
+    ],
+    note: '退货处理中 — RMA-20260604-0291 · 全额退款 $459.00',
+    tags: ['return', 'refund', 'quality-issue', 'RMA'],
+    platformMeta: { 'shopify_order_id': '5820173270120' }
   }
 };

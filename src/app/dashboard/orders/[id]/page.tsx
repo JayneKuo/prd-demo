@@ -7,6 +7,7 @@ import { StatusBadge } from '@/components/admin/status-badge';
 import { orders } from '@/lib/mock-data/orders';
 import { getOrderDetail, type OrderDetail, type FulfillmentPackage, type PackageUnit } from '@/lib/mock-data/order-details';
 import { cn } from '@/lib/utils';
+import { OrderTimeline } from '@/components/dashboard/order-timeline';
 
 /* ─── Copy Button ─── */
 function CopyButton({ text }: { text: string }) {
@@ -38,11 +39,6 @@ function mapFulfillmentStatus(ful: FulfillmentPackage): string {
   if (ful.outboundStatus) return ful.outboundStatus;
   return '处理中';
 }
-
-/* ─── Event icon ─── */
-const eventIcon: Record<string, string> = {
-  system: '⚙️', payment: '💳', fulfillment: '📦', customer: '👤', edit: '✏️', risk: '🛡️', note: '📝', logistics: '🚚'
-};
 
 const lifecycleLabels = ['下单', '支付', '确认', '履约', '签收'] as const;
 
@@ -770,15 +766,18 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             )}
           </section>
 
-          {/* ⑥ 操作时间线 — 根据当前 Tab 过滤 */}
+          {/* ⑥ 操作时间线 — 根据当前 Tab 过滤，支持折叠分组与分页 */}
           <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)]">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3">
-              <h2 className="flex items-center gap-2 text-[14px] font-semibold text-[var(--foreground)]"><Clock3 className="size-4 text-[var(--muted)]" />操作时间线</h2>
+              <h2 className="flex items-center gap-2 text-[14px] font-semibold text-[var(--foreground)]">
+                <Clock3 className="size-4 text-[var(--muted)]" />操作时间线
+              </h2>
               <span className="text-[12px] text-[var(--muted)]">
                 {activeTab === '商品明细' && '全部事件'}
                 {activeTab === '履约信息' && '履约决策'}
                 {activeTab === '物流信息' && '物流跟踪'}
-                {' · '}{detail.events.filter((event) => {
+                {' · '}
+                {detail.events.filter((event) => {
                   if (activeTab === '履约信息') return event.type === 'fulfillment';
                   if (activeTab === '物流信息') return event.type === 'logistics';
                   return true;
@@ -786,70 +785,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               </span>
             </div>
             <div className="px-4 py-4">
-              {(() => {
-                const filteredEvents = detail.events
-                  .filter((event) => {
-                    if (activeTab === '履约信息') return event.type === 'fulfillment';
-                    if (activeTab === '物流信息') return event.type === 'logistics';
-                    return true;
-                  })
-                  .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
-
-                if (filteredEvents.length === 0) {
-                  return (
-                    <div className="py-8 text-center">
-                      <Package className="mx-auto size-8 text-[var(--border)]" />
-                      <p className="mt-2 text-[13px] text-[var(--muted)]">
-                        {activeTab === '物流信息' ? '暂无物流跟踪记录 · 发货后将自动生成' : '暂无履约决策记录'}
-                      </p>
-                    </div>
-                  );
-                }
-
-                return (
-                  <ol className="relative border-l-2 border-[var(--border-subtle)] pl-6 space-y-4">
-                    {filteredEvents.map((event) => (
-                      <li key={event.id} className="relative">
-                        <span className="absolute -left-[29px] flex size-4 items-center justify-center text-[11px]">{eventIcon[event.type] ?? '⚙️'}</span>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-[13px] font-medium text-[var(--foreground)]">{event.title}</span>
-                          <span className="shrink-0 text-[11px] text-[var(--muted-foreground)]">{event.time}</span>
-                        </div>
-                        <div className="mt-0.5 text-[12px] text-[var(--muted)]">
-                          <span className="font-medium text-[var(--foreground)]">{event.actor}</span>
-                          {event.actorRole && <span className="ml-1.5 rounded bg-[var(--surface-subtle)] px-1.5 py-0.5 text-[10px] text-[var(--muted-foreground)]">{event.actorRole}</span>}
-                        </div>
-                        {event.description && <p className="mt-0.5 text-[12px] leading-5 text-[var(--muted)]">{event.description}</p>}
-                        {/* 命中规则标签 */}
-                        {event.ruleName && (
-                          <div className="mt-1.5">
-                            <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-[var(--primary)] ring-1 ring-inset ring-blue-200">
-                              ⚡ {event.ruleName}
-                            </span>
-                          </div>
-                        )}
-                        {/* 物流节点标识 */}
-                        {event.trackingNode && (
-                          <div className="mt-1.5">
-                            <span className={cn(
-                              'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset',
-                              event.trackingNode === 'delivered' && 'bg-green-50 text-[var(--success)] ring-green-200',
-                              event.trackingNode === 'out_for_delivery' && 'bg-amber-50 text-[var(--warning)] ring-amber-200',
-                              event.trackingNode === 'in_transit' && 'bg-blue-50 text-[var(--primary)] ring-blue-200',
-                              event.trackingNode === 'picked_up' && 'bg-[var(--surface-subtle)] text-[var(--foreground)] ring-[var(--border)]'
-                            )}>
-                              {event.trackingNode === 'delivered' && '✓ 已签收'}
-                              {event.trackingNode === 'out_for_delivery' && '🛵 派送中'}
-                              {event.trackingNode === 'in_transit' && '🔄 运输中'}
-                              {event.trackingNode === 'picked_up' && '📥 已揽收'}
-                            </span>
-                          </div>
-                        )}
-                      </li>
-                    ))}
-                  </ol>
-                );
-              })()}
+              <OrderTimeline events={detail.events} activeTab={activeTab} />
             </div>
           </section>
 

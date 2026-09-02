@@ -74,6 +74,22 @@ const statusMap: Record<string, { label: string; variant: StatusVariant }> = {
   'exception': { label: 'Exception', variant: 'danger' },
   'cancelled': { label: 'Cancelled', variant: 'neutral' },
 
+  // Product status
+  '草稿': { label: '草稿', variant: 'neutral' },
+  '已发布': { label: '已发布', variant: 'success' },
+  '下架': { label: '下架', variant: 'neutral' },
+  '审核中': { label: '审核中', variant: 'warning' },
+
+  // Channel publish status
+  '未发布': { label: '未发布', variant: 'neutral' },
+  '发布中': { label: '发布中', variant: 'info' },
+  '发布失败': { label: '发布失败', variant: 'danger' },
+  '已下架': { label: '已下架', variant: 'neutral' },
+
+  // Publish log status
+  '成功': { label: '成功', variant: 'success' },
+  '失败': { label: '失败', variant: 'danger' },
+
   // Carrier / Mapping status
   '启用': { label: '启用', variant: 'success' },
   '停用': { label: '停用', variant: 'neutral' },
