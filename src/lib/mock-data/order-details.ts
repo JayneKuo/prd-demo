@@ -2,7 +2,7 @@
  * 订单详情完整数据模型
  * 覆盖 Shopify / Amazon / Walmart 订单字段的超集
  */
-
+import { orderDetailsExtra } from './order-details-extra';
 /* ─── Line Item (商品行) ─── */
 export type OrderLineItem = {
   id: string;
@@ -19,12 +19,20 @@ export type OrderLineItem = {
   /** 单位 (件/箱/套/卷/台 etc.) */
   unit?: string;
   unitPrice: string;
-  /** 折扣分摊 */
+  /** 商品行级折扣（平台促销、阶梯价等） */
   discount: string;
+  /** 订单级折扣分摊到本行（优惠券、满减等） */
+  orderDiscountAlloc?: string;
   /** 税费 */
   tax: string;
-  /** 小计 (quantity × unitPrice - discount + tax) */
+  /** 商品原价小计（unitPrice × quantity，未扣折扣） */
+  grossSubtotal?: string;
+  /** 实付小计（扣除所有折扣后） */
   subtotal: string;
+  /** 下单时的 SKU 成本快照（来自 Inventory Cost Ledger） */
+  costSnapshot?: number;
+  /** 成本来源 */
+  costSource?: 'wms_receipt' | 'manual';
   /** 履约状态 */
   fulfillmentStatus: string;
   /** 履约状态说明 (如: 库存不足、无需发货、等待补货 等) */
@@ -43,6 +51,31 @@ export type OrderLineItem = {
   requiresShipping: boolean;
   /** 平台 line item id */
   platformLineItemId?: string;
+  /**
+   * 商品履约类型（来自商品中心，随 SKU 带入，只读）
+   * 驱动该行的履约路径和附加字段
+   * - physical:  实物出库
+   * - service:   生成工单，无需发货
+   * - presale:   预售期后出库
+   * - rental:    出库 + 到期归还
+   * - gift_card: 生成卡号，无实体出库
+   * - digital:   生成授权码，无 COGS
+   */
+  itemType?: FulfillmentType;
+  /** 服务商品：预约日期 */
+  serviceScheduledDate?: string;
+  /** 服务商品：时间窗口 */
+  serviceTimeWindow?: string;
+  /** 预售商品：预售截止日期 */
+  presaleEndDate?: string;
+  /** 租赁商品：租赁开始日期 */
+  rentalStartDate?: string;
+  /** 租赁商品：租赁结束日期 */
+  rentalEndDate?: string;
+  /** 礼品卡：收件人邮箱 */
+  giftCardRecipientEmail?: string;
+  /** 礼品卡：有效期 */
+  giftCardExpiry?: string;
 };
 
 /* ─── 支付交易 ─── */
@@ -183,13 +216,31 @@ export type FulfillmentPackage = {
 };
 
 /* ─── 退款记录 ─── */
+export type RefundType =
+  | 'refund_only'          // 仅退款，商品不退回（客户保留商品，成本不变）
+  | 'return_refund'        // 退货退款，商品退回且状况良好可二次销售（成本冲销）
+  | 'return_refund_damaged'; // 退货退款，但商品损坏/报废（成本不可回收，与仅退款同）
+
 export type RefundRecord = {
   id: string;
+  /** 退款单号（对外展示） */
+  refundNo?: string;
   reason: string;
   amount: string;
   lineItems: { lineItemId: string; quantity: number }[];
   createdAt: string;
   note?: string;
+  /** 退款方式（原路返回 / 余额 / 手动） */
+  method?: string;
+  /** 处理人 */
+  processedBy?: string;
+  /**
+   * 退款类型（影响成本计算）
+   * - refund_only:           仅退款，成本不变
+   * - return_refund:         退货退款，商品可二次销售，COGS 冲销
+   * - return_refund_damaged: 退货但商品损坏，COGS 不可回收
+   */
+  refundType?: RefundType;
 };
 
 /* ─── 时间线事件 ─── */
@@ -203,13 +254,17 @@ export type OrderEvent = {
   title: string;
   description?: string;
   /** event type for icon/color */
-  type: 'system' | 'payment' | 'fulfillment' | 'customer' | 'edit' | 'risk' | 'note' | 'logistics';
+  type: 'system' | 'payment' | 'fulfillment' | 'customer' | 'edit' | 'risk' | 'note' | 'logistics' | 'refund' | 'upstreamChange';
   /** 关联的履约单号 */
   fulfillmentOrderNo?: string;
   /** 命中的规则名称 */
   ruleName?: string;
   /** 物流跟踪节点 */
   trackingNode?: string;
+  /** 上游变更类型（type=upstreamChange 时使用）*/
+  upstreamChangeType?: string;
+  /** 上游变更摘要：自然语言描述变更内容，含商品名/SKU/数量（type=upstreamChange 时使用）*/
+  upstreamChangeSummary?: string;
 };
 
 /* ─── 客户信息 ─── */
@@ -228,6 +283,198 @@ export type OrderCustomer = {
 };
 
 /* ─── 订单详情完整模型 ─── */
+/* ─── 附加费用（商家手动录入，影响利润计算）─── */
+export type AdditionalFeeType =
+  | 'handling'     // 包材/操作费
+  | 'insurance'    // 保险费
+  | 'customs'      // 关税/清关费
+  | 'return'       // 退货处理费
+  | 'platform'     // 平台专项费用
+  | 'marketing'    // 营销/广告费
+  | 'other';       // 其他
+
+export type AdditionalFee = {
+  id: string;
+  type: AdditionalFeeType;
+  label: string;       // 费用名称（可自定义）
+  amount: number;      // 金额（正数=成本，负数=补贴/扣减）
+  currency: string;
+  note?: string;
+  createdAt: string;
+};
+
+/* ─── 上游渠道变更事件（系统自动感知）─── */
+export type UpstreamChangeType =
+  | 'order_cancelled'       // 订单被取消
+  | 'buyer_cancel_request'  // 买家申请取消
+  | 'item_cancelled'        // 商品被取消
+  | 'quantity_changed'      // 商品数量变更
+  | 'address_changed'       // 收货地址变更
+  | 'item_added'            // 商品新增
+  | 'price_changed';        // 价格变更
+
+export type UpstreamChangeStatus =
+  | 'pending'      // 待处置（新产生，未处理）
+  | 'handled'      // 已处置
+  | 'ignored';     // 已忽略
+
+/** 订单履约阶段（影响处置策略） */
+export type FulfillmentStage =
+  | 'pending_review'    // 待审核发货
+  | 'pending_outbound'  // 待仓库出库（已下单至仓库，未出库）
+  | 'outbounded';       // 仓库已出库（已发货）
+
+export type UpstreamChange = {
+  id: string;
+  /** 变更类型 */
+  type: UpstreamChangeType;
+  /** 变更状态 */
+  status: UpstreamChangeStatus;
+  /** 发生时间（上游推送时间） */
+  detectedAt: string;
+  /** 处置时间 */
+  handledAt?: string;
+  /** 处置人 */
+  handledBy?: string;
+  /** 处置动作 */
+  handledAction?: string;
+  /** 订单当时所处的履约阶段 */
+  stage: FulfillmentStage;
+  /** 变更前数据（用于对比展示） */
+  before?: Record<string, unknown>;
+  /** 变更后数据 */
+  after?: Record<string, unknown>;
+  /** 渠道原始变更说明 */
+  channelNote?: string;
+  /** 系统建议的处置方式 */
+  suggestions: UpstreamChangeSuggestion[];
+};
+
+export type UpstreamChangeSuggestion = {
+  action: string;           // 操作标识
+  label: string;            // 显示文字
+  variant: 'primary' | 'danger' | 'default';
+  description?: string;     // 操作说明
+};
+
+/* ─── 外部成本补充（WMS/TMS 回传，不在订单数据里的部分）─── */
+export type OrderCostSupplement = {  /** 仓储操作费（WMS 回传：拣货+打包+操作） */
+  warehouseCost?: number;
+  /** 企业承担运输成本（TMS/Carrier 回传） */
+  freightCost?: number;
+  /** 成本是否完整 */
+  costComplete: boolean;
+  /** 成本不完整说明 */
+  costPendingNote?: string;
+  currency: string;
+};
+
+/* ─── 订单利润分析（轻量：只存无法从订单自身推算的外部数据）─── */
+export type OrderProfitability = OrderCostSupplement;
+
+/* ─── 履约类型系统 ─── */
+
+/**
+ * 订单履约类型 — 驱动进度条步骤、必填字段、成本模型
+ * physical:    实物商品（默认，走仓库出库流程）
+ * presale:     预售商品（延迟履约，预售期结束后才能出库）
+ * service:     服务商品（关联工单，无需发货）
+ * rental:      租赁商品（出库 + 到期归还，成本按折旧计）
+ * gift_card:   礼品卡 / 储值卡（生成卡号/PIN，无实体出库，记负债）
+ * digital:     数字商品（License / 下载链接，无 COGS）
+ */
+export type FulfillmentType =
+  | 'physical'
+  | 'presale'
+  | 'service'
+  | 'rental'
+  | 'gift_card'
+  | 'digital';
+
+/** 预售商品配置 */
+export type PresaleConfig = {
+  /** 预售截止日期 (ISO date string) */
+  presaleEndDate: string;
+  /** 最低起售数量（达到才发货，可选）*/
+  minQtyThreshold?: number;
+  /** 当前已预售数量 */
+  currentPresaleQty?: number;
+  /** 预售状态 */
+  presaleStatus: 'active' | 'ended' | 'cancelled';
+  /** 预计发货日期（预售期结束后的出库目标日期）*/
+  estimatedShipDate?: string;
+};
+
+/** 服务商品配置 */
+export type ServiceConfig = {
+  /** 服务类型 (installation / maintenance / consulting / delivery_with_install 等) */
+  serviceType: string;
+  /** 预约服务日期 */
+  scheduledDate?: string;
+  /** 预约时间窗口 (e.g. "14:00–18:00") */
+  scheduledTimeWindow?: string;
+  /** 服务地址（可能与收货地址不同）*/
+  serviceAddress?: string;
+  /** 关联工单号 */
+  workOrderNo?: string;
+  /** 服务状态 */
+  serviceStatus: 'pending_schedule' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  /** 服务技术人员 */
+  technician?: string;
+  /** 完成时间 */
+  completedAt?: string;
+};
+
+/** 租赁商品配置 */
+export type RentalConfig = {
+  /** 租赁开始日期 */
+  rentalStartDate: string;
+  /** 租赁结束日期 */
+  rentalEndDate: string;
+  /** 押金金额 */
+  depositAmount?: string;
+  /** 押金状态 */
+  depositStatus?: 'held' | 'released' | 'forfeited';
+  /** 租赁状态 */
+  rentalStatus: 'active' | 'overdue' | 'returned' | 'cancelled';
+  /** 实际归还时间 */
+  returnedAt?: string;
+  /** 归还状况 */
+  returnCondition?: 'good' | 'damaged' | 'missing';
+};
+
+/** 礼品卡 / 储值卡配置 */
+export type GiftCardConfig = {
+  /** 卡面值（与订单金额一致）*/
+  faceValue: string;
+  /** 卡号（生成后填充）*/
+  cardNumber?: string;
+  /** PIN 码 */
+  pin?: string;
+  /** 有效期 */
+  expiryDate?: string;
+  /** 卡状态 */
+  cardStatus: 'pending_issue' | 'issued' | 'activated' | 'redeemed' | 'expired' | 'cancelled';
+  /** 核销金额（已使用金额）*/
+  redeemedAmount?: string;
+  /** 核销时间 */
+  redeemedAt?: string;
+  /** 受赠人邮件（发送礼品卡时用）*/
+  recipientEmail?: string;
+};
+
+/** 数字商品配置 */
+export type DigitalConfig = {
+  /** License Key / 授权码 */
+  licenseKey?: string;
+  /** 下载链接 */
+  downloadUrl?: string;
+  /** 有效期 */
+  expiryDate?: string;
+  /** 激活状态 */
+  activationStatus: 'pending' | 'activated' | 'expired' | 'revoked';
+};
+
 export type OrderDetail = {
   /* 基本标识 */
   id: string;
@@ -296,8 +543,25 @@ export type OrderDetail = {
   noteAttributes?: { name: string; value: string }[];
   tags: string[];
 
+  /* 利润分析 */
+  profitability?: OrderProfitability;
+
+  /* 附加费用（商家手动录入） */
+  additionalFees?: AdditionalFee[];
+
+  /* 上游渠道变更事件（系统自动感知，用于异常处置） */
+  upstreamChanges?: UpstreamChange[];
+
   /* 平台扩展字段 */
   platformMeta?: Record<string, string>;
+
+  /* 履约类型及对应配置 */
+  fulfillmentType?: FulfillmentType;
+  presaleConfig?: PresaleConfig;
+  serviceConfig?: ServiceConfig;
+  rentalConfig?: RentalConfig;
+  giftCardConfig?: GiftCardConfig;
+  digitalConfig?: DigitalConfig;
 };
 
 /* ─── Demo 数据 ─── */
@@ -338,9 +602,13 @@ export const orderDetails: Record<string, OrderDetail> = {
         quantity: 1,
         unit: '件',
         unitPrice: '$89.00',
+        grossSubtotal: '$89.00',
         discount: '$0.00',
+        orderDiscountAlloc: '$0.00',
         tax: '$7.12',
         subtotal: '$96.12',
+        costSnapshot: 32.00,
+        costSource: 'wms_receipt',
         fulfillmentStatus: '待履约',
         fulfillmentNote: '等待生成履约单',
         weight: 85,
@@ -357,9 +625,13 @@ export const orderDetails: Record<string, OrderDetail> = {
         quantity: 1,
         unit: '件',
         unitPrice: '$29.00',
+        grossSubtotal: '$29.00',
         discount: '$0.00',
+        orderDiscountAlloc: '$0.00',
         tax: '$2.32',
         subtotal: '$31.32',
+        costSnapshot: 12.00,
+        costSource: 'wms_receipt',
         fulfillmentStatus: '待履约',
         fulfillmentNote: '等待生成履约单',
         weight: 42,
@@ -376,9 +648,13 @@ export const orderDetails: Record<string, OrderDetail> = {
         quantity: 1,
         unit: '件',
         unitPrice: '$19.00',
+        grossSubtotal: '$19.00',
         discount: '$0.00',
+        orderDiscountAlloc: '$0.00',
         tax: '$1.52',
         subtotal: '$20.52',
+        costSnapshot: 5.50,
+        costSource: 'manual',
         fulfillmentStatus: '待履约',
         fulfillmentNote: '等待生成履约单',
         weight: 65,
@@ -435,6 +711,7 @@ export const orderDetails: Record<string, OrderDetail> = {
     ],
     refunds: [],
     events: [
+      { id: 'evt_upstream_001_1', time: '2026-06-04 16:45:00', actor: '系统', actorRole: 'automation', title: '上游变更感知：收货地址已变更', type: 'upstreamChange' as const, upstreamChangeType: 'address_changed', upstreamChangeSummary: '收货地址：11 Broadway，New York → 350 5th Ave，New York · 买家通过 Shopify 订单编辑提交' },
       { id: 'evt_001', time: '2026-06-04 16:31:02', actor: '系统', actorRole: 'automation', title: '订单自动确认', description: '风控通过，进入待处理队列', type: 'system' },
       { id: 'evt_002', time: '2026-06-04 16:29:42', actor: 'Stripe', actorRole: 'payment_gateway', title: '支付成功', description: 'Visa ****4242 收款 $159.96，网关参考号 ch_3Nq8K2EJ...', type: 'payment' },
       { id: 'evt_003', time: '2026-06-04 16:29:38', actor: '系统', actorRole: 'automation', title: '风控检查通过', description: 'Risk level: Low · AVS: Y · CVV: M', type: 'risk' },
@@ -442,13 +719,40 @@ export const orderDetails: Record<string, OrderDetail> = {
     ],
     note: '请尽量在周三前发出，谢谢！',
     tags: ['priority', 'new-customer-campaign'],
+    profitability: {
+      // 只存来自外部系统的成本，订单自身的数据从 lineItems/transactions 计算
+      warehouseCost: 3.20,
+      freightCost: 0,       // TMS 尚未回传
+      costComplete: false,
+      costPendingNote: '运输成本待 TMS 回传后更新',
+      currency: 'USD',
+    },
+    additionalFees: [],
+    // 上游变更：地址变更（待审核阶段，系统已自动更新）
+    upstreamChanges: [
+      {
+        id: 'uc_001_1',
+        type: 'address_changed',
+        status: 'pending',
+        detectedAt: '2026-06-04 16:45:00',
+        stage: 'pending_review',
+        before: { address1: '11 Broadway', city: 'New York', zip: '10004' },
+        after: { address1: '350 5th Ave', city: 'New York', zip: '10118' },
+        channelNote: 'Shopify: Buyer updated shipping address via order edit',
+        suggestions: [
+          { action: 'accept_address', label: '接受新地址', variant: 'primary', description: '系统已自动更新收货地址，点击确认接受' },
+          { action: 'ignore', label: '忽略', variant: 'default', description: '忽略此变更，使用原地址发货' },
+        ],
+      },
+    ],
     platformMeta: {
       'shopify_order_id': '5820173271233',
       'checkout_token': 'abc123def456',
       'landing_site': '/collections/electronics',
       'referring_site': 'https://google.com',
       'browser_ip': '203.0.113.42'
-    }
+    },
+    fulfillmentType: 'physical',
   },
   so_007: {
     id: 'so_007',
@@ -476,10 +780,10 @@ export const orderDetails: Record<string, OrderDetail> = {
     paymentGateway: 'Stripe',
     discountCodes: [{ code: 'CAMP10', type: 'percentage', amount: '$20.00' }],
     lineItems: [
-      { id: 'li_071', sku: 'TENT-4P-GRN', channelSku: 'SH-TENT-4P-GRN', warehouseSku: 'WMS-TENT-4P-GRN', title: 'Camping Tent 4P', variantTitle: 'Green / 4-person', quantity: 1, unit: '顶', unitPrice: '$229.00', discount: '$10.00', tax: '$17.52', subtotal: '$236.52', fulfillmentStatus: '已发货', fulfillmentNote: '已从 US-West-SEA 发出', weight: 4500, requiresShipping: true },
-      { id: 'li_072', sku: 'SB-WARM-BLU', channelSku: 'SH-SB-WARM-BLU', warehouseSku: 'WMS-SB-WARM-BLU', title: 'Sleeping Bag', variantTitle: 'Blue / -10°C', quantity: 2, unit: '件', unitPrice: '$79.00', discount: '$5.00', tax: '$12.24', subtotal: '$165.24', fulfillmentStatus: '已发货', fulfillmentNote: '已从 US-West-SEA 发出', weight: 1800, requiresShipping: true },
-      { id: 'li_073', sku: 'HL-LED-400', channelSku: 'SH-HL-LED-400', warehouseSku: 'WMS-HL-LED-400', title: 'Headlamp', variantTitle: '400 Lumen / USB-C', quantity: 2, unit: '件', unitPrice: '$35.00', discount: '$3.00', tax: '$5.36', subtotal: '$72.36', fulfillmentStatus: '库存不足', fulfillmentNote: '全网缺货，补货 ETA 06-08', weight: 120, requiresShipping: true },
-      { id: 'li_074', sku: 'FAK-DLX-01', channelSku: 'SH-FAK-DLX-01', warehouseSku: 'WMS-FAK-DLX-01', title: 'First Aid Kit', variantTitle: 'Deluxe / 120-piece', quantity: 1, unit: '套', unitPrice: '$45.30', discount: '$2.00', tax: '$4.88', subtotal: '$48.18', fulfillmentStatus: '库存不足', fulfillmentNote: '等待 Headlamp 到货后合并发出', weight: 680, requiresShipping: true }
+      { id: 'li_071', sku: 'TENT-4P-GRN', channelSku: 'SH-TENT-4P-GRN', warehouseSku: 'WMS-TENT-4P-GRN', title: 'Camping Tent 4P', variantTitle: 'Green / 4-person', quantity: 1, unit: '顶', unitPrice: '$229.00', grossSubtotal: '$229.00', discount: '$10.00', orderDiscountAlloc: '$8.78', tax: '$17.52', subtotal: '$210.22', costSnapshot: 85.00, costSource: 'wms_receipt', fulfillmentStatus: '已发货', fulfillmentNote: '已从 US-West-SEA 发出', weight: 4500, requiresShipping: true },
+      { id: 'li_072', sku: 'SB-WARM-BLU', channelSku: 'SH-SB-WARM-BLU', warehouseSku: 'WMS-SB-WARM-BLU', title: 'Sleeping Bag', variantTitle: 'Blue / -10°C', quantity: 2, unit: '件', unitPrice: '$79.00', grossSubtotal: '$158.00', discount: '$5.00', orderDiscountAlloc: '$6.06', tax: '$12.24', subtotal: '$146.94', costSnapshot: 30.00, costSource: 'wms_receipt', fulfillmentStatus: '已发货', fulfillmentNote: '已从 US-West-SEA 发出', weight: 1800, requiresShipping: true },
+      { id: 'li_073', sku: 'HL-LED-400', channelSku: 'SH-HL-LED-400', warehouseSku: 'WMS-HL-LED-400', title: 'Headlamp', variantTitle: '400 Lumen / USB-C', quantity: 2, unit: '件', unitPrice: '$35.00', grossSubtotal: '$70.00', discount: '$3.00', orderDiscountAlloc: '$2.68', tax: '$5.36', subtotal: '$64.32', costSnapshot: 8.00, costSource: 'manual', fulfillmentStatus: '库存不足', fulfillmentNote: '全网缺货，补货 ETA 06-08', weight: 120, requiresShipping: true },
+      { id: 'li_074', sku: 'FAK-DLX-01', channelSku: 'SH-FAK-DLX-01', warehouseSku: 'WMS-FAK-DLX-01', title: 'First Aid Kit', variantTitle: 'Deluxe / 120-piece', quantity: 1, unit: '套', unitPrice: '$45.30', grossSubtotal: '$45.30', discount: '$2.00', orderDiscountAlloc: '$1.74', tax: '$4.88', subtotal: '$41.56', costSnapshot: 27.00, costSource: 'wms_receipt', fulfillmentStatus: '库存不足', fulfillmentNote: '等待 Headlamp 到货后合并发出', weight: 680, requiresShipping: true }
     ],
     customer: {
       name: 'Robert Taylor',
@@ -533,10 +837,30 @@ export const orderDetails: Record<string, OrderDetail> = {
     transactions: [
       { id: 'txn_071', kind: 'sale', gateway: 'Stripe', method: 'Mastercard ****8899', amount: '$567.30', currency: 'USD', status: 'success', createdAt: '2026-06-03 11:20:32', gatewayReference: 'ch_7Xm2P1QZ...' }
     ],
-    refunds: [],
+    refunds: [
+      {
+        id: 'ref_071',
+        refundNo: 'REF-20260604-0001',
+        reason: '库存不足 - Headlamp 全网缺货，客户申请部分退款',
+        amount: '$64.32',
+        lineItems: [
+          { lineItemId: 'li_073', quantity: 2 }
+        ],
+        createdAt: '2026-06-04 10:30:00',
+        note: '已通知客户，退款原路返回 Mastercard ****8899',
+        method: '原路返回 (Mastercard ****8899)',
+        processedBy: 'Lisa Chen',
+        refundType: 'refund_only',  // 仅退款：Headlamp 全网缺货，商品从未发出，但因无货无法退回实物，成本按0计（未出库）
+      }
+    ],
     events: [
+      /* ─── 上游变更感知（最新，系统自动） ─── */
+      { id: 'evt_upstream_007_1', time: '2026-06-04 11:00:00', actor: '系统', actorRole: 'automation', title: '上游变更感知：买家申请取消订单', type: 'upstreamChange' as const, upstreamChangeType: 'buyer_cancel_request', upstreamChangeSummary: '买家通过 Shopify 提交取消申请，FO-20260603-0071 已出库在途，请决定是否拦截' },
+      { id: 'evt_upstream_007_2', time: '2026-06-04 09:10:00', actor: '系统', actorRole: 'automation', title: '上游变更感知：商品行被渠道取消', type: 'upstreamChange' as const, upstreamChangeType: 'item_cancelled', upstreamChangeSummary: 'Headlamp（HL-LED-400）× 2 件 被渠道标记取消，原因：全网库存不足' },
       /* ─── 运营挂起 (最新) ─── */
       { id: 'evt_07_20', time: '2026-06-04 09:15:00', actor: 'Lisa Chen', actorRole: 'ops_manager', title: '订单挂起', description: '第二批履约单库存不足无法执行，等待补货 ETA 06-08，已通知客户', type: 'edit' },
+      /* ─── 退款事件 ─── */
+      { id: 'evt_07_ref1', time: '2026-06-04 10:30:00', actor: 'Lisa Chen', actorRole: 'ops_manager', title: '部分退款 - $64.32', description: '退款单 REF-20260604-0001 · Headlamp × 2 件 · 原路返回 Mastercard ****8899 · 原因：全网库存不足，无法履约', type: 'refund' },
       /* ─── 第二个履约单 (HL-LED-400 + FAK-DLX-01) - 挂起 ─── */
       { id: 'evt_07_19', time: '2026-06-03 14:50:00', actor: '履约引擎', actorRole: 'automation', title: '履约挂起 - 等待补货', description: 'FO-20260603-0072: Headlamp (HL-LED-400) 全网库存不足 · US-West-SEA: 0 / US-East-EWR: 0 / US-Central-DFW: 0 · 补货 ETA 06-08 · 履约单挂起', type: 'fulfillment', ruleName: '库存不足挂起规则', fulfillmentOrderNo: 'FO-20260603-0072' },
       { id: 'evt_07_18', time: '2026-06-03 14:48:00', actor: '履约引擎', actorRole: 'automation', title: '选仓决策 - 失败', description: 'FO-20260603-0072: 候选仓遍历 US-West-SEA(HL-LED-400=0) / US-East-EWR(HL-LED-400=0) / US-Central-DFW(HL-LED-400=0) · 找不到有效仓库 · 所有仓库 Headlamp 缺货', type: 'fulfillment', ruleName: '就近发货策略', fulfillmentOrderNo: 'FO-20260603-0072' },
@@ -567,15 +891,57 @@ export const orderDetails: Record<string, OrderDetail> = {
     ],
     note: '',
     tags: ['partial-fulfillment', 'backorder'],
+    profitability: {
+      warehouseCost: 8.50,
+      freightCost: 42.00,
+      costComplete: true,
+      currency: 'USD',
+    },
+    additionalFees: [
+      { id: 'fee_001', type: 'insurance', label: '运输保险', amount: 12.00, currency: 'USD', note: 'FedEx 声明价值保险', createdAt: '2026-06-03 18:30:00' },
+      { id: 'fee_002', type: 'handling', label: '大件操作费', amount: 5.00, currency: 'USD', note: '帐篷超重件附加操作费', createdAt: '2026-06-03 16:00:00' },
+    ],
+    // 上游变更：买家申请取消（已出库阶段——最危险的场景）
+    upstreamChanges: [
+      {
+        id: 'uc_007_1',
+        type: 'buyer_cancel_request',
+        status: 'pending',
+        detectedAt: '2026-06-04 11:00:00',
+        stage: 'outbounded',
+        before: { status: 'active' },
+        after: { status: 'cancellation_requested', reason: '库存不足商品无法按时到货，买家不愿等待' },
+        channelNote: 'Shopify: Buyer submitted cancellation request — Order partially fulfilled, FO-20260603-0071 already shipped',
+        suggestions: [
+          { action: 'agree_cancel_partial', label: '同意取消（已发部分不影响）', variant: 'primary', description: '同意取消未发货部分，已发货包裹继续投递，并对已发商品进行退款' },
+          { action: 'initiate_recall', label: '召回已发包裹', variant: 'danger', description: '通知承运商尝试拦截已发货包裹（成功率取决于当前位置）' },
+          { action: 'reject_cancel', label: '拒绝取消申请', variant: 'default', description: '拒绝买家取消请求，继续履约' },
+          { action: 'ignore', label: '忽略', variant: 'default' },
+        ],
+      },
+      {
+        id: 'uc_007_2',
+        type: 'item_cancelled',
+        status: 'pending',
+        detectedAt: '2026-06-04 09:10:00',
+        stage: 'pending_outbound',
+        before: { lineItemId: 'li_073', quantity: 2 },
+        after: { lineItemId: 'li_073', quantity: 0, reason: 'out_of_stock' },
+        channelNote: 'Shopify: Line item HL-LED-400 cancelled due to inventory unavailability',
+        suggestions: [
+          { action: 'remove_item', label: '从发货单移除', variant: 'primary', description: '将 Headlamp × 2 从履约单移除，仅发货其他商品' },
+          { action: 'partial_refund', label: '对该商品发起退款', variant: 'default', description: '对取消商品 $64.32 直接退款，无需退货' },
+        ],
+      },
+    ],
     platformMeta: {
       'shopify_order_id': '5820173100801',
       'landing_site': '/collections/outdoor',
       'referring_site': 'https://instagram.com'
-    }
+    },
+    fulfillmentType: 'physical',
   }
 };
-
-import { orderDetailsExtra } from './order-details-extra';
 
 /** 合并所有订单详情 */
 const allOrderDetails: Record<string, OrderDetail> = { ...orderDetails, ...orderDetailsExtra };

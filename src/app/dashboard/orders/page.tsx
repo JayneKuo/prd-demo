@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { Columns3, Copy, Download, GitBranch, Plus, RefreshCw, Search, X } from 'lucide-react';
+import { AlertTriangle, Columns3, Copy, Download, GitBranch, Plus, RefreshCw, Search, X } from 'lucide-react';
 import { useShellState } from '@/components/providers/shell-state-provider';
 import { orders, type OrderRow } from '@/lib/mock-data/orders';
 import { hasCapability } from '@/lib/permissions';
@@ -62,12 +62,72 @@ export default function OrdersPage() {
   const [pageSize, setPageSize] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
   const [jumpPage, setJumpPage] = useState('1');
+  const [upstreamBannerOpen, setUpstreamBannerOpen] = useState(true); // kept for future use
 
   const availableMerchantNames = companyMerchants
     .filter((merchant) => merchantScope === ALL_MERCHANTS_SCOPE || merchant.id === merchantScope)
     .map((merchant) => merchant.name);
   const scopedMerchantNames = getMerchantNamesForScope(companyId, merchantScope);
   const scopedOrders = orders.filter((order) => scopedMerchantNames.includes(order.merchant));
+
+  // 上游变更汇总：从 scopedOrders 中聚合各类型变更数量和订单列表
+  const upstreamSummary = useMemo(() => {
+    const typeMap: Record<string, { label: string; count: number; orders: { id: string; orderNo: string }[] }> = {
+      order_cancelled: { label: '渠道侧订单取消', count: 0, orders: [] },
+      buyer_cancel_request: { label: '买家申请取消', count: 0, orders: [] },
+      item_cancelled: { label: '商品行被取消', count: 0, orders: [] },
+      quantity_changed: { label: '数量变更', count: 0, orders: [] },
+      address_changed: { label: '收货地址变更', count: 0, orders: [] },
+      item_added: { label: '新增商品', count: 0, orders: [] },
+      price_changed: { label: '价格变更', count: 0, orders: [] },
+    };
+    for (const order of scopedOrders) {
+      if ((order.upstreamChangeCount ?? 0) > 0) {
+        if (order.id === 'so_001') {
+          typeMap.address_changed.count += 1;
+          typeMap.address_changed.orders.push({ id: order.id, orderNo: order.orderNo });
+        } else if (order.id === 'so_002') {
+          typeMap.order_cancelled.count += 1;
+          typeMap.order_cancelled.orders.push({ id: order.id, orderNo: order.orderNo });
+        } else if (order.id === 'so_007') {
+          typeMap.buyer_cancel_request.count += 1;
+          typeMap.buyer_cancel_request.orders.push({ id: order.id, orderNo: order.orderNo });
+          typeMap.item_cancelled.count += 1;
+          typeMap.item_cancelled.orders.push({ id: order.id, orderNo: order.orderNo });
+        } else if (order.id === 'so_008') {
+          typeMap.quantity_changed.count += 1;
+          typeMap.quantity_changed.orders.push({ id: order.id, orderNo: order.orderNo });
+        } else if (order.id === 'so_013') {
+          typeMap.address_changed.count += 1;
+          typeMap.address_changed.orders.push({ id: order.id, orderNo: order.orderNo });
+        }
+      }
+    }
+    return Object.entries(typeMap)
+      .filter(([, v]) => v.count > 0)
+      .map(([type, v]) => ({ type, ...v }));
+  }, [scopedOrders]);
+
+  // 每个订单的上游变更类型列表，用于列表行展示
+  const orderUpstreamMap = useMemo(() => {
+    const changeTypeLabel: Record<string, string> = {
+      order_cancelled: '渠道取消',
+      buyer_cancel_request: '买家申请取消',
+      item_cancelled: '商品行取消',
+      quantity_changed: '数量变更',
+      address_changed: '地址变更',
+      item_added: '新增商品',
+      price_changed: '价格变更',
+    };
+    const map = new Map<string, string[]>();
+    for (const item of upstreamSummary) {
+      for (const o of item.orders) {
+        if (!map.has(o.id)) map.set(o.id, []);
+        map.get(o.id)!.push(changeTypeLabel[item.type] ?? item.type);
+      }
+    }
+    return map;
+  }, [upstreamSummary]);
   const batchValues = useMemo(() => normalizeBatchInput(batchInput), [batchInput]);
   const channelOptions = useMemo(
     () => Array.from(new Set(scopedOrders.map((order) => order.channel))),
@@ -518,13 +578,53 @@ export default function OrdersPage() {
 
                   {/* Exception */}
                   <td className="whitespace-nowrap px-3 py-3">
-                    {row.exception ? (
-                      <span className="inline-flex rounded-md bg-red-50 px-1.5 py-0.5 text-[11px] font-medium text-[var(--danger)] ring-1 ring-inset ring-red-200">
-                        {row.exception}
-                      </span>
-                    ) : (
-                      <span className="text-[11px] text-[var(--muted-foreground)]">—</span>
-                    )}
+                    <div className="flex flex-wrap items-center gap-1">
+                      {/* 普通异常标签 */}
+                      {row.exception ? (
+                        <span className="inline-flex rounded-md bg-red-50 px-1.5 py-0.5 text-[11px] font-medium text-[var(--danger)] ring-1 ring-inset ring-red-200">
+                          {row.exception}
+                        </span>
+                      ) : null}
+
+                      {/* 上游变更标签 */}
+                      {(() => {
+                        const changes = orderUpstreamMap.get(row.id) ?? [];
+                        if (changes.length === 0) return null;
+                        // 只显示第一个，其余收进 hover tooltip
+                        const first = changes[0];
+                        const rest = changes.slice(1);
+                        return (
+                          <div className="relative group/upstream inline-flex items-center gap-1">
+                            <span className="inline-flex items-center gap-0.5 rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-inset ring-amber-200">
+                              <AlertTriangle className="size-2.5 shrink-0" />
+                              {first}
+                            </span>
+                            {rest.length > 0 && (
+                              <span className="cursor-default rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                                +{rest.length}
+                              </span>
+                            )}
+                            {/* Hover tooltip：全部变更类型 */}
+                            {changes.length > 1 && (
+                              <div className="pointer-events-none absolute bottom-full left-0 z-50 mb-1.5 hidden min-w-[140px] rounded-lg border border-amber-200 bg-white p-2 shadow-[var(--shadow-panel)] group-hover/upstream:block">
+                                <div className="mb-1 text-[10px] font-semibold text-amber-600 uppercase tracking-wide">上游变更</div>
+                                {changes.map((c, i) => (
+                                  <div key={i} className="flex items-center gap-1 py-0.5 text-[12px] text-[var(--foreground)]">
+                                    <AlertTriangle className="size-3 text-amber-500 shrink-0" />
+                                    {c}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                      {/* 无任何异常 */}
+                      {!row.exception && (orderUpstreamMap.get(row.id) ?? []).length === 0 && (
+                        <span className="text-[11px] text-[var(--muted-foreground)]">—</span>
+                      )}
+                    </div>
                   </td>
 
                   {/* Time */}

@@ -44,6 +44,20 @@ type OrderItem = {
   taxAmount: number;
   /** 是否来自商品库（有 masterVariantId） */
   fromCatalog: boolean;
+  /** 商品履约类型（来自商品中心，随 SKU 带入，只读；手填商品默认 physical） */
+  itemType: import('@/lib/mock-data/order-details').FulfillmentType;
+  /** 服务商品附加字段 */
+  serviceScheduledDate?: string;
+  serviceTimeWindow?: string;
+  /** 预售商品附加字段 */
+  presaleEndDate?: string;
+  /** 租赁商品附加字段 */
+  rentalStartDate?: string;
+  rentalEndDate?: string;
+  rentalDeposit?: string;
+  /** 礼品卡附加字段 */
+  giftCardRecipientEmail?: string;
+  giftCardExpiry?: string;
 };
 
 type Customer = {
@@ -78,6 +92,8 @@ type CatalogVariant = {
   currency: string;
   defaultImageUrl?: string;
   uomCode?: string;
+  /** 商品履约类型（来自商品中心，随 SKU 带入） */
+  itemType?: import('@/lib/mock-data/order-details').FulfillmentType;
 };
 
 type SalesChannel = {
@@ -117,18 +133,25 @@ const mockAddresses: Record<string, CustomerAddress[]> = {
 };
 
 const mockVariants: CatalogVariant[] = [
-  { id: 'var_001', sku: 'SKU-0001', name: 'Smart Watch Band', variantClass: 'Black / S', basePrice: 12.99, currency: 'USD', uomCode: 'PCS' },
-  { id: 'var_002', sku: 'SKU-0002', name: 'Screen Protector', variantClass: 'Tempered Glass', basePrice: 8.99, currency: 'USD', uomCode: 'PCS' },
-  { id: 'var_003', sku: 'SKU-0003', name: 'Charging Dock', variantClass: 'White', basePrice: 29.99, currency: 'USD', uomCode: 'PCS' },
-  { id: 'var_004', sku: 'SKU-0004', name: 'Mechanical Keyboard', variantClass: 'Cherry MX Blue', basePrice: 89.99, currency: 'USD', uomCode: 'PCS' },
-  { id: 'var_005', sku: 'SKU-0005', name: 'Webcam 4K', variantClass: '60fps / USB-C', basePrice: 59.99, currency: 'USD', uomCode: 'PCS' },
-  { id: 'var_006', sku: 'SKU-0006', name: 'Ring Light Mini', variantClass: '6-inch', basePrice: 24.99, currency: 'USD', uomCode: 'PCS' },
-  { id: 'var_007', sku: 'SKU-0007', name: 'Phone Case', variantClass: 'iPhone 15 / Clear', basePrice: 15.99, currency: 'USD', uomCode: 'PCS' },
-  { id: 'var_008', sku: 'SKU-0008', name: 'USB-C Cable 2m', variantClass: 'White', basePrice: 9.99, currency: 'USD', uomCode: 'PCS' },
-  { id: 'var_009', sku: 'SKU-0009', name: 'Bluetooth Speaker', variantClass: 'Midnight Black', basePrice: 45.99, currency: 'USD', uomCode: 'PCS' },
-  { id: 'var_010', sku: 'SKU-0010', name: 'Wireless Earbuds Pro', variantClass: 'ANC / USB-C', basePrice: 79.99, currency: 'USD', uomCode: 'PCS' },
-  { id: 'var_011', sku: 'SKU-0011', name: 'Laptop Stand', variantClass: 'Aluminum / Silver', basePrice: 49.99, currency: 'USD', uomCode: 'PCS' },
-  { id: 'var_012', sku: 'SKU-0012', name: 'Wireless Charger', variantClass: '15W / Black', basePrice: 19.99, currency: 'USD', uomCode: 'PCS' },
+  { id: 'var_001', sku: 'SKU-0001', name: 'Smart Watch Band', variantClass: 'Black / S', basePrice: 12.99, currency: 'USD', uomCode: 'PCS', itemType: 'physical' },
+  { id: 'var_002', sku: 'SKU-0002', name: 'Screen Protector', variantClass: 'Tempered Glass', basePrice: 8.99, currency: 'USD', uomCode: 'PCS', itemType: 'physical' },
+  { id: 'var_003', sku: 'SKU-0003', name: 'Charging Dock', variantClass: 'White', basePrice: 29.99, currency: 'USD', uomCode: 'PCS', itemType: 'physical' },
+  { id: 'var_004', sku: 'SKU-0004', name: 'Mechanical Keyboard', variantClass: 'Cherry MX Blue', basePrice: 89.99, currency: 'USD', uomCode: 'PCS', itemType: 'physical' },
+  { id: 'var_005', sku: 'SKU-0005', name: 'Webcam 4K', variantClass: '60fps / USB-C', basePrice: 59.99, currency: 'USD', uomCode: 'PCS', itemType: 'physical' },
+  { id: 'var_006', sku: 'SKU-0006', name: 'Ring Light Mini', variantClass: '6-inch', basePrice: 24.99, currency: 'USD', uomCode: 'PCS', itemType: 'physical' },
+  { id: 'var_007', sku: 'SKU-0007', name: 'Phone Case', variantClass: 'iPhone 15 / Clear', basePrice: 15.99, currency: 'USD', uomCode: 'PCS', itemType: 'physical' },
+  { id: 'var_008', sku: 'SKU-0008', name: 'USB-C Cable 2m', variantClass: 'White', basePrice: 9.99, currency: 'USD', uomCode: 'PCS', itemType: 'physical' },
+  { id: 'var_009', sku: 'SKU-0009', name: 'Bluetooth Speaker', variantClass: 'Midnight Black', basePrice: 45.99, currency: 'USD', uomCode: 'PCS', itemType: 'physical' },
+  { id: 'var_010', sku: 'SKU-0010', name: 'Wireless Earbuds Pro', variantClass: 'ANC / USB-C', basePrice: 79.99, currency: 'USD', uomCode: 'PCS', itemType: 'physical' },
+  { id: 'var_011', sku: 'SKU-0011', name: 'Laptop Stand', variantClass: 'Aluminum / Silver', basePrice: 49.99, currency: 'USD', uomCode: 'PCS', itemType: 'physical' },
+  { id: 'var_012', sku: 'SKU-0012', name: 'Wireless Charger', variantClass: '15W / Black', basePrice: 19.99, currency: 'USD', uomCode: 'PCS', itemType: 'physical' },
+  // ── 非实物商品 ──
+  { id: 'var_svc_001', sku: 'SVC-INSTALL-STD', name: '设备安装服务', variantClass: '标准安装 / 上门', basePrice: 80.00, currency: 'USD', uomCode: 'PCS', itemType: 'service' },
+  { id: 'var_svc_002', sku: 'SVC-DELIVERY-INSTALL', name: '送货安装一体服务', variantClass: '含拆包 / 调试', basePrice: 120.00, currency: 'USD', uomCode: 'PCS', itemType: 'service' },
+  { id: 'var_gc_001', sku: 'GC-USD-50', name: 'Gift Card $50', variantClass: '$50 USD', basePrice: 50.00, currency: 'USD', uomCode: 'PCS', itemType: 'gift_card' },
+  { id: 'var_gc_002', sku: 'GC-USD-100', name: 'Gift Card $100', variantClass: '$100 USD', basePrice: 100.00, currency: 'USD', uomCode: 'PCS', itemType: 'gift_card' },
+  { id: 'var_rental_001', sku: 'RENTAL-CAM-A7IV-30D', name: 'Sony A7IV Camera Kit（租赁）', variantClass: '30 天 / 含镜头', basePrice: 450.00, currency: 'USD', uomCode: 'PCS', itemType: 'rental' },
+  { id: 'var_digital_001', sku: 'SW-LICENSE-PRO', name: 'Pro Software License', variantClass: '1 年 / 单用户', basePrice: 199.00, currency: 'USD', uomCode: 'PCS', itemType: 'digital' },
 ];
 
 // ─── 通用子组件 ───────────────────────────────────────────────────────────────
@@ -987,6 +1010,60 @@ function CustomerCard({
 // ─── 收货地址卡片 ─────────────────────────────────────────────────────────────
 // ─── 主页面 ──────────────────────────────────────────────────────────────────
 
+/* ─── 商品行附加字段组件（服务/预售/租赁/礼品卡/数字商品）─── */
+function ItemExtraFields({
+  item,
+  updateItem,
+}: {
+  item: OrderItem;
+  updateItem: (key: string, field: keyof OrderItem, value: string | number | boolean) => void;
+}) {
+  const smCls = 'h-7 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 text-[12px] text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none';
+  return (
+    <div className="border-t border-dashed border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-2" style={{ minWidth: '660px' }}>
+      {item.itemType === 'service' && (
+        <div className="flex flex-wrap items-center gap-2 text-[12px]">
+          <span className="shrink-0 text-[var(--muted-foreground)]">📅 预约日期</span>
+          <input type="date" value={item.serviceScheduledDate ?? ''} onChange={e => updateItem(item._key, 'serviceScheduledDate', e.target.value)} className={smCls} />
+          <span className="shrink-0 text-[var(--muted-foreground)]">时间窗口</span>
+          <input type="text" placeholder="如 14:00–18:00" value={item.serviceTimeWindow ?? ''} onChange={e => updateItem(item._key, 'serviceTimeWindow', e.target.value)} className={`${smCls} w-32`} />
+          <span className="text-[10px] text-purple-600">确认后系统生成工单并分配技术人员</span>
+        </div>
+      )}
+      {item.itemType === 'presale' && (
+        <div className="flex flex-wrap items-center gap-2 text-[12px]">
+          <span className="shrink-0 text-[var(--muted-foreground)]">⏳ 预售截止日期 <span className="text-[var(--danger)]">*</span></span>
+          <input type="date" value={item.presaleEndDate ?? ''} onChange={e => updateItem(item._key, 'presaleEndDate', e.target.value)} className={smCls} />
+          <span className="text-[10px] text-amber-600">截止后才触发履约，未达起售量则退款</span>
+        </div>
+      )}
+      {item.itemType === 'rental' && (
+        <div className="flex flex-wrap items-center gap-2 text-[12px]">
+          <span className="shrink-0 text-[var(--muted-foreground)]">🔑 租赁开始 <span className="text-[var(--danger)]">*</span></span>
+          <input type="date" value={item.rentalStartDate ?? ''} onChange={e => updateItem(item._key, 'rentalStartDate', e.target.value)} className={smCls} />
+          <span className="shrink-0 text-[var(--muted-foreground)]">结束</span>
+          <input type="date" value={item.rentalEndDate ?? ''} onChange={e => updateItem(item._key, 'rentalEndDate', e.target.value)} className={smCls} />
+          <span className="shrink-0 text-[var(--muted-foreground)]">押金</span>
+          <input type="number" min={0} step={0.01} placeholder="0.00" value={item.rentalDeposit ?? ''} onChange={e => updateItem(item._key, 'rentalDeposit', e.target.value)} className={`${smCls} w-24`} />
+          <span className="text-[10px] text-cyan-600">押金支付时预授权，归还确认后释放</span>
+        </div>
+      )}
+      {item.itemType === 'gift_card' && (
+        <div className="flex flex-wrap items-center gap-2 text-[12px]">
+          <span className="shrink-0 text-[var(--muted-foreground)]">🎁 收件人邮箱</span>
+          <input type="email" placeholder="recipient@example.com" value={item.giftCardRecipientEmail ?? ''} onChange={e => updateItem(item._key, 'giftCardRecipientEmail', e.target.value)} className={`${smCls} w-52`} />
+          <span className="shrink-0 text-[var(--muted-foreground)]">有效期</span>
+          <input type="date" value={item.giftCardExpiry ?? ''} onChange={e => updateItem(item._key, 'giftCardExpiry', e.target.value)} className={smCls} />
+          <span className="text-[10px] text-pink-600">支付后自动生成卡号 / PIN 发送至收件人</span>
+        </div>
+      )}
+      {item.itemType === 'digital' && (
+        <span className="text-[11px] text-green-700">💾 支付确认后自动生成授权码发送至买家邮箱 · 无实体出库 · 不计 COGS</span>
+      )}
+    </div>
+  );
+}
+
 export default function NewSalesOrderPage() {
   // 商品行
   const [items, setItems] = useState<OrderItem[]>([]);
@@ -1046,7 +1123,6 @@ export default function NewSalesOrderPage() {
   const [shippingService, setShippingService] = useState('');
 
   // 高级选项
-  const [orderType, setOrderType] = useState('STANDARD');
   const [priority, setPriority] = useState('NORMAL');
   const [businessType, setBusinessType] = useState('B2C');
   const [referenceNo, setReferenceNo] = useState('');
@@ -1105,6 +1181,14 @@ export default function NewSalesOrderPage() {
     if (!addr.shipToCountry) errors.push('收货国家为必填项');
     if (!addr.shipToStreet) errors.push('详细地址为必填项');
     if (!addr.shipToPostalCode) errors.push('邮政编码为必填项');
+    // 行级校验：非实物商品的必填字段
+    items.forEach((item, i) => {
+      if (item.itemType === 'presale' && !item.presaleEndDate) errors.push(`第 ${i + 1} 行（${item.productName || 'SKU ' + item.sku}）预售商品必须填写截止日期`);
+      if (item.itemType === 'rental') {
+        if (!item.rentalStartDate) errors.push(`第 ${i + 1} 行（${item.productName || 'SKU ' + item.sku}）租赁商品必须填写租赁开始日期`);
+        if (!item.rentalEndDate) errors.push(`第 ${i + 1} 行（${item.productName || 'SKU ' + item.sku}）租赁商品必须填写租赁结束日期`);
+      }
+    });
     return errors;
   };
 
@@ -1160,6 +1244,7 @@ export default function NewSalesOrderPage() {
       discountAmount: 0,
       taxAmount: 0,
       fromCatalog: true,
+      itemType: v.itemType ?? 'physical',
     }));
     setItems(prev => [...prev, ...newItems]);
   };
@@ -1176,6 +1261,7 @@ export default function NewSalesOrderPage() {
       discountAmount: 0,
       taxAmount: 0,
       fromCatalog: false,
+      itemType: 'physical',
     }]);
   };
 
@@ -1247,15 +1333,6 @@ export default function NewSalesOrderPage() {
                   {mockChannels.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
-                </select>
-              </div>
-              <div>
-                <Label>订单类型</Label>
-                <select value={orderType} onChange={e => setOrderType(e.target.value)} className={smInputCls}>
-                  <option value="STANDARD">标准</option>
-                  <option value="PRESALE">预售</option>
-                  <option value="WHOLESALE">批发</option>
-                  <option value="DROPSHIP">代发</option>
                 </select>
               </div>
               <div>
@@ -1361,8 +1438,9 @@ export default function NewSalesOrderPage() {
                   {items.map(item => {
                     const lineTotal = item.unitPrice * item.qty - item.discountAmount + item.taxAmount;
                     return (
+                      <div key={item._key}>
+                        {/* 主行（8列 grid）*/}
                       <div
-                        key={item._key}
                         className="grid items-start gap-x-2 px-4 py-3 hover:bg-[var(--surface-subtle)] transition"
                         style={{ gridTemplateColumns: 'minmax(180px,1fr) 60px 56px 88px 88px 72px 80px 28px', minWidth: '660px' }}
                       >
@@ -1384,6 +1462,23 @@ export default function NewSalesOrderPage() {
                               placeholder="SKU"
                               className="mt-0.5 w-full border-0 bg-transparent p-0 font-mono text-[11px] text-[var(--muted)] placeholder:text-[var(--muted-foreground)] focus:outline-none"
                             />
+                            {/* 商品类型标签（来自商品中心，只读） */}
+                            {item.itemType && item.itemType !== 'physical' && (() => {
+                              const typeMeta: Record<string, { icon: string; label: string; cls: string }> = {
+                                service:   { icon: '🔧', label: '服务商品', cls: 'bg-purple-50 border-purple-200 text-purple-700' },
+                                presale:   { icon: '⏳', label: '预售商品', cls: 'bg-amber-50 border-amber-200 text-amber-700' },
+                                rental:    { icon: '🔑', label: '租赁商品', cls: 'bg-cyan-50 border-cyan-200 text-cyan-700' },
+                                gift_card: { icon: '🎁', label: '礼品卡',   cls: 'bg-pink-50 border-pink-200 text-pink-700' },
+                                digital:   { icon: '💾', label: '数字商品', cls: 'bg-green-50 border-green-200 text-green-700' },
+                              };
+                              const m = typeMeta[item.itemType];
+                              return m ? (
+                                <span className={`mt-1 inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium ${m.cls}`}>
+                                  <span>{m.icon}</span>{m.label}
+                                  {item.fromCatalog && <span className="ml-0.5 opacity-60">· 来自商品中心</span>}
+                                </span>
+                              ) : null;
+                            })()}
                             {!item.fromCatalog && item.sku && (
                               <span className="mt-1 inline-flex items-center gap-1 rounded bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10px] text-amber-700">
                                 <Info className="size-3 shrink-0" />手填 · 提交时自动建档
@@ -1486,6 +1581,12 @@ export default function NewSalesOrderPage() {
                             <X className="size-3.5" />
                           </button>
                         </div>
+                      </div>{/* end 主行 grid */}
+
+                      {/* 非实物类型附加字段 — 全宽条，紧贴主行下方 */}
+                      {item.itemType !== 'physical' && (
+                        <ItemExtraFields item={item} updateItem={updateItem} />
+                      )}
                       </div>
                     );
                   })}

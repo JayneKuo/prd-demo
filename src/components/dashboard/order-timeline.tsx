@@ -18,6 +18,7 @@ const eventIcon: Record<string, string> = {
   risk: '🛡️',
   note: '📝',
   logistics: '🚚',
+  refund: '↩️',
 };
 
 /* ─── 日期格式化 ─── */
@@ -45,8 +46,86 @@ function toDateKey(timeStr: string): string {
   return timeStr.slice(0, 10);
 }
 
+/* ─── 上游变更类型标签映射 ─── */
+const upstreamChangeTypeLabel: Record<string, { label: string; color: string }> = {
+  order_cancelled:      { label: '订单取消',     color: 'bg-red-50 text-red-700 ring-red-200' },
+  buyer_cancel_request: { label: '买家申请取消', color: 'bg-red-50 text-red-700 ring-red-200' },
+  item_cancelled:       { label: '商品行取消',   color: 'bg-orange-50 text-orange-700 ring-orange-200' },
+  quantity_changed:     { label: '数量变更',     color: 'bg-orange-50 text-orange-700 ring-orange-200' },
+  address_changed:      { label: '地址变更',     color: 'bg-blue-50 text-blue-700 ring-blue-200' },
+  item_added:           { label: '新增商品',     color: 'bg-green-50 text-green-700 ring-green-200' },
+  price_changed:        { label: '价格变更',     color: 'bg-purple-50 text-purple-700 ring-purple-200' },
+};
+
 /* ─── 单条事件 ─── */
 function TimelineEventItem({ event }: { event: OrderEvent }) {
+  /* upstreamChange 专属渲染 */
+  if (event.type === 'upstreamChange') {
+    const typeMeta = event.upstreamChangeType
+      ? upstreamChangeTypeLabel[event.upstreamChangeType]
+      : null;
+    // 根据 title 判断是「感知」还是「已处置/已忽略」
+    const isHandled = event.title.startsWith('已处置') || event.title.startsWith('已忽略');
+
+    return (
+      <li className="relative">
+        {/* 图标圆点 */}
+        <span className="absolute -left-[29px] flex size-4 items-center justify-center text-[13px]">
+          {isHandled ? '✅' : '⚠️'}
+        </span>
+
+        {/* 标题行 */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className={cn(
+            'text-[13px] font-semibold',
+            isHandled ? 'text-[var(--foreground)]' : 'text-amber-700'
+          )}>
+            {event.title}
+          </span>
+          {typeMeta && (
+            <span className={cn(
+              'rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset',
+              typeMeta.color
+            )}>
+              {typeMeta.label}
+            </span>
+          )}
+          <span className="shrink-0 text-[11px] text-[var(--muted-foreground)]">
+            {event.time.slice(11, 16)}
+          </span>
+        </div>
+
+        {/* 操作人 */}
+        <div className="mt-0.5 text-[12px] text-[var(--muted)]">
+          <span className="font-medium text-[var(--foreground)]">{event.actor}</span>
+          {event.actorRole && (
+            <span className="ml-1.5 rounded bg-[var(--surface-subtle)] px-1.5 py-0.5 text-[10px] text-[var(--muted-foreground)]">
+              {event.actorRole}
+            </span>
+          )}
+        </div>
+
+        {/* 自然语言摘要 — 核心：人类可读的变更内容 */}
+        {event.upstreamChangeSummary && (
+          <div className={cn(
+            'mt-1.5 rounded-md px-2.5 py-2 text-[12px] leading-5',
+            isHandled
+              ? 'bg-[var(--surface-subtle)] text-[var(--foreground)]'
+              : 'bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200'
+          )}>
+            {event.upstreamChangeSummary}
+          </div>
+        )}
+
+        {/* 处置后果说明（仅已处置事件有 description） */}
+        {isHandled && event.description && (
+          <p className="mt-1 text-[11px] leading-4 text-[var(--muted)]">{event.description}</p>
+        )}
+      </li>
+    );
+  }
+
+  /* ─── 默认渲染（其余事件类型不变）─── */
   return (
     <li className="relative">
       {/* 图标圆点 */}
@@ -82,6 +161,15 @@ function TimelineEventItem({ event }: { event: OrderEvent }) {
         <div className="mt-1.5">
           <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-[var(--primary)] ring-1 ring-inset ring-blue-200">
             ⚡ {event.ruleName}
+          </span>
+        </div>
+      )}
+
+      {/* 退款事件标识 */}
+      {event.type === 'refund' && (
+        <div className="mt-1.5">
+          <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-[var(--danger)] ring-1 ring-inset ring-red-200">
+            ↩ 退款
           </span>
         </div>
       )}

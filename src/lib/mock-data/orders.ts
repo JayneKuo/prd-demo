@@ -32,6 +32,8 @@ export type OrderRow = {
   exception: string;
   /** 下单时间 */
   orderTime: string;
+  /** 上游变更待处置数量（>0 时显示告警角标） */
+  upstreamChangeCount?: number;
 };
 
 export const orderColumns: TableColumn<OrderRow>[] = [
@@ -75,6 +77,7 @@ export const orders: OrderRow[] = [
     refNo: 'PO-2024-8821',
     channel: 'Shopify',
     merchant: 'US Store',
+    upstreamChangeCount: 1,
     customer: 'Emily Johnson',
     region: 'US / New York',
     itemsSummary: '3 件商品',
@@ -112,6 +115,7 @@ export const orders: OrderRow[] = [
     refNo: '',
     channel: 'Shopify',
     merchant: 'US Store',
+    upstreamChangeCount: 1,
     customer: 'Michael Brown',
     region: 'US / Los Angeles',
     itemsSummary: '5 件商品',
@@ -149,6 +153,7 @@ export const orders: OrderRow[] = [
     refNo: '',
     channel: 'Shopify',
     merchant: 'US Store',
+    upstreamChangeCount: 1,
     customer: 'Jason Kim',
     region: 'US / San Francisco',
     itemsSummary: '4 件商品',
@@ -187,6 +192,7 @@ export const orders: OrderRow[] = [
     refNo: '',
     channel: 'Shopify',
     merchant: 'US Store',
+    upstreamChangeCount: 2,
     customer: 'Robert Taylor',
     region: 'US / Seattle',
     itemsSummary: '6 件商品',
@@ -206,6 +212,7 @@ export const orders: OrderRow[] = [
     refNo: 'WHL-2024-112',
     channel: 'Shopify',
     merchant: 'US Store',
+    upstreamChangeCount: 1,
     customer: 'David Lee',
     region: 'US / Boston',
     itemsSummary: '8 件商品',
@@ -594,5 +601,43 @@ export const orders: OrderRow[] = [
     fulfillment: '已退货',
     exception: '退货处理中',
     orderTime: '05-28 16:45'
+  },
+  /* ═══ 礼品卡订单 ═══ */
+  {
+    id: 'so_gc_001',
+    orderNo: 'SO-20260605-GC01',
+    platformNo: '#SH-7291600',
+    refNo: '',
+    channel: 'Shopify',
+    merchant: 'US Store',
+    customer: 'Olivia Chen',
+    region: 'US / San Francisco',
+    itemsSummary: '1 张礼品卡',
+    itemsDetail: ['Gift Card $100 × 1'],
+    amount: '$100.00',
+    status: '处理中',
+    payment: '已支付',
+    fulfillment: '卡号生成中',
+    exception: '',
+    orderTime: '06-05 10:30'
+  },
+  /* ═══ 租赁订单 ═══ */
+  {
+    id: 'so_rental_001',
+    orderNo: 'SO-20260601-RN01',
+    platformNo: '#SH-7291700',
+    refNo: 'RENTAL-ENT-2026-001',
+    channel: 'Shopify',
+    merchant: 'US Store',
+    customer: 'Marcus Webb',
+    region: 'US / Los Angeles',
+    itemsSummary: '1 套设备（租赁）',
+    itemsDetail: ['Professional Camera Kit × 1 (30天租赁)'],
+    amount: '$486.00',
+    status: '处理中',
+    payment: '已支付',
+    fulfillment: '已发货',
+    exception: '',
+    orderTime: '06-01 09:00'
   }
 ];

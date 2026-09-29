@@ -63,7 +63,7 @@ function getIcon(name: string): LucideIcon {
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { sidebarCollapsed, locale, setSidebarCollapsed } = useShellState();
+  const { sidebarCollapsed, locale, setSidebarCollapsed, compactLayout } = useShellState();
 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
@@ -256,7 +256,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           {/* Main content area */}
           <div className="flex min-w-0 flex-1 flex-col">
             <Topbar />
-            <main className="min-w-0 flex-1 overflow-y-auto px-5 py-5 lg:px-8 lg:py-6">{children}</main>
+            <main className={cn('min-w-0 flex-1 overflow-y-auto', compactLayout ? 'py-5 lg:py-6' : 'px-5 py-5 lg:px-8 lg:py-6')}>{children}</main>
           </div>
         </div>
       </div>

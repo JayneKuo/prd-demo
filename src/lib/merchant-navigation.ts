@@ -71,6 +71,7 @@ export const merchantNavigationGroups: NavGroup[] = [
     icon: 'shopping-bag',
     defaultOpen: false,
     items: [
+      { title: { 'zh-CN': '采购计划', 'en-US': 'Purchase Plans' }, href: '/dashboard/purchase-plans', capabilities: ['procurement:read'], icon: 'clipboard-list' },
       { title: { 'zh-CN': '采购订单', 'en-US': 'Purchase Orders' }, href: '/dashboard/purchase-orders', capabilities: ['procurement:read'], icon: 'file-plus' },
       { title: { 'zh-CN': '采购退货', 'en-US': 'Purchase Returns' }, href: '/dashboard/purchase-returns', capabilities: ['procurement:read'], icon: 'file-minus' },
       { title: { 'zh-CN': '供应商', 'en-US': 'Suppliers' }, href: '/dashboard/suppliers', capabilities: ['procurement:read'], icon: 'building' },
@@ -96,6 +97,7 @@ export const merchantNavigationGroups: NavGroup[] = [
     icon: 'circle-dollar-sign',
     defaultOpen: false,
     items: [
+      { title: { 'zh-CN': '财务概览', 'en-US': 'Finance Overview' }, href: '/dashboard/finance', capabilities: ['finance:read'], icon: 'layout-dashboard' },
       { title: { 'zh-CN': '应收', 'en-US': 'Receivables' }, href: '/dashboard/receivables', capabilities: ['finance:read'], icon: 'trending-up' },
       { title: { 'zh-CN': '应付', 'en-US': 'Payables' }, href: '/dashboard/payables', capabilities: ['finance:read'], icon: 'trending-down' },
       { title: { 'zh-CN': '费用', 'en-US': 'Expenses' }, href: '/dashboard/expenses', capabilities: ['finance:read'], icon: 'receipt' },

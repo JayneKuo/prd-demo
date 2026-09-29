@@ -1,6 +1,37 @@
 import type { TableColumn } from '@/components/admin/data-table-shell';
 import type { InternalLink, ExternalRef } from '@/lib/types/references';
 
+/** 入库单商品行（结构化，含成本信息） */
+export type InboundLineItem = {
+  /** 商品名称 */
+  name: string;
+  /** SKU 编码 */
+  sku: string;
+  /** 计划入库数量 */
+  plannedQty: number;
+  /** 实收数量（入库完成后填入） */
+  receivedQty?: number;
+  /** 单位 */
+  unit: string;
+  /** 采购单价（含税） */
+  unitCost?: number;
+  /** 小计（= unitCost × plannedQty） */
+  totalCost?: number;
+  /**
+   * 成本录入状态：
+   * - entered: 已录入单价
+   * - pending: 待录入（入库完成后需补充）
+   * - wms_synced: 由 WMS 采购回传自动同步
+   */
+  costStatus: 'entered' | 'pending' | 'wms_synced';
+  /** 批次号 */
+  lotNo?: string;
+  /** 质检结果 */
+  qcResult?: '通过' | '不通过' | '待质检';
+  /** 重量 (kg) */
+  weight?: number;
+};
+
 export type InboundRow = {
   id: string;
   /** 入库单号 (本平台生成) */
@@ -23,8 +54,14 @@ export type InboundRow = {
   warehouse: string;
   /** 商品摘要 */
   itemsSummary: string;
-  /** 商品明细 */
+  /** 商品明细（原始字符串，向后兼容列表页 hover） */
   itemsDetail: string[];
+  /** 商品明细（结构化，含成本，用于详情页） */
+  lineItems?: InboundLineItem[];
+  /** 入库总成本（= Σ lineItems.totalCost） */
+  totalCost?: number;
+  /** 成本币种 */
+  costCurrency?: string;
   /** 总件数 */
   totalQty: number;
   /** 总重量 */
@@ -93,6 +130,13 @@ export const inboundOrders: InboundRow[] = [
     warehouse: 'US-West-LAX',
     itemsSummary: '6 件商品',
     itemsDetail: ['Smart Watch Band × 3', 'Screen Protector × 2', 'Charging Dock × 1'],
+    lineItems: [
+      { name: 'Smart Watch Band', sku: 'SWB-BLK-001', plannedQty: 3, unit: '件', unitCost: 8.50, totalCost: 25.50, costStatus: 'entered', weight: 0.08 },
+      { name: 'Screen Protector', sku: 'SP-IP16-001', plannedQty: 2, unit: '件', unitCost: 3.20, totalCost: 6.40, costStatus: 'entered', weight: 0.02 },
+      { name: 'Charging Dock', sku: 'CD-USB-001', plannedQty: 1, unit: '件', costStatus: 'pending', weight: 0.15 },
+    ],
+    totalCost: 31.90,
+    costCurrency: 'USD',
     totalQty: 6,
     totalWeight: '2.4 kg',
     expectedAt: '06-06 10:00',
@@ -130,6 +174,13 @@ export const inboundOrders: InboundRow[] = [
     warehouse: 'US-East-EWR',
     itemsSummary: '10 件商品',
     itemsDetail: ['Mechanical Keyboard × 3', 'Webcam 4K × 4', 'Ring Light Mini × 3'],
+    lineItems: [
+      { name: 'Mechanical Keyboard', sku: 'MK-TKL-001', plannedQty: 3, receivedQty: 3, unit: '件', unitCost: 42.00, totalCost: 126.00, costStatus: 'wms_synced', lotNo: 'LOT-MK-0604', qcResult: '待质检', weight: 0.92 },
+      { name: 'Webcam 4K', sku: 'WC-4K-001', plannedQty: 4, receivedQty: 4, unit: '件', unitCost: 38.50, totalCost: 154.00, costStatus: 'wms_synced', lotNo: 'LOT-WC-0604', qcResult: '待质检', weight: 0.48 },
+      { name: 'Ring Light Mini', sku: 'RL-MINI-001', plannedQty: 3, receivedQty: 3, unit: '件', unitCost: 18.00, totalCost: 54.00, costStatus: 'wms_synced', lotNo: 'LOT-RL-0604', qcResult: '待质检', weight: 0.62 },
+    ],
+    totalCost: 334.00,
+    costCurrency: 'USD',
     totalQty: 10,
     totalWeight: '8.5 kg',
     expectedAt: '06-04 14:00',
@@ -166,6 +217,13 @@ export const inboundOrders: InboundRow[] = [
     warehouse: 'US-West-LAX',
     itemsSummary: '20 件商品',
     itemsDetail: ['Phone Case × 10', 'Tempered Glass × 5', 'USB-C Cable × 5'],
+    lineItems: [
+      { name: 'Phone Case', sku: 'PC-IP16-BLK', plannedQty: 10, receivedQty: 10, unit: '件', unitCost: 4.80, totalCost: 48.00, costStatus: 'wms_synced', lotNo: 'LOT-PC-0603', qcResult: '通过', weight: 0.05 },
+      { name: 'Tempered Glass', sku: 'TG-IP16-001', plannedQty: 5, receivedQty: 5, unit: '件', unitCost: 2.50, totalCost: 12.50, costStatus: 'wms_synced', lotNo: 'LOT-TG-0603', qcResult: '通过', weight: 0.02 },
+      { name: 'USB-C Cable 2m', sku: 'UCC-WHT-2M', plannedQty: 5, receivedQty: 5, unit: '件', unitCost: 5.50, totalCost: 27.50, costStatus: 'wms_synced', lotNo: 'LOT-UC-0603', qcResult: '通过', weight: 0.09 },
+    ],
+    totalCost: 88.00,
+    costCurrency: 'USD',
     totalQty: 20,
     totalWeight: '3.2 kg',
     expectedAt: '06-03 09:00',

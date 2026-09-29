@@ -1,13 +1,13 @@
 'use client';
 
-import { Bell, Moon, PanelLeft, Search, Sun } from 'lucide-react';
+import { Bell, LayoutTemplate, Moon, PanelLeft, Search, Sun } from 'lucide-react';
 import { UserMenu } from '@/components/layout/user-menu';
 import { shellCopy } from '@/lib/locale-config';
 import { useShellState } from '@/components/providers/shell-state-provider';
 import { cn } from '@/lib/utils';
 
 export function Topbar() {
-  const { locale, sidebarCollapsed, themeMode, setSidebarCollapsed, setThemeMode } = useShellState();
+  const { locale, sidebarCollapsed, themeMode, setSidebarCollapsed, setThemeMode, compactLayout, setCompactLayout } = useShellState();
   const copy = shellCopy[locale];
 
   return (
@@ -43,6 +43,21 @@ export function Topbar() {
           ) : (
             <Moon className="size-[18px]" aria-hidden="true" />
           )}
+        </button>
+
+        <button
+          className={cn(
+            'flex size-8 items-center justify-center rounded-md transition-colors duration-150',
+            compactLayout
+              ? 'bg-[var(--primary-soft)] text-[var(--primary)]'
+              : 'text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--foreground)]'
+          )}
+          onClick={() => setCompactLayout(!compactLayout)}
+          aria-label={locale === 'zh-CN' ? (compactLayout ? '恢复安全距离' : '平铺模式') : (compactLayout ? 'Restore padding' : 'Compact layout')}
+          aria-pressed={compactLayout}
+          title={locale === 'zh-CN' ? (compactLayout ? '恢复安全距离' : '切换为完全平铺') : (compactLayout ? 'Restore padding' : 'Switch to full bleed')}
+        >
+          <LayoutTemplate className="size-[18px]" aria-hidden="true" />
         </button>
 
         <button

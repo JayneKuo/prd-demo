@@ -89,6 +89,13 @@ select {
   outline-offset: 2px;
 }
 
+/* 平铺模式：去除页面内容顶层 wrapper 的最大宽度和水平内边距限制，保留小边距 */
+:root[data-compact='true'] main > * {
+  max-width: none !important;
+  padding-left: 20px !important;
+  padding-right: 20px !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -24,6 +24,14 @@ export const settingsGroups: SettingsGroup[] = [
     ]
   },
   {
+    title: '财务',
+    modules: [
+      { title: '财务配置', description: '设置收入确认规则、成本计算方法和 ERP 集成偏好。', href: '/dashboard/settings/finance' },
+      { title: 'ERP 集成', description: '配置与 NetSuite、QuickBooks 或其他财务系统的数据同步。', href: '/dashboard/settings/finance' },
+      { title: '税务规则', description: '管理销售税率、税务区域和豁免规则。', href: '/dashboard/settings/finance' }
+    ]
+  },
+  {
     title: '运营',
     modules: [
       { title: '订单路由', description: '设置默认分单、履约和异常处理策略。', href: '/dashboard/settings' },

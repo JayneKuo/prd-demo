@@ -77,6 +77,72 @@ export function StatusTimeline({ events }: { events: TimelineEvent[] }) {
   );
 }
 
+/* ─── Change Log ─── */
+export type ChangeEntry = {
+  actor: string;
+  actorType?: 'user' | 'system' | 'gateway';
+  time: string;
+  action: string;
+  field?: string;
+  from?: string;
+  to?: string;
+};
+
+export function ChangeLog({ entries }: { entries: ChangeEntry[] }) {
+  const actorColors: Record<NonNullable<ChangeEntry['actorType']>, string> = {
+    user: 'bg-[var(--primary)] text-white',
+    system: 'bg-[var(--surface-subtle)] text-[var(--muted-foreground)] border border-[var(--border)]',
+    gateway: 'bg-[var(--warning-subtle,#fef9c3)] text-[var(--warning,#854d0e)]'
+  };
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)]">
+      <div className="border-b border-[var(--border-subtle)] px-4 py-3">
+        <h2 className="text-[13px] font-semibold text-[var(--foreground)]">变更记录</h2>
+      </div>
+      <ol className="divide-y divide-[var(--border-subtle)]">
+        {entries.map((entry, index) => (
+          <li key={index} className="px-4 py-3">
+            {/* Actor + time */}
+            <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  'inline-flex h-5 items-center rounded px-1.5 text-[11px] font-semibold',
+                  actorColors[entry.actorType ?? 'system']
+                )}
+              >
+                {entry.actor}
+              </span>
+              <span className="text-[11px] text-[var(--muted)]">{entry.time}</span>
+            </div>
+            {/* Action label */}
+            <p className="mt-1 text-[12px] font-medium text-[var(--foreground)]">{entry.action}</p>
+            {/* Diff */}
+            {entry.field && (
+              <div className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-[var(--surface-subtle)] px-2.5 py-1.5 text-[11px]">
+                <span className="shrink-0 font-medium text-[var(--muted-foreground)]">{entry.field}</span>
+                {entry.from && (
+                  <>
+                    <span className="shrink-0 rounded bg-[#fee2e2] px-1 py-0.5 font-mono text-[#991b1b] line-through">
+                      {entry.from}
+                    </span>
+                    <span className="shrink-0 text-[var(--muted)]">→</span>
+                  </>
+                )}
+                {entry.to && (
+                  <span className="shrink-0 rounded bg-[#dcfce7] px-1 py-0.5 font-mono text-[#166534]">
+                    {entry.to}
+                  </span>
+                )}
+              </div>
+            )}
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 /* ─── Detail Page Template ─── */
 export function DetailPageTemplate({
   title,

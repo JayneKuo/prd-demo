@@ -59,9 +59,9 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
     paymentGateway: 'Stripe',
     discountCodes: [],
     lineItems: [
-      { id: 'li_021', sku: 'SWB-SIL-M', title: 'Smart Watch Band', variantTitle: 'Silver / Medium', quantity: 2, unitPrice: '$49.00', discount: '$0.00', tax: '$7.84', subtotal: '$105.84', fulfillmentStatus: '已生成', fulfillmentNote: '履约单已生成，等待拣货', weight: 35, requiresShipping: true, channelSku: 'SH-SWB-SIL-M', warehouseSku: 'WMS-SWB-SIL-M', unit: '件' },
-      { id: 'li_022', sku: 'SP-TG-IP15', title: 'Screen Protector', variantTitle: 'iPhone 15 / Tempered Glass', quantity: 2, unitPrice: '$15.00', discount: '$0.00', tax: '$2.40', subtotal: '$32.40', fulfillmentStatus: '已生成', fulfillmentNote: '履约单已生成，等待拣货', weight: 20, requiresShipping: true, channelSku: 'SH-SP-TG-IP15', warehouseSku: 'WMS-SP-TG-IP15', unit: '件' },
-      { id: 'li_023', sku: 'CD-MG-WHT', title: 'Charging Dock', variantTitle: 'White / MagSafe', quantity: 1, unitPrice: '$89.50', discount: '$0.00', tax: '$5.76', subtotal: '$95.26', fulfillmentStatus: '已生成', fulfillmentNote: '履约单已生成，等待拣货', weight: 280, requiresShipping: true, channelSku: 'SH-CD-MG-WHT', warehouseSku: 'WMS-CD-MG-WHT', unit: '台' }
+      { id: 'li_021', sku: 'SWB-SIL-M', title: 'Smart Watch Band', variantTitle: 'Silver / Medium', quantity: 2, unitPrice: '$49.00', discount: '$0.00', tax: '$7.84', subtotal: '$105.84', costSnapshot: 18.62, costSource: 'manual', fulfillmentStatus: '已生成', fulfillmentNote: '履约单已生成，等待拣货', weight: 35, requiresShipping: true, channelSku: 'SH-SWB-SIL-M', warehouseSku: 'WMS-SWB-SIL-M', unit: '件' },
+      { id: 'li_022', sku: 'SP-TG-IP15', title: 'Screen Protector', variantTitle: 'iPhone 15 / Tempered Glass', quantity: 2, unitPrice: '$15.00', discount: '$0.00', tax: '$2.40', subtotal: '$32.40', costSnapshot: 5.7, costSource: 'manual', fulfillmentStatus: '已生成', fulfillmentNote: '履约单已生成，等待拣货', weight: 20, requiresShipping: true, channelSku: 'SH-SP-TG-IP15', warehouseSku: 'WMS-SP-TG-IP15', unit: '件' },
+      { id: 'li_023', sku: 'CD-MG-WHT', title: 'Charging Dock', variantTitle: 'White / MagSafe', quantity: 1, unitPrice: '$89.50', discount: '$0.00', tax: '$5.76', subtotal: '$95.26', costSnapshot: 34.01, costSource: 'manual', fulfillmentStatus: '已生成', fulfillmentNote: '履约单已生成，等待拣货', weight: 280, requiresShipping: true, channelSku: 'SH-CD-MG-WHT', warehouseSku: 'WMS-CD-MG-WHT', unit: '台' }
     ],
     customer: { name: 'Michael Brown', email: 'michael.b@example.com', phone: '+1 (310) 555-0234', ordersCount: 3, totalSpent: '$820.00', tags: ['electronics'], acceptsMarketing: true },
     shippingAddress: { name: 'Michael Brown', phone: '+1 (310) 555-0234', address1: '8500 Beverly Blvd', city: 'Los Angeles', province: 'CA', country: 'US', zip: '90048', formatted: '8500 Beverly Blvd, Los Angeles, CA 90048, US' },
@@ -98,8 +98,41 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       { id: 'evt_021', time: '2026-06-04 15:07:22', actor: 'Michael Brown', actorRole: 'customer', title: '订单创建', description: '通过 Shopify Web Checkout (iOS) 提交', type: 'customer' }
     ],
     note: '',
-    tags: [],
-    platformMeta: { 'shopify_order_id': '5820173271078', 'landing_site': '/products/charging-dock', 'referring_site': 'https://youtube.com' }
+    profitability: {
+      warehouseCost: 2.8,
+      freightCost: 0,
+      costComplete: false,
+      costPendingNote: '运输成本待 TMS 回传',
+      currency: 'USD',
+    },
+    additionalFees: [],
+    upstreamChanges: [
+      {
+        id: 'uc_002_1',
+        type: 'order_cancelled' as const,
+        status: 'pending' as const,
+        detectedAt: '2026-06-04 17:30:00',
+        stage: 'pending_outbound' as const,
+        before: { status: 'active' },
+        after: { status: 'cancelled', reason: 'Buyer cancelled via Shopify order status page' },
+        channelNote: 'Shopify: Order #SH-7291078 was cancelled by buyer — fulfillment order FO-20260604-0020 not yet picked',
+        suggestions: [
+          { action: 'stop_fulfillment', label: '立即暂停履约单', variant: 'primary' as const, description: '出库单尚未开始拣货，可立即通知仓库暂停，恢复库存' },
+          { action: 'confirm_cancel', label: '确认取消并退款', variant: 'default' as const, description: '停止履约并向买家发起全额退款 $432.50' },
+          { action: 'ignore', label: '忽略', variant: 'default' as const },
+        ],
+      },
+    ],
+        tags: [],
+    platformMeta: { 'shopify_order_id': '5820173271078', 'landing_site': '/products/charging-dock', 'referring_site': 'https://youtube.com' },
+    fulfillmentType: 'presale',
+    presaleConfig: {
+      presaleEndDate: '2026-06-10',
+      minQtyThreshold: 50,
+      currentPresaleQty: 43,
+      presaleStatus: 'active',
+      estimatedShipDate: '2026-06-12',
+    },
   },
 
   /* ═══ so_003: 保留/挂起 — 地址无效，已暂停履约 ═══ */
@@ -129,8 +162,8 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
     paymentGateway: 'Stripe',
     discountCodes: [],
     lineItems: [
-      { id: 'li_031', sku: 'YM-PRE-PUR', title: 'Yoga Mat Premium', variantTitle: 'Purple / 6mm', quantity: 1, unitPrice: '£45.00', discount: '£0.00', tax: '£2.00', subtotal: '£45.00', fulfillmentStatus: '已暂停', fulfillmentNote: '地址验证失败，等待客户确认', weight: 1200, requiresShipping: true, channelSku: 'SH-YM-PRE-PUR', warehouseSku: 'WMS-YM-PRE-PUR', unit: '张' },
-      { id: 'li_032', sku: 'RB-SET-3PK', title: 'Resistance Bands Set', variantTitle: '3-Pack / Light-Medium-Heavy', quantity: 1, unitPrice: '£23.00', discount: '£0.00', tax: '£1.00', subtotal: '£23.00', fulfillmentStatus: '已暂停', fulfillmentNote: '地址验证失败，等待客户确认', weight: 350, requiresShipping: true, channelSku: 'SH-RB-SET-3PK', warehouseSku: 'WMS-RB-SET-3PK', unit: '套' }
+      { id: 'li_031', sku: 'YM-PRE-PUR', title: 'Yoga Mat Premium', variantTitle: 'Purple / 6mm', quantity: 1, unitPrice: '£45.00', discount: '£0.00', tax: '£2.00', subtotal: '£45.00', costSnapshot: 17.1, costSource: 'manual', fulfillmentStatus: '已暂停', fulfillmentNote: '地址验证失败，等待客户确认', weight: 1200, requiresShipping: true, channelSku: 'SH-YM-PRE-PUR', warehouseSku: 'WMS-YM-PRE-PUR', unit: '张' },
+      { id: 'li_032', sku: 'RB-SET-3PK', title: 'Resistance Bands Set', variantTitle: '3-Pack / Light-Medium-Heavy', quantity: 1, unitPrice: '£23.00', discount: '£0.00', tax: '£1.00', subtotal: '£23.00', costSnapshot: 8.74, costSource: 'manual', fulfillmentStatus: '已暂停', fulfillmentNote: '地址验证失败，等待客户确认', weight: 350, requiresShipping: true, channelSku: 'SH-RB-SET-3PK', warehouseSku: 'WMS-RB-SET-3PK', unit: '套' }
     ],
     customer: { name: 'Sarah Williams', email: 'sarah.w@example.co.uk', phone: '+44 20 7946 0958', ordersCount: 1, totalSpent: '£76.80', tags: ['new-customer'], acceptsMarketing: false },
     shippingAddress: { name: 'Sarah Williams', phone: '+44 20 7946 0958', address1: '221B Baker St', city: 'London', province: '', country: 'GB', zip: 'NW1 6XE', formatted: '221B Baker St, London, NW1 6XE, GB' },
@@ -151,7 +184,15 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       { id: 'evt_031', time: '2026-06-04 14:42:10', actor: 'Sarah Williams', actorRole: 'customer', title: '订单创建', description: '通过 Shopify Web Checkout 提交', type: 'customer' }
     ],
     note: '地址可能填错了，客服已发邮件确认',
-    tags: ['address-issue', 'hold'],
+    profitability: {
+      warehouseCost: 0,
+      freightCost: 0,
+      costComplete: false,
+      costPendingNote: '等待地址确认，未发货',
+      currency: 'USD',
+    },
+    additionalFees: [],
+        tags: ['address-issue', 'hold'],
     platformMeta: { 'shopify_order_id': '5820173271092', 'browser_ip': '82.132.215.100' }
   },
 
@@ -182,7 +223,7 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
     paymentGateway: 'Amazon Pay',
     discountCodes: [],
     lineItems: [
-      { id: 'li_041', sku: 'BT-SPK-MINI', title: 'Bluetooth Speaker Mini', variantTitle: 'Black / IPX7', quantity: 1, unitPrice: '$79.99', discount: '$0.00', tax: '$5.00', subtotal: '$84.99', fulfillmentStatus: '待履约', fulfillmentNote: '等待生成履约单', weight: 320, requiresShipping: true, platformLineItemId: 'amz_li_30482837_1', channelSku: 'AMZ-BT-SPK-MINI', warehouseSku: 'WMS-BT-SPK-MINI', unit: '台' }
+      { id: 'li_041', sku: 'BT-SPK-MINI', title: 'Bluetooth Speaker Mini', variantTitle: 'Black / IPX7', quantity: 1, unitPrice: '$79.99', discount: '$0.00', tax: '$5.00', subtotal: '$84.99', costSnapshot: 30.4, costSource: 'manual', fulfillmentStatus: '待履约', fulfillmentNote: '等待生成履约单', weight: 320, requiresShipping: true, platformLineItemId: 'amz_li_30482837_1', channelSku: 'AMZ-BT-SPK-MINI', warehouseSku: 'WMS-BT-SPK-MINI', unit: '台' }
     ],
     customer: { name: 'James Wilson', email: 'j.wilson@example.com', phone: '', ordersCount: 1, totalSpent: '$89.99', tags: [], acceptsMarketing: false },
     shippingAddress: { name: 'James Wilson', phone: '+1 (312) 555-0177', address1: '233 S Wacker Dr, Suite 1200', city: 'Chicago', province: 'IL', country: 'US', zip: '60606', formatted: '233 S Wacker Dr, Suite 1200, Chicago, IL 60606, US' },
@@ -198,7 +239,15 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       { id: 'evt_041', time: '2026-06-03 22:15:44', actor: 'James Wilson', actorRole: 'customer', title: '订单创建', description: '通过 Amazon Marketplace 下单 (MFN)', type: 'customer' }
     ],
     note: '',
-    tags: ['payment-pending', 'amazon-mfn'],
+    profitability: {
+      warehouseCost: 0,
+      freightCost: 0,
+      costComplete: false,
+      costPendingNote: '支付未确认，未进入履约',
+      currency: 'USD',
+    },
+    additionalFees: [],
+        tags: ['payment-pending', 'amazon-mfn'],
     platformMeta: { 'amazon_order_id': '114-3941689-8772232', 'fulfillment_channel': 'MFN', 'ship_service_level': 'Standard' }
   },
 
@@ -229,9 +278,9 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
     paymentGateway: 'TikTok Payment',
     discountCodes: [],
     lineItems: [
-      { id: 'li_051', sku: 'LRL-10IN', title: 'LED Ring Light', variantTitle: '10 inch / Dimmable', quantity: 1, unitPrice: '$69.00', discount: '$0.00', tax: '$4.00', subtotal: '$73.00', fulfillmentStatus: '已生成', fulfillmentNote: '履约单已生成，等待拣货', weight: 680, requiresShipping: true, channelSku: 'TK-LRL-10IN', warehouseSku: 'WMS-LRL-10IN', unit: '件' },
-      { id: 'li_052', sku: 'PT-FLEX-55', title: 'Phone Tripod', variantTitle: 'Flexible / 55cm', quantity: 1, unitPrice: '$35.00', discount: '$0.00', tax: '$2.00', subtotal: '$37.00', fulfillmentStatus: '已生成', fulfillmentNote: '履约单已生成，等待拣货', weight: 420, requiresShipping: true, channelSku: 'TK-PT-FLEX-55', warehouseSku: 'WMS-PT-FLEX-55', unit: '件' },
-      { id: 'li_053', sku: 'SS-BT-BLK', title: 'Selfie Stick', variantTitle: 'Black / Bluetooth', quantity: 1, unitPrice: '$35.00', discount: '$0.00', tax: '$2.00', subtotal: '$37.00', fulfillmentStatus: '已生成', fulfillmentNote: '履约单已生成，等待拣货', weight: 195, requiresShipping: true, channelSku: 'TK-SS-BT-BLK', warehouseSku: 'WMS-SS-BT-BLK', unit: '件' }
+      { id: 'li_051', sku: 'LRL-10IN', title: 'LED Ring Light', variantTitle: '10 inch / Dimmable', quantity: 1, unitPrice: '$69.00', discount: '$0.00', tax: '$4.00', subtotal: '$73.00', costSnapshot: 26.22, costSource: 'manual', fulfillmentStatus: '已生成', fulfillmentNote: '履约单已生成，等待拣货', weight: 680, requiresShipping: true, channelSku: 'TK-LRL-10IN', warehouseSku: 'WMS-LRL-10IN', unit: '件' },
+      { id: 'li_052', sku: 'PT-FLEX-55', title: 'Phone Tripod', variantTitle: 'Flexible / 55cm', quantity: 1, unitPrice: '$35.00', discount: '$0.00', tax: '$2.00', subtotal: '$37.00', costSnapshot: 13.3, costSource: 'manual', fulfillmentStatus: '已生成', fulfillmentNote: '履约单已生成，等待拣货', weight: 420, requiresShipping: true, channelSku: 'TK-PT-FLEX-55', warehouseSku: 'WMS-PT-FLEX-55', unit: '件' },
+      { id: 'li_053', sku: 'SS-BT-BLK', title: 'Selfie Stick', variantTitle: 'Black / Bluetooth', quantity: 1, unitPrice: '$35.00', discount: '$0.00', tax: '$2.00', subtotal: '$37.00', costSnapshot: 13.3, costSource: 'manual', fulfillmentStatus: '已生成', fulfillmentNote: '履约单已生成，等待拣货', weight: 195, requiresShipping: true, channelSku: 'TK-SS-BT-BLK', warehouseSku: 'WMS-SS-BT-BLK', unit: '件' }
     ],
     customer: { name: 'Maria Garcia', email: 'maria.g@example.com', phone: '+1 (305) 555-0289', ordersCount: 2, totalSpent: '$312.00', tags: ['tiktok-buyer', 'content-creator'], acceptsMarketing: true },
     shippingAddress: { name: 'Maria Garcia', phone: '+1 (305) 555-0289', address1: '1100 Biscayne Blvd, Apt 2204', city: 'Miami', province: 'FL', country: 'US', zip: '33132', formatted: '1100 Biscayne Blvd, Apt 2204, Miami, FL 33132, US' },
@@ -256,8 +305,26 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       { id: 'evt_051', time: '2026-06-03 20:15:08', actor: 'Maria Garcia', actorRole: 'customer', title: '订单创建', description: '通过 TikTok Shop 直播间下单，来源: @mariag_live 直播间', type: 'customer' }
     ],
     note: '',
-    tags: ['tiktok', 'livestream-order'],
-    platformMeta: { 'tiktok_order_id': 'TK-8827163', 'tiktok_shop_id': 'us_shop_001', 'source': 'live_stream' }
+    profitability: {
+      warehouseCost: 2.4,
+      freightCost: 0,
+      costComplete: false,
+      costPendingNote: '运输成本待 TMS 回传',
+      currency: 'USD',
+    },
+    additionalFees: [],
+        tags: ['tiktok', 'livestream-order'],
+    platformMeta: { 'tiktok_order_id': 'TK-8827163', 'tiktok_shop_id': 'us_shop_001', 'source': 'live_stream' },
+    fulfillmentType: 'service',
+    serviceConfig: {
+      serviceType: 'installation',
+      scheduledDate: '2026-06-10',
+      scheduledTimeWindow: '14:00–18:00',
+      serviceAddress: '456 Ocean Ave, Miami FL 33139',
+      workOrderNo: 'WO-20260605-0031',
+      serviceStatus: 'scheduled',
+      technician: 'Carlos Rivera',
+    },
   },
 
   /* ═══ so_006: 新加坡 Shopify 待处理 ═══ */
@@ -287,10 +354,10 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
     paymentGateway: 'Stripe',
     discountCodes: [],
     lineItems: [
-      { id: 'li_061', sku: 'DO-BM-NAT', title: 'Desk Organizer', variantTitle: 'Bamboo / Natural', quantity: 1, unitPrice: 'S$89.00', discount: 'S$0.00', tax: 'S$5.00', subtotal: 'S$94.00', fulfillmentStatus: '待履约', fulfillmentNote: '等待生成履约单', weight: 1500, requiresShipping: true, channelSku: 'SH-DO-BM-NAT', warehouseSku: 'WMS-DO-BM-NAT', unit: '件' },
-      { id: 'li_062', sku: 'MS-ALM-SLV', title: 'Monitor Stand', variantTitle: 'Aluminum / Silver', quantity: 1, unitPrice: 'S$129.00', discount: 'S$0.00', tax: 'S$9.00', subtotal: 'S$138.00', fulfillmentStatus: '待履约', fulfillmentNote: '等待生成履约单', weight: 2200, requiresShipping: true, channelSku: 'SH-MS-ALM-SLV', warehouseSku: 'WMS-MS-ALM-SLV', unit: '台' },
-      { id: 'li_063', sku: 'CC-6PK-BLK', title: 'Cable Clips', variantTitle: 'Black / 6-Pack', quantity: 1, unitPrice: 'S$15.00', discount: 'S$0.00', tax: 'S$1.00', subtotal: 'S$16.00', fulfillmentStatus: '待履约', fulfillmentNote: '等待生成履约单', weight: 45, requiresShipping: true, channelSku: 'SH-CC-6PK-BLK', warehouseSku: 'WMS-CC-6PK-BLK', unit: '件' },
-      { id: 'li_064', sku: 'MP-XL-GRY', title: 'Mouse Pad XL', variantTitle: 'Grey / 90×40cm', quantity: 1, unitPrice: 'S$35.00', discount: 'S$0.00', tax: 'S$3.00', subtotal: 'S$38.00', fulfillmentStatus: '待履约', fulfillmentNote: '等待生成履约单', weight: 320, requiresShipping: true, channelSku: 'SH-MP-XL-GRY', warehouseSku: 'WMS-MP-XL-GRY', unit: '张' }
+      { id: 'li_061', sku: 'DO-BM-NAT', title: 'Desk Organizer', variantTitle: 'Bamboo / Natural', quantity: 1, unitPrice: 'S$89.00', discount: 'S$0.00', tax: 'S$5.00', subtotal: 'S$94.00', costSnapshot: 33.82, costSource: 'manual', fulfillmentStatus: '待履约', fulfillmentNote: '等待生成履约单', weight: 1500, requiresShipping: true, channelSku: 'SH-DO-BM-NAT', warehouseSku: 'WMS-DO-BM-NAT', unit: '件' },
+      { id: 'li_062', sku: 'MS-ALM-SLV', title: 'Monitor Stand', variantTitle: 'Aluminum / Silver', quantity: 1, unitPrice: 'S$129.00', discount: 'S$0.00', tax: 'S$9.00', subtotal: 'S$138.00', costSnapshot: 49.02, costSource: 'manual', fulfillmentStatus: '待履约', fulfillmentNote: '等待生成履约单', weight: 2200, requiresShipping: true, channelSku: 'SH-MS-ALM-SLV', warehouseSku: 'WMS-MS-ALM-SLV', unit: '台' },
+      { id: 'li_063', sku: 'CC-6PK-BLK', title: 'Cable Clips', variantTitle: 'Black / 6-Pack', quantity: 1, unitPrice: 'S$15.00', discount: 'S$0.00', tax: 'S$1.00', subtotal: 'S$16.00', costSnapshot: 5.7, costSource: 'manual', fulfillmentStatus: '待履约', fulfillmentNote: '等待生成履约单', weight: 45, requiresShipping: true, channelSku: 'SH-CC-6PK-BLK', warehouseSku: 'WMS-CC-6PK-BLK', unit: '件' },
+      { id: 'li_064', sku: 'MP-XL-GRY', title: 'Mouse Pad XL', variantTitle: 'Grey / 90×40cm', quantity: 1, unitPrice: 'S$35.00', discount: 'S$0.00', tax: 'S$3.00', subtotal: 'S$38.00', costSnapshot: 13.3, costSource: 'manual', fulfillmentStatus: '待履约', fulfillmentNote: '等待生成履约单', weight: 320, requiresShipping: true, channelSku: 'SH-MP-XL-GRY', warehouseSku: 'WMS-MP-XL-GRY', unit: '张' }
     ],
     customer: { name: 'Lisa Chen', email: 'lisa.chen@example.sg', phone: '+65 9123 4567', ordersCount: 8, totalSpent: 'S$2,140.00', tags: ['loyal', 'office-gear'], acceptsMarketing: true },
     shippingAddress: { name: 'Lisa Chen', company: 'TechPulse Pte Ltd', phone: '+65 9123 4567', address1: '1 Raffles Place, #28-01', city: 'Singapore', province: '', country: 'SG', zip: '048616', formatted: '1 Raffles Place, #28-01, Singapore 048616, SG' },
@@ -306,7 +373,15 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       { id: 'evt_061', time: '2026-06-03 18:33:55', actor: 'Lisa Chen', actorRole: 'customer', title: '订单创建', description: '通过 Shopify Web Checkout 提交', type: 'customer' }
     ],
     note: '请放在前台，谢谢',
-    tags: ['b2b', 'singapore'],
+    profitability: {
+      warehouseCost: 0,
+      freightCost: 0,
+      costComplete: false,
+      costPendingNote: '未发货，成本待回传',
+      currency: 'USD',
+    },
+    additionalFees: [],
+        tags: ['b2b', 'singapore'],
     platformMeta: { 'shopify_order_id': '5820173270856', 'landing_site': '/collections/desk-setup' }
   },
 
@@ -337,13 +412,13 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
     paymentGateway: 'Stripe',
     discountCodes: [{ code: 'OFFICE20', type: 'fixed_amount', amount: '$50.00' }],
     lineItems: [
-      { id: 'li_081', sku: 'OC-ERG-BLK', title: 'Office Chair Ergonomic', variantTitle: 'Black / Mesh / Lumbar Support', quantity: 1, unitPrice: '$399.00', discount: '$20.00', tax: '$30.32', subtotal: '$409.32', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', batchNo: 'B2026-03-OC', serialNumbers: ['SN-OC-ERG-20260301-0042'], weight: 18000, requiresShipping: true, channelSku: 'SH-OC-ERG-BLK', warehouseSku: 'WMS-OC-ERG-BLK', unit: '把' },
-      { id: 'li_082', sku: 'SD-FRM-WHT', title: 'Standing Desk Frame', variantTitle: 'White / Electric / 120cm', quantity: 1, unitPrice: '$349.00', discount: '$15.00', tax: '$26.72', subtotal: '$360.72', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', batchNo: 'B2026-02-SD', serialNumbers: ['SN-SD-FRM-20260215-0189'], weight: 32000, requiresShipping: true, channelSku: 'SH-SD-FRM-WHT', warehouseSku: 'WMS-SD-FRM-WHT', unit: '台' },
-      { id: 'li_083', sku: 'MA-DL-BLK', title: 'Monitor Arm', variantTitle: 'Dual / Black / Gas Spring', quantity: 2, unitPrice: '$89.00', discount: '$5.00', tax: '$13.84', subtotal: '$185.84', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', batchNo: 'B2026-04-MA', serialNumbers: ['SN-MA-DL-20260410-0331', 'SN-MA-DL-20260410-0332'], weight: 4200, requiresShipping: true, channelSku: 'SH-MA-DL-BLK', warehouseSku: 'WMS-MA-DL-BLK', unit: '件' },
-      { id: 'li_084', sku: 'DM-FL-GRY', title: 'Desk Mat', variantTitle: 'Grey / 80×40 / Felt', quantity: 1, unitPrice: '$35.00', discount: '$0.00', tax: '$2.80', subtotal: '$37.80', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', weight: 450, requiresShipping: true, channelSku: 'SH-DM-FL-GRY', warehouseSku: 'WMS-DM-FL-GRY', unit: '张' },
-      { id: 'li_085', sku: 'KT-SLD-OAK', title: 'Keyboard Tray', variantTitle: 'Oak / Slide-out', quantity: 1, unitPrice: '$65.00', discount: '$5.00', tax: '$4.80', subtotal: '$64.80', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', weight: 1800, requiresShipping: true, channelSku: 'SH-KT-SLD-OAK', warehouseSku: 'WMS-KT-SLD-OAK', unit: '件' },
-      { id: 'li_086', sku: 'CT-UND-BLK', title: 'Cable Tray', variantTitle: 'Under-desk / Black / 60cm', quantity: 1, unitPrice: '$29.00', discount: '$3.00', tax: '$2.08', subtotal: '$28.08', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', weight: 600, requiresShipping: true, channelSku: 'SH-CT-UND-BLK', warehouseSku: 'WMS-CT-UND-BLK', unit: '件' },
-      { id: 'li_087', sku: 'FR-MEM-BLK', title: 'Foot Rest', variantTitle: 'Memory Foam / Adjustable', quantity: 1, unitPrice: '$45.00', discount: '$2.00', tax: '$3.44', subtotal: '$46.44', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', weight: 900, requiresShipping: true, channelSku: 'SH-FR-MEM-BLK', warehouseSku: 'WMS-FR-MEM-BLK', unit: '件' }
+      { id: 'li_081', sku: 'OC-ERG-BLK', title: 'Office Chair Ergonomic', variantTitle: 'Black / Mesh / Lumbar Support', quantity: 1, unitPrice: '$399.00', discount: '$20.00', tax: '$30.32', subtotal: '$409.32', costSnapshot: 151.62, costSource: 'manual', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', batchNo: 'B2026-03-OC', serialNumbers: ['SN-OC-ERG-20260301-0042'], weight: 18000, requiresShipping: true, channelSku: 'SH-OC-ERG-BLK', warehouseSku: 'WMS-OC-ERG-BLK', unit: '把' },
+      { id: 'li_082', sku: 'SD-FRM-WHT', title: 'Standing Desk Frame', variantTitle: 'White / Electric / 120cm', quantity: 1, unitPrice: '$349.00', discount: '$15.00', tax: '$26.72', subtotal: '$360.72', costSnapshot: 132.62, costSource: 'manual', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', batchNo: 'B2026-02-SD', serialNumbers: ['SN-SD-FRM-20260215-0189'], weight: 32000, requiresShipping: true, channelSku: 'SH-SD-FRM-WHT', warehouseSku: 'WMS-SD-FRM-WHT', unit: '台' },
+      { id: 'li_083', sku: 'MA-DL-BLK', title: 'Monitor Arm', variantTitle: 'Dual / Black / Gas Spring', quantity: 2, unitPrice: '$89.00', discount: '$5.00', tax: '$13.84', subtotal: '$185.84', costSnapshot: 33.82, costSource: 'manual', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', batchNo: 'B2026-04-MA', serialNumbers: ['SN-MA-DL-20260410-0331', 'SN-MA-DL-20260410-0332'], weight: 4200, requiresShipping: true, channelSku: 'SH-MA-DL-BLK', warehouseSku: 'WMS-MA-DL-BLK', unit: '件' },
+      { id: 'li_084', sku: 'DM-FL-GRY', title: 'Desk Mat', variantTitle: 'Grey / 80×40 / Felt', quantity: 1, unitPrice: '$35.00', discount: '$0.00', tax: '$2.80', subtotal: '$37.80', costSnapshot: 13.3, costSource: 'manual', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', weight: 450, requiresShipping: true, channelSku: 'SH-DM-FL-GRY', warehouseSku: 'WMS-DM-FL-GRY', unit: '张' },
+      { id: 'li_085', sku: 'KT-SLD-OAK', title: 'Keyboard Tray', variantTitle: 'Oak / Slide-out', quantity: 1, unitPrice: '$65.00', discount: '$5.00', tax: '$4.80', subtotal: '$64.80', costSnapshot: 24.7, costSource: 'manual', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', weight: 1800, requiresShipping: true, channelSku: 'SH-KT-SLD-OAK', warehouseSku: 'WMS-KT-SLD-OAK', unit: '件' },
+      { id: 'li_086', sku: 'CT-UND-BLK', title: 'Cable Tray', variantTitle: 'Under-desk / Black / 60cm', quantity: 1, unitPrice: '$29.00', discount: '$3.00', tax: '$2.08', subtotal: '$28.08', costSnapshot: 11.02, costSource: 'manual', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', weight: 600, requiresShipping: true, channelSku: 'SH-CT-UND-BLK', warehouseSku: 'WMS-CT-UND-BLK', unit: '件' },
+      { id: 'li_087', sku: 'FR-MEM-BLK', title: 'Foot Rest', variantTitle: 'Memory Foam / Adjustable', quantity: 1, unitPrice: '$45.00', discount: '$2.00', tax: '$3.44', subtotal: '$46.44', costSnapshot: 17.1, costSource: 'manual', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', weight: 900, requiresShipping: true, channelSku: 'SH-FR-MEM-BLK', warehouseSku: 'WMS-FR-MEM-BLK', unit: '件' }
     ],
     customer: { name: 'David Lee', email: 'david.lee@example.com', phone: '+1 (617) 555-0321', ordersCount: 2, totalSpent: '$1,680.00', tags: ['wholesale', 'office-setup'], acceptsMarketing: true },
     shippingAddress: { name: 'David Lee', company: 'Lee Consulting LLC', phone: '+1 (617) 555-0321', address1: '100 Summer St, Floor 12', city: 'Boston', province: 'MA', country: 'US', zip: '02110', formatted: '100 Summer St, Floor 12, Boston, MA 02110, US' },
@@ -474,7 +549,33 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       { id: 'evt_08_l2a4', time: '2026-06-04 14:00:00', actor: 'UPS', actorRole: 'carrier', title: '到达配送站 (标品)', description: '到达 Boston Downtown 配送站 · 预计明日配送 100 Summer St', type: 'logistics', trackingNode: 'out_for_delivery', fulfillmentOrderNo: 'FO-20260602-0082' }
     ],
     note: '需要白手套送货上门服务，送到 12 楼前台',
-    tags: ['b2b', 'freight', 'white-glove', 'multi-fulfillment'],
+    profitability: {
+      warehouseCost: 18.5,
+      freightCost: 128,
+      costComplete: true,
+      currency: 'USD',
+    },
+    additionalFees: [],
+    // 上游变更：商品数量变更（已出库运输中，数量已无法追回）
+    upstreamChanges: [
+      {
+        id: 'uc_008_1',
+        type: 'quantity_changed' as const,
+        status: 'pending' as const,
+        detectedAt: '2026-06-03 22:10:00',
+        stage: 'outbounded' as const,
+        before: { lineItemId: 'li_082', sku: 'MONITOR-ARM-DLX', quantity: 2 },
+        after: { lineItemId: 'li_082', sku: 'MONITOR-ARM-DLX', quantity: 1, reason: 'Buyer realized they only need 1 arm' },
+        channelNote: 'Shopify: Buyer submitted order edit request — Monitor Arm qty 2→1, package already shipped (FedEx 7489203847200)',
+        suggestions: [
+          { action: 'partial_refund', label: '对减少数量退款', variant: 'primary' as const, description: '对 Monitor Arm × 1 件（约 $180）发起退款，买家收货后自行处理多余件' },
+          { action: 'arrange_return', label: '安排退货', variant: 'default' as const, description: '等待买家签收后，安排退回 Monitor Arm × 1，退款 $180' },
+          { action: 'reject_edit', label: '拒绝数量修改', variant: 'default' as const, description: '包裹已在途，无法修改，通知买家' },
+          { action: 'ignore', label: '忽略', variant: 'default' as const },
+        ],
+      },
+    ],
+        tags: ['b2b', 'freight', 'white-glove', 'multi-fulfillment'],
     platformMeta: { 'shopify_order_id': '5820173270712', 'landing_site': '/pages/office-bundle', 'referring_site': 'https://linkedin.com' }
   },
 
@@ -506,7 +607,7 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
     paymentGateway: 'Stripe',
     discountCodes: [],
     lineItems: [
-      { id: 'li_091', sku: 'SC-SET-LAV', title: 'Scented Candle Set', variantTitle: 'Lavender & Vanilla / 3-Pack', quantity: 1, unitPrice: '£38.00', discount: '£0.00', tax: '£3.00', subtotal: '£38.00', fulfillmentStatus: '已取消', fulfillmentNote: '客户取消，已退款', weight: 850, requiresShipping: true, channelSku: 'SH-SC-SET-LAV', warehouseSku: 'WMS-SC-SET-LAV', unit: '套' }
+      { id: 'li_091', sku: 'SC-SET-LAV', title: 'Scented Candle Set', variantTitle: 'Lavender & Vanilla / 3-Pack', quantity: 1, unitPrice: '£38.00', discount: '£0.00', tax: '£3.00', subtotal: '£38.00', costSnapshot: 14.44, costSource: 'manual', fulfillmentStatus: '已取消', fulfillmentNote: '客户取消，已退款', weight: 850, requiresShipping: true, channelSku: 'SH-SC-SET-LAV', warehouseSku: 'WMS-SC-SET-LAV', unit: '套' }
     ],
     customer: { name: 'Anna Schmidt', email: 'anna.s@example.co.uk', phone: '+44 161 555 0432', ordersCount: 4, totalSpent: '£320.00', tags: ['returning'], acceptsMarketing: true },
     shippingAddress: { name: 'Anna Schmidt', phone: '+44 161 555 0432', address1: '15 Deansgate', city: 'Manchester', province: '', country: 'GB', zip: 'M3 4EN', formatted: '15 Deansgate, Manchester, M3 4EN, GB' },
@@ -530,7 +631,14 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       { id: 'evt_091', time: '2026-06-02 08:45:12', actor: 'Anna Schmidt', actorRole: 'customer', title: '订单创建', description: '通过 Shopify Web Checkout 提交', type: 'customer' }
     ],
     note: '客户来电取消，原因：重复下单',
-    tags: ['cancelled', 'refunded'],
+    profitability: {
+      warehouseCost: 0,
+      freightCost: 0,
+      costComplete: true,
+      currency: 'USD',
+    },
+    additionalFees: [],
+        tags: ['cancelled', 'refunded'],
     platformMeta: { 'shopify_order_id': '5820173270698', 'cancel_reason': 'customer' }
   },
 
@@ -562,15 +670,15 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
     paymentGateway: 'Stripe',
     discountCodes: [{ code: 'KITCHEN15', type: 'percentage', amount: 'S$30.00' }],
     lineItems: [
-      { id: 'li_101', sku: 'KK-SET-PRO', title: 'Kitchen Knife Set', variantTitle: 'Professional / 8-piece / German Steel', quantity: 1, unitPrice: 'S$289.00', discount: 'S$15.00', tax: 'S$32.00', subtotal: 'S$306.00', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 3200, requiresShipping: true, channelSku: 'SH-KK-SET-PRO', warehouseSku: 'WMS-KK-SET-PRO', unit: '套' },
-      { id: 'li_102', sku: 'CB-BM-LG', title: 'Cutting Board', variantTitle: 'Bamboo / Large', quantity: 2, unitPrice: 'S$45.00', discount: 'S$5.00', tax: 'S$10.00', subtotal: 'S$95.00', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 1400, requiresShipping: true, channelSku: 'SH-CB-BM-LG', warehouseSku: 'WMS-CB-BM-LG', unit: '件' },
-      { id: 'li_103', sku: 'SR-ROT-18', title: 'Spice Rack', variantTitle: 'Rotating / 18-jar', quantity: 1, unitPrice: 'S$69.00', discount: 'S$5.00', tax: 'S$8.00', subtotal: 'S$72.00', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 2800, requiresShipping: true, channelSku: 'SH-SR-ROT-18', warehouseSku: 'WMS-SR-ROT-18', unit: '件' },
-      { id: 'li_104', sku: 'MC-SS-5PK', title: 'Measuring Cups', variantTitle: 'Stainless Steel / 5-piece', quantity: 1, unitPrice: 'S$25.00', discount: 'S$0.00', tax: 'S$3.00', subtotal: 'S$28.00', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 380, requiresShipping: true, channelSku: 'SH-MC-SS-5PK', warehouseSku: 'WMS-MC-SS-5PK', unit: '套' },
-      { id: 'li_105', sku: 'MB-CER-3PK', title: 'Mixing Bowls', variantTitle: 'Ceramic / 3-Pack', quantity: 1, unitPrice: 'S$55.00', discount: 'S$3.00', tax: 'S$6.00', subtotal: 'S$58.00', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 2100, requiresShipping: true, channelSku: 'SH-MB-CER-3PK', warehouseSku: 'WMS-MB-CER-3PK', unit: '套' },
-      { id: 'li_106', sku: 'SP-SIL-3PK', title: 'Spatula Set', variantTitle: 'Silicone / Heat-resistant / 3-piece', quantity: 1, unitPrice: 'S$29.00', discount: 'S$0.00', tax: 'S$4.00', subtotal: 'S$33.00', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 220, requiresShipping: true, channelSku: 'SH-SP-SIL-3PK', warehouseSku: 'WMS-SP-SIL-3PK', unit: '套' },
-      { id: 'li_107', sku: 'AP-CTN-NVY', title: 'Apron', variantTitle: 'Cotton / Navy', quantity: 1, unitPrice: 'S$35.00', discount: 'S$2.00', tax: 'S$4.00', subtotal: 'S$37.00', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 280, requiresShipping: true, channelSku: 'SH-AP-CTN-NVY', warehouseSku: 'WMS-AP-CTN-NVY', unit: '件' },
-      { id: 'li_108', sku: 'OM-SIL-RED', title: 'Oven Mitts', variantTitle: 'Silicone / Red / Pair', quantity: 1, unitPrice: 'S$22.00', discount: 'S$0.00', tax: 'S$3.00', subtotal: 'S$25.00', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 180, requiresShipping: true, channelSku: 'SH-OM-SIL-RED', warehouseSku: 'WMS-OM-SIL-RED', unit: '对' },
-      { id: 'li_109', sku: 'TM-DIG-MAG', title: 'Timer', variantTitle: 'Digital / Magnetic', quantity: 1, unitPrice: 'S$15.00', discount: 'S$0.00', tax: 'S$2.00', subtotal: 'S$17.00', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 65, requiresShipping: true, channelSku: 'SH-TM-DIG-MAG', warehouseSku: 'WMS-TM-DIG-MAG', unit: '个' }
+      { id: 'li_101', sku: 'KK-SET-PRO', title: 'Kitchen Knife Set', variantTitle: 'Professional / 8-piece / German Steel', quantity: 1, unitPrice: 'S$289.00', discount: 'S$15.00', tax: 'S$32.00', subtotal: 'S$306.00', costSnapshot: 109.82, costSource: 'manual', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 3200, requiresShipping: true, channelSku: 'SH-KK-SET-PRO', warehouseSku: 'WMS-KK-SET-PRO', unit: '套' },
+      { id: 'li_102', sku: 'CB-BM-LG', title: 'Cutting Board', variantTitle: 'Bamboo / Large', quantity: 2, unitPrice: 'S$45.00', discount: 'S$5.00', tax: 'S$10.00', subtotal: 'S$95.00', costSnapshot: 17.1, costSource: 'manual', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 1400, requiresShipping: true, channelSku: 'SH-CB-BM-LG', warehouseSku: 'WMS-CB-BM-LG', unit: '件' },
+      { id: 'li_103', sku: 'SR-ROT-18', title: 'Spice Rack', variantTitle: 'Rotating / 18-jar', quantity: 1, unitPrice: 'S$69.00', discount: 'S$5.00', tax: 'S$8.00', subtotal: 'S$72.00', costSnapshot: 26.22, costSource: 'manual', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 2800, requiresShipping: true, channelSku: 'SH-SR-ROT-18', warehouseSku: 'WMS-SR-ROT-18', unit: '件' },
+      { id: 'li_104', sku: 'MC-SS-5PK', title: 'Measuring Cups', variantTitle: 'Stainless Steel / 5-piece', quantity: 1, unitPrice: 'S$25.00', discount: 'S$0.00', tax: 'S$3.00', subtotal: 'S$28.00', costSnapshot: 9.5, costSource: 'manual', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 380, requiresShipping: true, channelSku: 'SH-MC-SS-5PK', warehouseSku: 'WMS-MC-SS-5PK', unit: '套' },
+      { id: 'li_105', sku: 'MB-CER-3PK', title: 'Mixing Bowls', variantTitle: 'Ceramic / 3-Pack', quantity: 1, unitPrice: 'S$55.00', discount: 'S$3.00', tax: 'S$6.00', subtotal: 'S$58.00', costSnapshot: 20.9, costSource: 'manual', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 2100, requiresShipping: true, channelSku: 'SH-MB-CER-3PK', warehouseSku: 'WMS-MB-CER-3PK', unit: '套' },
+      { id: 'li_106', sku: 'SP-SIL-3PK', title: 'Spatula Set', variantTitle: 'Silicone / Heat-resistant / 3-piece', quantity: 1, unitPrice: 'S$29.00', discount: 'S$0.00', tax: 'S$4.00', subtotal: 'S$33.00', costSnapshot: 11.02, costSource: 'manual', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 220, requiresShipping: true, channelSku: 'SH-SP-SIL-3PK', warehouseSku: 'WMS-SP-SIL-3PK', unit: '套' },
+      { id: 'li_107', sku: 'AP-CTN-NVY', title: 'Apron', variantTitle: 'Cotton / Navy', quantity: 1, unitPrice: 'S$35.00', discount: 'S$2.00', tax: 'S$4.00', subtotal: 'S$37.00', costSnapshot: 13.3, costSource: 'manual', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 280, requiresShipping: true, channelSku: 'SH-AP-CTN-NVY', warehouseSku: 'WMS-AP-CTN-NVY', unit: '件' },
+      { id: 'li_108', sku: 'OM-SIL-RED', title: 'Oven Mitts', variantTitle: 'Silicone / Red / Pair', quantity: 1, unitPrice: 'S$22.00', discount: 'S$0.00', tax: 'S$3.00', subtotal: 'S$25.00', costSnapshot: 8.36, costSource: 'manual', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 180, requiresShipping: true, channelSku: 'SH-OM-SIL-RED', warehouseSku: 'WMS-OM-SIL-RED', unit: '对' },
+      { id: 'li_109', sku: 'TM-DIG-MAG', title: 'Timer', variantTitle: 'Digital / Magnetic', quantity: 1, unitPrice: 'S$15.00', discount: 'S$0.00', tax: 'S$2.00', subtotal: 'S$17.00', costSnapshot: 5.7, costSource: 'manual', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 65, requiresShipping: true, channelSku: 'SH-TM-DIG-MAG', warehouseSku: 'WMS-TM-DIG-MAG', unit: '个' }
     ],
     customer: { name: 'Kevin Park', email: 'kevin.p@example.sg', phone: '+65 8765 4321', ordersCount: 15, totalSpent: 'S$5,680.00', tags: ['VIP', 'kitchen-enthusiast', 'loyal'], acceptsMarketing: true },
     shippingAddress: { name: 'Kevin Park', phone: '+65 8765 4321', address1: '6 Raffles Quay, #15-08', city: 'Singapore', province: '', country: 'SG', zip: '048580', formatted: '6 Raffles Quay, #15-08, Singapore 048580, SG' },
@@ -604,7 +712,14 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       { id: 'evt_104_l4', time: '2026-06-02 10:30:00', actor: 'Ninja Van', actorRole: 'carrier', title: '签收成功', description: '本人签收 · Raffles Quay #15-08 前台', type: 'logistics', trackingNode: 'delivered' }
     ],
     note: '',
-    tags: ['completed', 'vip-order'],
+    profitability: {
+      warehouseCost: 12,
+      freightCost: 24,
+      costComplete: true,
+      currency: 'USD',
+    },
+    additionalFees: [],
+        tags: ['completed', 'vip-order'],
     platformMeta: { 'shopify_order_id': '5820173270589' }
   },
 
@@ -635,8 +750,8 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
     paymentGateway: 'Amazon Pay',
     discountCodes: [],
     lineItems: [
-      { id: 'li_111', sku: 'GM-PRO-BLK', title: 'Gaming Mouse', variantTitle: 'Black / 25600 DPI / Wireless', quantity: 1, unitPrice: '$149.00', discount: '$0.00', tax: '$9.00', subtotal: '$158.00', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', weight: 140, requiresShipping: true, platformLineItemId: 'amz_li_30481922_1', channelSku: 'AMZ-GM-PRO-BLK', warehouseSku: 'WMS-GM-PRO-BLK', unit: '个' },
-      { id: 'li_112', sku: 'MP-RGB-XL', title: 'Mouse Pad RGB', variantTitle: 'XL / 14 lighting modes', quantity: 1, unitPrice: '$60.00', discount: '$0.00', tax: '$4.00', subtotal: '$64.00', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', weight: 580, requiresShipping: true, platformLineItemId: 'amz_li_30481922_2', channelSku: 'AMZ-MP-RGB-XL', warehouseSku: 'WMS-MP-RGB-XL', unit: '张' }
+      { id: 'li_111', sku: 'GM-PRO-BLK', title: 'Gaming Mouse', variantTitle: 'Black / 25600 DPI / Wireless', quantity: 1, unitPrice: '$149.00', discount: '$0.00', tax: '$9.00', subtotal: '$158.00', costSnapshot: 56.62, costSource: 'manual', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', weight: 140, requiresShipping: true, platformLineItemId: 'amz_li_30481922_1', channelSku: 'AMZ-GM-PRO-BLK', warehouseSku: 'WMS-GM-PRO-BLK', unit: '个' },
+      { id: 'li_112', sku: 'MP-RGB-XL', title: 'Mouse Pad RGB', variantTitle: 'XL / 14 lighting modes', quantity: 1, unitPrice: '$60.00', discount: '$0.00', tax: '$4.00', subtotal: '$64.00', costSnapshot: 22.8, costSource: 'manual', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', weight: 580, requiresShipping: true, platformLineItemId: 'amz_li_30481922_2', channelSku: 'AMZ-MP-RGB-XL', warehouseSku: 'WMS-MP-RGB-XL', unit: '张' }
     ],
     customer: { name: 'Tom Harris', email: 'tom.h@example.com', phone: '', ordersCount: 7, totalSpent: '$1,450.00', tags: ['gamer', 'amazon-buyer'], acceptsMarketing: false },
     shippingAddress: { name: 'Tom Harris', phone: '+1 (214) 555-0876', address1: '2001 Ross Ave, Suite 700', city: 'Dallas', province: 'TX', country: 'US', zip: '75201', formatted: '2001 Ross Ave, Suite 700, Dallas, TX 75201, US' },
@@ -662,7 +777,14 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       { id: 'evt_114_l4', time: '2026-06-03 14:00:00', actor: 'UPS', actorRole: 'carrier', title: '到达配送站', description: '到达 Ross Ave 配送站，预计明日配送', type: 'logistics', trackingNode: 'out_for_delivery' }
     ],
     note: '',
-    tags: ['amazon-mfn'],
+    profitability: {
+      warehouseCost: 3.2,
+      freightCost: 12,
+      costComplete: true,
+      currency: 'USD',
+    },
+    additionalFees: [],
+        tags: ['amazon-mfn'],
     platformMeta: { 'amazon_order_id': '114-7782910-3381028', 'fulfillment_channel': 'MFN', 'ship_service_level': 'Standard', 'buy_shipping_label': 'UPS Ground' }
   },
 
@@ -694,8 +816,8 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
     paymentGateway: 'TikTok Payment',
     discountCodes: [],
     lineItems: [
-      { id: 'li_121', sku: 'HD-CMP-PNK', title: 'Hair Dryer Compact', variantTitle: 'Pink / Ionic / 1600W', quantity: 1, unitPrice: '£79.00', discount: '£0.00', tax: '£6.00', subtotal: '£79.00', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 520, requiresShipping: true, channelSku: 'TK-HD-CMP-PNK', warehouseSku: 'WMS-HD-CMP-PNK', unit: '台' },
-      { id: 'li_122', sku: 'HC-SET-12P', title: 'Hair Clips Set', variantTitle: 'Assorted / 12-piece', quantity: 1, unitPrice: '£19.00', discount: '£0.00', tax: '£2.00', subtotal: '£19.00', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 85, requiresShipping: true, channelSku: 'TK-HC-SET-12P', warehouseSku: 'WMS-HC-SET-12P', unit: '套' }
+      { id: 'li_121', sku: 'HD-CMP-PNK', title: 'Hair Dryer Compact', variantTitle: 'Pink / Ionic / 1600W', quantity: 1, unitPrice: '£79.00', discount: '£0.00', tax: '£6.00', subtotal: '£79.00', costSnapshot: 30.02, costSource: 'manual', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 520, requiresShipping: true, channelSku: 'TK-HD-CMP-PNK', warehouseSku: 'WMS-HD-CMP-PNK', unit: '台' },
+      { id: 'li_122', sku: 'HC-SET-12P', title: 'Hair Clips Set', variantTitle: 'Assorted / 12-piece', quantity: 1, unitPrice: '£19.00', discount: '£0.00', tax: '£2.00', subtotal: '£19.00', costSnapshot: 7.22, costSource: 'manual', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 85, requiresShipping: true, channelSku: 'TK-HC-SET-12P', warehouseSku: 'WMS-HC-SET-12P', unit: '套' }
     ],
     customer: { name: 'Sophie Turner', email: 'sophie.t@example.co.uk', phone: '+44 121 555 0199', ordersCount: 3, totalSpent: '£289.00', tags: ['tiktok-buyer', 'beauty'], acceptsMarketing: true },
     shippingAddress: { name: 'Sophie Turner', phone: '+44 121 555 0199', address1: '45 Broad St', city: 'Birmingham', province: '', country: 'GB', zip: 'B1 2HP', formatted: '45 Broad St, Birmingham, B1 2HP, GB' },
@@ -733,7 +855,14 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       { id: 'evt_12_l4', time: '2026-06-02 09:15:00', actor: 'Royal Mail', actorRole: 'carrier', title: '签收成功', description: '投递至信箱 · 45 Broad St, Birmingham, B1 2HP', type: 'logistics', trackingNode: 'delivered', fulfillmentOrderNo: 'FO-20260531-0121' }
     ],
     note: '',
-    tags: ['completed', 'tiktok-promo'],
+    profitability: {
+      warehouseCost: 2.8,
+      freightCost: 6,
+      costComplete: true,
+      currency: 'USD',
+    },
+    additionalFees: [],
+        tags: ['completed', 'tiktok-promo'],
     platformMeta: { 'tiktok_order_id': 'TK-8826991', 'tiktok_shop_id': 'uk_shop_001', 'source': 'product_page', 'promo_code': 'TIKTOK-PROMO-06' }
   },
 
@@ -764,10 +893,10 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
     paymentGateway: 'Stripe',
     discountCodes: [{ code: 'SAVE15', type: 'fixed_amount', amount: '$15.00' }],
     lineItems: [
-      { id: 'li_131', sku: 'KB-MEC-RGB', title: 'Mechanical Keyboard', variantTitle: 'RGB / Cherry MX Blue', quantity: 1, unitPrice: '$129.00', discount: '$5.00', tax: '$9.92', subtotal: '$133.92', fulfillmentStatus: '拣货中', fulfillmentNote: '仓库拣货执行中', weight: 980, requiresShipping: true, channelSku: 'SH-KB-MEC-RGB', warehouseSku: 'WMS-KB-MEC-RGB', unit: '台' },
-      { id: 'li_132', sku: 'WR-GEL-BLK', title: 'Wrist Rest', variantTitle: 'Gel / Black / Full-size', quantity: 1, unitPrice: '$29.00', discount: '$0.00', tax: '$2.32', subtotal: '$31.32', fulfillmentStatus: '拣货中', fulfillmentNote: '仓库拣货执行中', weight: 320, requiresShipping: true, channelSku: 'SH-WR-GEL-BLK', warehouseSku: 'WMS-WR-GEL-BLK', unit: '件' },
-      { id: 'li_133', sku: 'WC-4K-HDR', title: 'Webcam 4K', variantTitle: '4K HDR / Auto-focus', quantity: 1, unitPrice: '$149.00', discount: '$8.00', tax: '$11.28', subtotal: '$152.28', fulfillmentStatus: '拣货中', fulfillmentNote: '仓库拣货执行中', weight: 210, requiresShipping: true, channelSku: 'SH-WC-4K-HDR', warehouseSku: 'WMS-WC-4K-HDR', unit: '个' },
-      { id: 'li_134', sku: 'RL-LED-DIM', title: 'Ring Light Mini', variantTitle: '6 inch / Clip-on / Dimmable', quantity: 1, unitPrice: '$39.00', discount: '$2.00', tax: '$2.96', subtotal: '$39.96', fulfillmentStatus: '拣货中', fulfillmentNote: '仓库拣货执行中', weight: 150, requiresShipping: true, channelSku: 'SH-RL-LED-DIM', warehouseSku: 'WMS-RL-LED-DIM', unit: '件' }
+      { id: 'li_131', sku: 'KB-MEC-RGB', title: 'Mechanical Keyboard', variantTitle: 'RGB / Cherry MX Blue', quantity: 1, unitPrice: '$129.00', discount: '$5.00', tax: '$9.92', subtotal: '$133.92', costSnapshot: 49.02, costSource: 'manual', fulfillmentStatus: '拣货中', fulfillmentNote: '仓库拣货执行中', weight: 980, requiresShipping: true, channelSku: 'SH-KB-MEC-RGB', warehouseSku: 'WMS-KB-MEC-RGB', unit: '台' },
+      { id: 'li_132', sku: 'WR-GEL-BLK', title: 'Wrist Rest', variantTitle: 'Gel / Black / Full-size', quantity: 1, unitPrice: '$29.00', discount: '$0.00', tax: '$2.32', subtotal: '$31.32', costSnapshot: 11.02, costSource: 'manual', fulfillmentStatus: '拣货中', fulfillmentNote: '仓库拣货执行中', weight: 320, requiresShipping: true, channelSku: 'SH-WR-GEL-BLK', warehouseSku: 'WMS-WR-GEL-BLK', unit: '件' },
+      { id: 'li_133', sku: 'WC-4K-HDR', title: 'Webcam 4K', variantTitle: '4K HDR / Auto-focus', quantity: 1, unitPrice: '$149.00', discount: '$8.00', tax: '$11.28', subtotal: '$152.28', costSnapshot: 56.62, costSource: 'manual', fulfillmentStatus: '拣货中', fulfillmentNote: '仓库拣货执行中', weight: 210, requiresShipping: true, channelSku: 'SH-WC-4K-HDR', warehouseSku: 'WMS-WC-4K-HDR', unit: '个' },
+      { id: 'li_134', sku: 'RL-LED-DIM', title: 'Ring Light Mini', variantTitle: '6 inch / Clip-on / Dimmable', quantity: 1, unitPrice: '$39.00', discount: '$2.00', tax: '$2.96', subtotal: '$39.96', costSnapshot: 14.82, costSource: 'manual', fulfillmentStatus: '拣货中', fulfillmentNote: '仓库拣货执行中', weight: 150, requiresShipping: true, channelSku: 'SH-RL-LED-DIM', warehouseSku: 'WMS-RL-LED-DIM', unit: '件' }
     ],
     customer: { name: 'Jason Kim', email: 'jason.k@example.com', phone: '+1 (415) 555-0312', ordersCount: 8, totalSpent: '$2,150.00', tags: ['tech-enthusiast', 'returning'], acceptsMarketing: true },
     shippingAddress: { name: 'Jason Kim', phone: '+1 (415) 555-0312', address1: '580 Market St, Suite 400', city: 'San Francisco', province: 'CA', country: 'US', zip: '94104', formatted: '580 Market St, Suite 400, San Francisco, CA 94104, US' },
@@ -827,7 +956,33 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       { id: 'evt_13_01', time: '2026-06-04 09:30:00', actor: 'Jason Kim', actorRole: 'customer', title: '订单创建', description: '通过 Shopify Web Checkout (Chrome) 提交', type: 'customer' }
     ],
     note: '',
-    tags: ['split-fulfillment', 'multi-warehouse'],
+    profitability: {
+      warehouseCost: 4.5,
+      freightCost: 0,
+      costComplete: false,
+      costPendingNote: '运输成本待 TMS 回传',
+      currency: 'USD',
+    },
+    additionalFees: [],
+    // 上游变更：地址变更（拣货中，出库单已下发但尚未交接承运商）
+    upstreamChanges: [
+      {
+        id: 'uc_013_1',
+        type: 'address_changed' as const,
+        status: 'pending' as const,
+        detectedAt: '2026-06-04 11:45:00',
+        stage: 'pending_outbound' as const,
+        before: { address1: '101 Market St', city: 'San Francisco', zip: '94105' },
+        after: { address1: '580 California St', city: 'San Francisco', zip: '94104' },
+        channelNote: 'Shopify: Buyer updated shipping address — office relocation, new address confirmed by buyer',
+        suggestions: [
+          { action: 'update_shipping_label', label: '更新运单地址', variant: 'primary' as const, description: '通知仓库暂停出库，更新快递运单上的目的地址后继续发货' },
+          { action: 'accept_address', label: '接受新地址并继续', variant: 'default' as const, description: '系统已自动更新收货地址，确认后仓库继续正常拣货发货' },
+          { action: 'ignore', label: '忽略（使用原地址）', variant: 'default' as const },
+        ],
+      },
+    ],
+        tags: ['split-fulfillment', 'multi-warehouse'],
     platformMeta: { 'shopify_order_id': '5820173271150', 'landing_site': '/collections/tech-accessories', 'referring_site': 'https://reddit.com' }
   },
 
@@ -859,8 +1014,8 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
     discountCodes: [],
 
     lineItems: [
-      { id: 'li_141', sku: 'ST-WIFI-V3', title: 'Smart Thermostat', variantTitle: 'WiFi / V3 / White', quantity: 1, unitPrice: '$199.00', discount: '$0.00', tax: '$12.74', subtotal: '$211.74', fulfillmentStatus: '找不到仓库', fulfillmentNote: '新品未铺货，等待入库', weight: 850, requiresShipping: true, channelSku: 'SH-ST-WIFI-V3', warehouseSku: 'WMS-ST-WIFI-V3', unit: '台' },
-      { id: 'li_142', sku: 'TS-BLE-3PK', title: 'Temperature Sensor 3-Pack', variantTitle: 'Bluetooth / White / 3-Pack', quantity: 1, unitPrice: '$79.00', discount: '$0.00', tax: '$5.26', subtotal: '$84.26', fulfillmentStatus: '找不到仓库', fulfillmentNote: '新品未铺货，等待入库', weight: 120, requiresShipping: true, channelSku: 'SH-TS-BLE-3PK', warehouseSku: 'WMS-TS-BLE-3PK', unit: '套' }
+      { id: 'li_141', sku: 'ST-WIFI-V3', title: 'Smart Thermostat', variantTitle: 'WiFi / V3 / White', quantity: 1, unitPrice: '$199.00', discount: '$0.00', tax: '$12.74', subtotal: '$211.74', costSnapshot: 75.62, costSource: 'manual', fulfillmentStatus: '找不到仓库', fulfillmentNote: '新品未铺货，等待入库', weight: 850, requiresShipping: true, channelSku: 'SH-ST-WIFI-V3', warehouseSku: 'WMS-ST-WIFI-V3', unit: '台' },
+      { id: 'li_142', sku: 'TS-BLE-3PK', title: 'Temperature Sensor 3-Pack', variantTitle: 'Bluetooth / White / 3-Pack', quantity: 1, unitPrice: '$79.00', discount: '$0.00', tax: '$5.26', subtotal: '$84.26', costSnapshot: 30.02, costSource: 'manual', fulfillmentStatus: '找不到仓库', fulfillmentNote: '新品未铺货，等待入库', weight: 120, requiresShipping: true, channelSku: 'SH-TS-BLE-3PK', warehouseSku: 'WMS-TS-BLE-3PK', unit: '套' }
     ],
     customer: { name: 'Daniel Cooper', email: 'daniel.cooper@example.com', phone: '+1 (720) 555-0189', ordersCount: 1, totalSpent: '$311.00', tags: ['new-customer', 'smart-home'], acceptsMarketing: true },
     shippingAddress: { name: 'Daniel Cooper', phone: '+1 (720) 555-0189', address1: '1600 Champa St, Apt 402', city: 'Denver', province: 'CO', country: 'US', zip: '80202', formatted: '1600 Champa St, Apt 402, Denver, CO 80202, US' },
@@ -882,7 +1037,15 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       { id: 'evt_14_01', time: '2026-06-04 11:20:00', actor: 'Daniel Cooper', actorRole: 'customer', title: '订单创建', description: '通过 Shopify Web Checkout (Chrome) 提交', type: 'customer' }
     ],
     note: '',
-    tags: ['no-warehouse', 'new-product', 'smart-home'],
+    profitability: {
+      warehouseCost: 0,
+      freightCost: 0,
+      costComplete: false,
+      costPendingNote: '未发货，等待人工处理',
+      currency: 'USD',
+    },
+    additionalFees: [],
+        tags: ['no-warehouse', 'new-product', 'smart-home'],
     platformMeta: { 'shopify_order_id': '5820173271200', 'landing_site': '/collections/smart-home', 'referring_site': 'https://google.com' }
   },
 
@@ -913,11 +1076,11 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
     paymentGateway: 'Stripe',
     discountCodes: [],
     lineItems: [
-      { id: 'li_151', sku: 'PJ-4K-HDR', title: 'Projector 4K', variantTitle: 'HDR / 3000 Lumens / White', quantity: 1, unitPrice: '$899.00', discount: '$0.00', tax: '$57.54', subtotal: '$956.54', fulfillmentStatus: '已发货', fulfillmentNote: '已从US-Central-DFW发出', weight: 5200, requiresShipping: true, channelSku: 'SH-PJ-4K-HDR', warehouseSku: 'WMS-PJ-4K-HDR', unit: '台' },
-      { id: 'li_152', sku: 'PS-100-WHT', title: 'Projector Screen 100"', variantTitle: 'White / Motorized / 16:9', quantity: 1, unitPrice: '$450.00', discount: '$0.00', tax: '$28.80', subtotal: '$478.80', fulfillmentStatus: '已发货', fulfillmentNote: '已从US-Central-DFW发出', weight: 8500, requiresShipping: true, channelSku: 'SH-PS-100-WHT', warehouseSku: 'WMS-PS-100-WHT', unit: '件' },
-      { id: 'li_153', sku: 'HC-5M-8K', title: 'HDMI Cable 5m', variantTitle: '8K / Braided / Gold-plated', quantity: 2, unitPrice: '$35.00', discount: '$0.00', tax: '$4.48', subtotal: '$74.48', fulfillmentStatus: '拣货中', fulfillmentNote: '仓库拣货执行中', weight: 180, requiresShipping: true, channelSku: 'SH-HC-5M-8K', warehouseSku: 'WMS-HC-5M-8K', unit: '条' },
-      { id: 'li_154', sku: 'SP-8OUT-USB', title: 'Surge Protector', variantTitle: '8-Outlet / USB-C / Black', quantity: 1, unitPrice: '$45.00', discount: '$0.00', tax: '$2.88', subtotal: '$47.88', fulfillmentStatus: '拣货中', fulfillmentNote: '仓库拣货执行中', weight: 420, requiresShipping: true, channelSku: 'SH-SP-8OUT-USB', warehouseSku: 'WMS-SP-8OUT-USB', unit: '件' },
-      { id: 'li_155', sku: 'CS-NYL-2M', title: 'Cable Sleeve 2m', variantTitle: 'Nylon / Black / 2-meter', quantity: 2, unitPrice: '$12.00', discount: '$0.00', tax: '$1.54', subtotal: '$25.54', fulfillmentStatus: '待发货', fulfillmentNote: '等待打包', weight: 85, requiresShipping: true, channelSku: 'SH-CS-NYL-2M', warehouseSku: 'WMS-CS-NYL-2M', unit: '卷' }
+      { id: 'li_151', sku: 'PJ-4K-HDR', title: 'Projector 4K', variantTitle: 'HDR / 3000 Lumens / White', quantity: 1, unitPrice: '$899.00', discount: '$0.00', tax: '$57.54', subtotal: '$956.54', costSnapshot: 341.62, costSource: 'manual', fulfillmentStatus: '已发货', fulfillmentNote: '已从US-Central-DFW发出', weight: 5200, requiresShipping: true, channelSku: 'SH-PJ-4K-HDR', warehouseSku: 'WMS-PJ-4K-HDR', unit: '台' },
+      { id: 'li_152', sku: 'PS-100-WHT', title: 'Projector Screen 100"', variantTitle: 'White / Motorized / 16:9', quantity: 1, unitPrice: '$450.00', discount: '$0.00', tax: '$28.80', subtotal: '$478.80', costSnapshot: 171, costSource: 'manual', fulfillmentStatus: '已发货', fulfillmentNote: '已从US-Central-DFW发出', weight: 8500, requiresShipping: true, channelSku: 'SH-PS-100-WHT', warehouseSku: 'WMS-PS-100-WHT', unit: '件' },
+      { id: 'li_153', sku: 'HC-5M-8K', title: 'HDMI Cable 5m', variantTitle: '8K / Braided / Gold-plated', quantity: 2, unitPrice: '$35.00', discount: '$0.00', tax: '$4.48', subtotal: '$74.48', costSnapshot: 13.3, costSource: 'manual', fulfillmentStatus: '拣货中', fulfillmentNote: '仓库拣货执行中', weight: 180, requiresShipping: true, channelSku: 'SH-HC-5M-8K', warehouseSku: 'WMS-HC-5M-8K', unit: '条' },
+      { id: 'li_154', sku: 'SP-8OUT-USB', title: 'Surge Protector', variantTitle: '8-Outlet / USB-C / Black', quantity: 1, unitPrice: '$45.00', discount: '$0.00', tax: '$2.88', subtotal: '$47.88', costSnapshot: 17.1, costSource: 'manual', fulfillmentStatus: '拣货中', fulfillmentNote: '仓库拣货执行中', weight: 420, requiresShipping: true, channelSku: 'SH-SP-8OUT-USB', warehouseSku: 'WMS-SP-8OUT-USB', unit: '件' },
+      { id: 'li_155', sku: 'CS-NYL-2M', title: 'Cable Sleeve 2m', variantTitle: 'Nylon / Black / 2-meter', quantity: 2, unitPrice: '$12.00', discount: '$0.00', tax: '$1.54', subtotal: '$25.54', costSnapshot: 4.56, costSource: 'manual', fulfillmentStatus: '待发货', fulfillmentNote: '等待打包', weight: 85, requiresShipping: true, channelSku: 'SH-CS-NYL-2M', warehouseSku: 'WMS-CS-NYL-2M', unit: '卷' }
     ],
     customer: { name: 'Rachel Green', email: 'rachel.green@example.com', phone: '+1 (480) 555-0276', ordersCount: 5, totalSpent: '$3,200.00', tags: ['electronics', 'home-theater'], acceptsMarketing: true },
     shippingAddress: { name: 'Rachel Green', phone: '+1 (480) 555-0276', address1: '4200 N Scottsdale Rd, Unit 12', city: 'Phoenix', province: 'AZ', country: 'US', zip: '85251', formatted: '4200 N Scottsdale Rd, Unit 12, Phoenix, AZ 85251, US' },
@@ -1003,7 +1166,15 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       { id: 'evt_15_l1c', time: '2026-06-06 08:00:00', actor: 'FedEx Freight', actorRole: 'carrier', title: '运输中 (Projector+Screen)', description: '离开 Albuquerque · 发往 Phoenix AZ 配送站', type: 'logistics', trackingNode: 'in_transit', fulfillmentOrderNo: 'FO-20260604-0151' }
     ],
     note: '',
-    tags: ['split-3-way', 'multi-warehouse', 'home-theater'],
+    profitability: {
+      warehouseCost: 6.8,
+      freightCost: 0,
+      costComplete: false,
+      costPendingNote: '部分发货，运输成本待回传',
+      currency: 'USD',
+    },
+    additionalFees: [],
+        tags: ['split-3-way', 'multi-warehouse', 'home-theater'],
     platformMeta: { 'shopify_order_id': '5820173271210', 'landing_site': '/collections/home-theater', 'referring_site': 'https://youtube.com' }
   },
 
@@ -1034,9 +1205,9 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
     paymentGateway: 'Amazon Pay',
     discountCodes: [],
     lineItems: [
-      { id: 'li_161', sku: 'WR-AX6000', title: 'Wireless Router', variantTitle: 'AX6000 / Tri-band / Black', quantity: 1, unitPrice: '$189.00', discount: '$0.00', tax: '$12.10', subtotal: '$201.10', fulfillmentStatus: '已发货', fulfillmentNote: '已从US-Central-DFW发出', weight: 680, requiresShipping: true, channelSku: 'AMZ-WR-AX6000', warehouseSku: 'WMS-WR-AX6000', unit: '台' },
-      { id: 'li_162', sku: 'NS-24P-POE', title: 'Network Switch 24-port', variantTitle: 'PoE+ / Managed / Rack-mount', quantity: 1, unitPrice: '$159.00', discount: '$0.00', tax: '$10.18', subtotal: '$169.18', fulfillmentStatus: '合规审查', fulfillmentNote: 'FCC认证待确认，暂停发货', weight: 2400, requiresShipping: true, channelSku: 'AMZ-NS-24P-POE', warehouseSku: 'WMS-NS-24P-POE', unit: '台' },
-      { id: 'li_163', sku: 'EC-CAT6-10M', title: 'Ethernet Cable Cat6 10m', variantTitle: 'Cat6 / Blue / 10-meter', quantity: 2, unitPrice: '$18.00', discount: '$0.00', tax: '$2.30', subtotal: '$38.30', fulfillmentStatus: '合规审查', fulfillmentNote: '关联商品暂停', weight: 320, requiresShipping: true, channelSku: 'AMZ-EC-CAT6-10M', warehouseSku: 'WMS-EC-CAT6-10M', unit: '条' }
+      { id: 'li_161', sku: 'WR-AX6000', title: 'Wireless Router', variantTitle: 'AX6000 / Tri-band / Black', quantity: 1, unitPrice: '$189.00', discount: '$0.00', tax: '$12.10', subtotal: '$201.10', costSnapshot: 71.82, costSource: 'manual', fulfillmentStatus: '已发货', fulfillmentNote: '已从US-Central-DFW发出', weight: 680, requiresShipping: true, channelSku: 'AMZ-WR-AX6000', warehouseSku: 'WMS-WR-AX6000', unit: '台' },
+      { id: 'li_162', sku: 'NS-24P-POE', title: 'Network Switch 24-port', variantTitle: 'PoE+ / Managed / Rack-mount', quantity: 1, unitPrice: '$159.00', discount: '$0.00', tax: '$10.18', subtotal: '$169.18', costSnapshot: 60.42, costSource: 'manual', fulfillmentStatus: '合规审查', fulfillmentNote: 'FCC认证待确认，暂停发货', weight: 2400, requiresShipping: true, channelSku: 'AMZ-NS-24P-POE', warehouseSku: 'WMS-NS-24P-POE', unit: '台' },
+      { id: 'li_163', sku: 'EC-CAT6-10M', title: 'Ethernet Cable Cat6 10m', variantTitle: 'Cat6 / Blue / 10-meter', quantity: 2, unitPrice: '$18.00', discount: '$0.00', tax: '$2.30', subtotal: '$38.30', costSnapshot: 6.84, costSource: 'manual', fulfillmentStatus: '合规审查', fulfillmentNote: '关联商品暂停', weight: 320, requiresShipping: true, channelSku: 'AMZ-EC-CAT6-10M', warehouseSku: 'WMS-EC-CAT6-10M', unit: '条' }
     ],
     customer: { name: 'Chris Martinez', email: 'chris.martinez@example.com', phone: '+1 (713) 555-0344', ordersCount: 12, totalSpent: '$2,890.00', tags: ['networking', 'b2b'], acceptsMarketing: false },
     shippingAddress: { name: 'Chris Martinez', company: 'Martinez IT Solutions', phone: '+1 (713) 555-0344', address1: '2300 Westheimer Rd, Suite 500', city: 'Houston', province: 'TX', country: 'US', zip: '77098', formatted: '2300 Westheimer Rd, Suite 500, Houston, TX 77098, US' },
@@ -1097,7 +1268,15 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       { id: 'evt_16_l1c', time: '2026-06-04 09:00:00', actor: 'UPS', actorRole: 'carrier', title: '派送中 (Router)', description: '出发配送 · 目的地 2300 Westheimer Rd, Houston TX', type: 'logistics', trackingNode: 'out_for_delivery', fulfillmentOrderNo: 'FO-20260603-0161' }
     ],
     note: 'B2B客户，Network Switch需FCC合规确认',
-    tags: ['partial-hold', 'compliance', 'networking', 'amazon'],
+    profitability: {
+      warehouseCost: 4.2,
+      freightCost: 18,
+      costComplete: false,
+      costPendingNote: '合规暂停，部分成本待确认',
+      currency: 'USD',
+    },
+    additionalFees: [],
+        tags: ['partial-hold', 'compliance', 'networking', 'amazon'],
     platformMeta: { 'amazon_order_id': 'AMZ-30483001', 'fulfillment_channel': 'MFN', 'ship_service_level': 'Std US D2D Dom' }
   },
 
@@ -1128,8 +1307,8 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
     paymentGateway: 'Stripe',
     discountCodes: [],
     lineItems: [
-      { id: 'li_171', sku: 'AP-HEPA-L', title: 'Air Purifier', variantTitle: 'HEPA / Large Room / White', quantity: 1, unitPrice: '$249.00', discount: '$0.00', tax: '$19.92', subtotal: '$268.92', fulfillmentStatus: '已发货', fulfillmentNote: '投递失败，等待重新派送', weight: 6800, requiresShipping: true, channelSku: 'SH-AP-HEPA-L', warehouseSku: 'WMS-AP-HEPA-L', unit: '台' },
-      { id: 'li_172', sku: 'RF-HEPA-2PK', title: 'Replacement Filter 2-Pack', variantTitle: 'HEPA / Compatible AP-L / 2-Pack', quantity: 2, unitPrice: '$40.00', discount: '$0.00', tax: '$6.40', subtotal: '$86.40', fulfillmentStatus: '已发货', fulfillmentNote: '投递失败，等待重新派送', weight: 450, requiresShipping: true, channelSku: 'SH-RF-HEPA-2PK', warehouseSku: 'WMS-RF-HEPA-2PK', unit: '件' }
+      { id: 'li_171', sku: 'AP-HEPA-L', title: 'Air Purifier', variantTitle: 'HEPA / Large Room / White', quantity: 1, unitPrice: '$249.00', discount: '$0.00', tax: '$19.92', subtotal: '$268.92', costSnapshot: 94.62, costSource: 'manual', fulfillmentStatus: '已发货', fulfillmentNote: '投递失败，等待重新派送', weight: 6800, requiresShipping: true, channelSku: 'SH-AP-HEPA-L', warehouseSku: 'WMS-AP-HEPA-L', unit: '台' },
+      { id: 'li_172', sku: 'RF-HEPA-2PK', title: 'Replacement Filter 2-Pack', variantTitle: 'HEPA / Compatible AP-L / 2-Pack', quantity: 2, unitPrice: '$40.00', discount: '$0.00', tax: '$6.40', subtotal: '$86.40', costSnapshot: 15.2, costSource: 'manual', fulfillmentStatus: '已发货', fulfillmentNote: '投递失败，等待重新派送', weight: 450, requiresShipping: true, channelSku: 'SH-RF-HEPA-2PK', warehouseSku: 'WMS-RF-HEPA-2PK', unit: '件' }
     ],
     customer: { name: 'Amanda Foster', email: 'amanda.foster@example.com', phone: '+1 (503) 555-0198', ordersCount: 3, totalSpent: '$680.00', tags: ['home-appliance'], acceptsMarketing: true },
     shippingAddress: { name: 'Amanda Foster', phone: '+1 (503) 555-0198', address1: '735 NW Hoyt St, Apt 8B', city: 'Portland', province: 'OR', country: 'US', zip: '97209', formatted: '735 NW Hoyt St, Apt 8B, Portland, OR 97209, US' },
@@ -1176,7 +1355,14 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       { id: 'evt_17_01', time: '2026-06-01 10:30:00', actor: 'Amanda Foster', actorRole: 'customer', title: '订单创建', description: '通过 Shopify Web Checkout (Chrome) 提交', type: 'customer' }
     ],
     note: '',
-    tags: ['delivery-failed', 'reschedule', 'home-appliance'],
+    profitability: {
+      warehouseCost: 3.6,
+      freightCost: 22,
+      costComplete: true,
+      currency: 'USD',
+    },
+    additionalFees: [],
+        tags: ['delivery-failed', 'reschedule', 'home-appliance'],
     platformMeta: { 'shopify_order_id': '5820173270500', 'landing_site': '/products/air-purifier-hepa', 'referring_site': 'https://google.com' }
   },
 
@@ -1208,10 +1394,10 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
     paymentGateway: 'Stripe',
     discountCodes: [],
     lineItems: [
-      { id: 'li_181', sku: 'SDT-OAK-140', title: 'Standing Desk Top', variantTitle: 'Oak / 140×70cm / Natural', quantity: 1, unitPrice: '$320.00', discount: '$0.00', tax: '$25.60', subtotal: '$345.60', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 18000, requiresShipping: true, channelSku: 'SH-SDT-OAK-140', warehouseSku: 'WMS-SDT-OAK-140', unit: '件' },
-      { id: 'li_182', sku: 'MLB-LED-PRO', title: 'Monitor Light Bar', variantTitle: 'LED Pro / Black / USB-C', quantity: 1, unitPrice: '$89.00', discount: '$0.00', tax: '$7.12', subtotal: '$96.12', fulfillmentStatus: '已退款', fulfillmentNote: '商品瑕疵，已退款', weight: 420, requiresShipping: true, channelSku: 'SH-MLB-LED-PRO', warehouseSku: 'WMS-MLB-LED-PRO', unit: '件' },
-      { id: 'li_183', sku: 'DS-BM-60', title: 'Desk Shelf', variantTitle: 'Bamboo / 60cm / Monitor Riser', quantity: 1, unitPrice: '$159.00', discount: '$0.00', tax: '$12.72', subtotal: '$171.72', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 2800, requiresShipping: true, channelSku: 'SH-DS-BM-60', warehouseSku: 'WMS-DS-BM-60', unit: '件' },
-      { id: 'li_184', sku: 'UH-7P-USB3', title: 'USB Hub 7-port', variantTitle: 'USB 3.0 / Aluminum / Silver', quantity: 1, unitPrice: '$45.00', discount: '$0.00', tax: '$3.60', subtotal: '$48.60', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 180, requiresShipping: true, channelSku: 'SH-UH-7P-USB3', warehouseSku: 'WMS-UH-7P-USB3', unit: '件' }
+      { id: 'li_181', sku: 'SDT-OAK-140', title: 'Standing Desk Top', variantTitle: 'Oak / 140×70cm / Natural', quantity: 1, unitPrice: '$320.00', discount: '$0.00', tax: '$25.60', subtotal: '$345.60', costSnapshot: 121.6, costSource: 'manual', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 18000, requiresShipping: true, channelSku: 'SH-SDT-OAK-140', warehouseSku: 'WMS-SDT-OAK-140', unit: '件' },
+      { id: 'li_182', sku: 'MLB-LED-PRO', title: 'Monitor Light Bar', variantTitle: 'LED Pro / Black / USB-C', quantity: 1, unitPrice: '$89.00', discount: '$0.00', tax: '$7.12', subtotal: '$96.12', costSnapshot: 33.82, costSource: 'manual', fulfillmentStatus: '已退款', fulfillmentNote: '商品瑕疵，已退款', weight: 420, requiresShipping: true, channelSku: 'SH-MLB-LED-PRO', warehouseSku: 'WMS-MLB-LED-PRO', unit: '件' },
+      { id: 'li_183', sku: 'DS-BM-60', title: 'Desk Shelf', variantTitle: 'Bamboo / 60cm / Monitor Riser', quantity: 1, unitPrice: '$159.00', discount: '$0.00', tax: '$12.72', subtotal: '$171.72', costSnapshot: 60.42, costSource: 'manual', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 2800, requiresShipping: true, channelSku: 'SH-DS-BM-60', warehouseSku: 'WMS-DS-BM-60', unit: '件' },
+      { id: 'li_184', sku: 'UH-7P-USB3', title: 'USB Hub 7-port', variantTitle: 'USB 3.0 / Aluminum / Silver', quantity: 1, unitPrice: '$45.00', discount: '$0.00', tax: '$3.60', subtotal: '$48.60', costSnapshot: 17.1, costSource: 'manual', fulfillmentStatus: '已签收', fulfillmentNote: '客户已签收', weight: 180, requiresShipping: true, channelSku: 'SH-UH-7P-USB3', warehouseSku: 'WMS-UH-7P-USB3', unit: '件' }
     ],
     customer: { name: 'Mark Thompson', email: 'mark.thompson@example.com', phone: '+1 (404) 555-0422', ordersCount: 6, totalSpent: '$1,850.00', tags: ['desk-setup', 'returning'], acceptsMarketing: true },
     shippingAddress: { name: 'Mark Thompson', phone: '+1 (404) 555-0422', address1: '250 Peachtree St NE, Apt 1501', city: 'Atlanta', province: 'GA', country: 'US', zip: '30303', formatted: '250 Peachtree St NE, Apt 1501, Atlanta, GA 30303, US' },
@@ -1262,7 +1448,14 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       { id: 'evt_18_01', time: '2026-05-30 14:00:00', actor: 'Mark Thompson', actorRole: 'customer', title: '订单创建', description: '通过 Shopify Web Checkout (Chrome) 提交', type: 'customer' }
     ],
     note: '',
-    tags: ['completed', 'partial-refund', 'desk-setup', 'defect'],
+    profitability: {
+      warehouseCost: 4,
+      freightCost: 16,
+      costComplete: true,
+      currency: 'USD',
+    },
+    additionalFees: [],
+        tags: ['completed', 'partial-refund', 'desk-setup', 'defect'],
     platformMeta: { 'shopify_order_id': '5820173270400', 'landing_site': '/collections/desk-setup', 'referring_site': 'https://pinterest.com' }
   },
 
@@ -1293,8 +1486,8 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
     paymentGateway: 'Wire Transfer',
     discountCodes: [],
     lineItems: [
-      { id: 'li_191', sku: 'LDL-WHT-PRO', title: 'LED Desk Lamp', variantTitle: 'White / Pro', quantity: 200, unitPrice: '$45.00', discount: '$0.00', tax: '$400.00', subtotal: '$9,400.00', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', batchNo: 'B2026-05-LDL-001', serialNumbers: ['SN-LDL-20260520-0001', 'SN-LDL-20260520-0002', 'SN-LDL-20260520-0003', 'SN-LDL-20260520-0004', 'SN-LDL-20260520-0005', 'SN-LDL-20260520-0006', 'SN-LDL-20260520-0007', 'SN-LDL-20260520-0008', 'SN-LDL-20260520-0009', 'SN-LDL-20260520-0010', 'SN-LDL-20260520-0011', 'SN-LDL-20260520-0012'], weight: 850, requiresShipping: true, channelSku: 'WMT-LDL-WHT-PRO', warehouseSku: 'WMS-LDL-WHT-PRO', unit: '件' },
-      { id: 'li_192', sku: 'UC-3P-BLK', title: 'USB Charger 3-port', variantTitle: 'Black / 30W', quantity: 300, unitPrice: '$22.00', discount: '$0.00', tax: '$400.00', subtotal: '$7,000.00', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', batchNo: 'B2026-05-UC3P-002', serialNumbers: ['SN-UC3P-20260518-0001', 'SN-UC3P-20260518-0002', 'SN-UC3P-20260518-0003', 'SN-UC3P-20260518-0004', 'SN-UC3P-20260518-0005', 'SN-UC3P-20260518-0006', 'SN-UC3P-20260518-0007', 'SN-UC3P-20260518-0008'], weight: 120, requiresShipping: true, channelSku: 'WMT-UC-3P-BLK', warehouseSku: 'WMS-UC-3P-BLK', unit: '件' }
+      { id: 'li_191', sku: 'LDL-WHT-PRO', title: 'LED Desk Lamp', variantTitle: 'White / Pro', quantity: 200, unitPrice: '$45.00', discount: '$0.00', tax: '$400.00', subtotal: '$9,400.00', costSnapshot: 17.1, costSource: 'manual', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', batchNo: 'B2026-05-LDL-001', serialNumbers: ['SN-LDL-20260520-0001', 'SN-LDL-20260520-0002', 'SN-LDL-20260520-0003', 'SN-LDL-20260520-0004', 'SN-LDL-20260520-0005', 'SN-LDL-20260520-0006', 'SN-LDL-20260520-0007', 'SN-LDL-20260520-0008', 'SN-LDL-20260520-0009', 'SN-LDL-20260520-0010', 'SN-LDL-20260520-0011', 'SN-LDL-20260520-0012'], weight: 850, requiresShipping: true, channelSku: 'WMT-LDL-WHT-PRO', warehouseSku: 'WMS-LDL-WHT-PRO', unit: '件' },
+      { id: 'li_192', sku: 'UC-3P-BLK', title: 'USB Charger 3-port', variantTitle: 'Black / 30W', quantity: 300, unitPrice: '$22.00', discount: '$0.00', tax: '$400.00', subtotal: '$7,000.00', costSnapshot: 8.36, costSource: 'manual', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', batchNo: 'B2026-05-UC3P-002', serialNumbers: ['SN-UC3P-20260518-0001', 'SN-UC3P-20260518-0002', 'SN-UC3P-20260518-0003', 'SN-UC3P-20260518-0004', 'SN-UC3P-20260518-0005', 'SN-UC3P-20260518-0006', 'SN-UC3P-20260518-0007', 'SN-UC3P-20260518-0008'], weight: 120, requiresShipping: true, channelSku: 'WMT-UC-3P-BLK', warehouseSku: 'WMS-UC-3P-BLK', unit: '件' }
     ],
     customer: { name: 'Walmart DC #6042', email: 'receiving@walmart-dc6042.com', phone: '+1 (479) 555-0100', ordersCount: 45, totalSpent: '$890,000.00', tags: ['B2B', 'walmart', 'bulk'], acceptsMarketing: false },
     shippingAddress: { name: 'Walmart Distribution Center #6042', phone: '+1 (479) 555-0100', address1: '1301 SE 10th St', city: 'Bentonville', province: 'AR', country: 'US', zip: '72712', formatted: '1301 SE 10th St, Bentonville, AR 72712, US' },
@@ -1355,7 +1548,14 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       { id: 'evt_19_01', time: '2026-05-28 09:00:00', actor: 'Walmart DC #6042', actorRole: 'customer', title: '订单创建', description: '通过 Walmart Supplier Portal 提交 B2B 采购订单 PO-WMT-2026-0528', type: 'customer' }
     ],
     note: 'Walmart DC #6042 月度补货订单',
-    tags: ['B2B', 'walmart', 'ocean-freight', 'fcl', 'cross-border'],
+    profitability: {
+      warehouseCost: 38,
+      freightCost: 480,
+      costComplete: true,
+      currency: 'USD',
+    },
+    additionalFees: [],
+        tags: ['B2B', 'walmart', 'ocean-freight', 'fcl', 'cross-border'],
     platformMeta: { 'walmart_po': 'PO-WMT-2026-0528', 'supplier_id': 'SUP-CN-20230401', 'dc_number': '6042' }
   },
 
@@ -1386,8 +1586,8 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
     paymentGateway: 'Stripe',
     discountCodes: [],
     lineItems: [
-      { id: 'li_201', sku: 'WC-QI-15W', title: 'Wireless Charger', variantTitle: 'Qi / 15W', quantity: 10, unitPrice: '£180.00', discount: '£0.00', tax: '£61.00', subtotal: '£1,861.00', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', batchNo: 'B2026-05-WC', weight: 220, requiresShipping: true, channelSku: 'SH-WC-QI-15W', warehouseSku: 'WMS-WC-QI-15W', unit: '台' },
-      { id: 'li_202', sku: 'UH-7P-TB4', title: 'USB Hub Pro', variantTitle: '7-Port / Thunderbolt 4', quantity: 10, unitPrice: '£200.00', discount: '£0.00', tax: '£61.00', subtotal: '£2,061.00', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', batchNo: 'B2026-05-UH', serialNumbers: ['SN-UH7P-0601', 'SN-UH7P-0602', 'SN-UH7P-0603', 'SN-UH7P-0604', 'SN-UH7P-0605', 'SN-UH7P-0606', 'SN-UH7P-0607', 'SN-UH7P-0608', 'SN-UH7P-0609', 'SN-UH7P-0610'], weight: 380, requiresShipping: true, channelSku: 'SH-UH-7P-TB4', warehouseSku: 'WMS-UH-7P-TB4', unit: '台' }
+      { id: 'li_201', sku: 'WC-QI-15W', title: 'Wireless Charger', variantTitle: 'Qi / 15W', quantity: 10, unitPrice: '£180.00', discount: '£0.00', tax: '£61.00', subtotal: '£1,861.00', costSnapshot: 68.4, costSource: 'manual', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', batchNo: 'B2026-05-WC', weight: 220, requiresShipping: true, channelSku: 'SH-WC-QI-15W', warehouseSku: 'WMS-WC-QI-15W', unit: '台' },
+      { id: 'li_202', sku: 'UH-7P-TB4', title: 'USB Hub Pro', variantTitle: '7-Port / Thunderbolt 4', quantity: 10, unitPrice: '£200.00', discount: '£0.00', tax: '£61.00', subtotal: '£2,061.00', costSnapshot: 76, costSource: 'manual', fulfillmentStatus: '已发货', fulfillmentNote: '包裹运输中', batchNo: 'B2026-05-UH', serialNumbers: ['SN-UH7P-0601', 'SN-UH7P-0602', 'SN-UH7P-0603', 'SN-UH7P-0604', 'SN-UH7P-0605', 'SN-UH7P-0606', 'SN-UH7P-0607', 'SN-UH7P-0608', 'SN-UH7P-0609', 'SN-UH7P-0610'], weight: 380, requiresShipping: true, channelSku: 'SH-UH-7P-TB4', warehouseSku: 'WMS-UH-7P-TB4', unit: '台' }
     ],
     customer: { name: 'Tech Solutions Ltd', email: 'procurement@techsolutions.co.uk', phone: '+44 20 7946 1234', ordersCount: 12, totalSpent: '£58,000.00', tags: ['B2B', 'uk-business', 'priority'], acceptsMarketing: true },
     shippingAddress: { name: 'Tech Solutions Ltd', company: 'Tech Solutions Ltd', phone: '+44 20 7946 1234', address1: '50 Eastcastle St', city: 'London', province: '', country: 'GB', zip: 'W1W 8EA', formatted: '50 Eastcastle St, London W1W 8EA, GB' },
@@ -1443,7 +1643,14 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       { id: 'evt_20_01', time: '2026-06-02 14:00:00', actor: 'Tech Solutions Ltd', actorRole: 'customer', title: '订单创建', description: '通过 Shopify B2B 加急渠道提交 · 备注: URGENT delivery needed', type: 'customer' }
     ],
     note: 'URGENT - client demo next week, need delivery by June 5',
-    tags: ['B2B', 'urgent', 'air-freight', 'cross-border', 'uk'],
+    profitability: {
+      warehouseCost: 12,
+      freightCost: 220,
+      costComplete: true,
+      currency: 'USD',
+    },
+    additionalFees: [],
+        tags: ['B2B', 'urgent', 'air-freight', 'cross-border', 'uk'],
     platformMeta: { 'shopify_order_id': '5820173270300', 'landing_site': '/b2b/bulk-order', 'note_attributes': 'priority=urgent' }
   },
 
@@ -1616,7 +1823,15 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
         type: 'customer'
       }
     ],
-    note: '',
+    profitability: {
+      warehouseCost: 0,
+      freightCost: 0,
+      costComplete: false,
+      costPendingNote: 'SKU未识别，未发货',
+      currency: 'USD',
+    },
+    additionalFees: [],
+        note: '',
     tags: ['sku-exception', 'pending-product-setup'],
     platformMeta: { 'shopify_order_id': '5820173271350' }
   },
@@ -1680,7 +1895,7 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       phone: '+1 (615) 555-0177',
       ordersCount: 4,
       totalSpent: '$541.00',
-      tags: ['Repeat buyer'],
+      tags: [],
       acceptsMarketing: false
     },
     shippingAddress: {
@@ -1801,7 +2016,15 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
         type: 'customer'
       }
     ],
-    note: '',
+    profitability: {
+      warehouseCost: 0,
+      freightCost: 0,
+      costComplete: false,
+      costPendingNote: '仓库SKU未映射，未发货',
+      currency: 'USD',
+    },
+    additionalFees: [],
+        note: '',
     tags: ['sku-exception', 'missing-warehouse-sku'],
     platformMeta: { 'shopify_order_id': '5820173271401' }
   },
@@ -2034,7 +2257,15 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
         type: 'customer'
       }
     ],
-    note: '',
+    profitability: {
+      warehouseCost: 0,
+      freightCost: 0,
+      costComplete: false,
+      costPendingNote: 'WMS货品不存在，未发货',
+      currency: 'USD',
+    },
+    additionalFees: [],
+        note: '',
     tags: ['sku-exception', 'wms-item-not-found'],
     platformMeta: { 'shopify_order_id': '5820173271488' }
   },
@@ -2116,7 +2347,7 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       phone: '+1 (702) 555-0392',
       ordersCount: 1,
       totalSpent: '$2,890.00',
-      tags: ['high-risk', 'new-customer'],
+      tags: [],
       acceptsMarketing: false
     },
     shippingAddress: {
@@ -2210,7 +2441,15 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
         type: 'customer'
       }
     ],
-    note: '',
+    profitability: {
+      warehouseCost: 0,
+      freightCost: 0,
+      costComplete: false,
+      costPendingNote: '风控拦截，未发货',
+      currency: 'USD',
+    },
+    additionalFees: [],
+        note: '',
     tags: ['high-risk', 'fraud-review', 'manual-review-required'],
     platformMeta: {
       'shopify_order_id': '5820173271530',
@@ -2377,7 +2616,15 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
         type: 'customer'
       }
     ],
-    note: '',
+    profitability: {
+      warehouseCost: 0,
+      freightCost: 0,
+      costComplete: false,
+      costPendingNote: '渠道SKU未映射，未发货',
+      currency: 'USD',
+    },
+    additionalFees: [],
+        note: '',
     tags: ['sku-exception', 'channel-sku-unmapped', 'amazon'],
     platformMeta: {
       'amazon_order_id': '114-3048351-0012345',
@@ -2463,7 +2710,7 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       phone: '+1 (312) 555-0188',
       ordersCount: 8,
       totalSpent: '$22,400.00',
-      tags: ['B2B', 'Manufacturing'],
+      tags: [],
       acceptsMarketing: false
     },
     shippingAddress: {
@@ -2633,7 +2880,15 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
         type: 'customer'
       }
     ],
-    note: 'White glove delivery required, loading dock available at delivery address',
+    profitability: {
+      warehouseCost: 22,
+      freightCost: 0,
+      costComplete: false,
+      costPendingNote: 'LTL运输成本待承运商账单',
+      currency: 'USD',
+    },
+    additionalFees: [],
+        note: 'White glove delivery required, loading dock available at delivery address',
     tags: ['B2B', 'LTL', 'oversize', 'white-glove'],
     platformMeta: { 'shopify_order_id': '5820173271680' }
   },
@@ -2713,7 +2968,7 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       phone: '+65 9123 4567',
       ordersCount: 7,
       totalSpent: 'S$890.00',
-      tags: ['COD preferred'],
+      tags: [],
       acceptsMarketing: true
     },
     shippingAddress: {
@@ -2845,7 +3100,15 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
         type: 'customer'
       }
     ],
-    note: 'COD — 快递员收款 S$189.00',
+    profitability: {
+      warehouseCost: 3.2,
+      freightCost: 14,
+      costComplete: false,
+      costPendingNote: 'COD货到付款，支付未确认',
+      currency: 'USD',
+    },
+    additionalFees: [],
+        note: 'COD — 快递员收款 S$189.00',
     tags: ['COD', 'lazada', 'sg'],
     platformMeta: {
       'lazada_order_id': 'LZ-8801234',
@@ -2931,7 +3194,7 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       phone: '+1 (479) 555-0100',
       ordersCount: 34,
       totalSpent: '$1,820,000.00',
-      tags: ['B2B', 'Walmart', 'Key Account'],
+      tags: [],
       acceptsMarketing: false
     },
     shippingAddress: {
@@ -3156,7 +3419,15 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
         type: 'customer'
       }
     ],
-    note: 'PO-WMT-2026-0601 — 分3批交货，每批400件。批次1：6/5，批次2：6/6，批次3：6/8。',
+    profitability: {
+      warehouseCost: 28,
+      freightCost: 0,
+      costComplete: false,
+      costPendingNote: 'B2B分批发货，运输成本待汇总',
+      currency: 'USD',
+    },
+    additionalFees: [],
+        note: 'PO-WMT-2026-0601 — 分3批交货，每批400件。批次1：6/5，批次2：6/6，批次3：6/8。',
     tags: ['B2B', 'Walmart', 'bulk-order', 'split-shipment', 'LTL'],
     platformMeta: {
       'walmart_po_number': 'PO-WMT-2026-0601',
@@ -3244,8 +3515,8 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
       phone: '+1 (602) 555-0251',
       ordersCount: 9,
       totalSpent: '$2,180.00',
-      tags: ['VIP', 'Repeat buyer'],
-      acceptsMarketing: true
+      tags: [],
+      acceptsMarketing: false,
     },
     shippingAddress: {
       name: 'Jessica Lane',
@@ -3465,8 +3736,235 @@ export const orderDetailsExtra: Record<string, OrderDetail> = {
         type: 'customer'
       }
     ],
-    note: '退货处理中 — RMA-20260604-0291 · 全额退款 $459.00',
+    profitability: {
+      warehouseCost: 8,
+      freightCost: 32,
+      costComplete: true,
+      currency: 'USD',
+    },
+    additionalFees: [],
+        note: '退货处理中 — RMA-20260604-0291 · 全额退款 $459.00',
     tags: ['return', 'refund', 'quality-issue', 'RMA'],
-    platformMeta: { 'shopify_order_id': '5820173270120' }
+    platformMeta: { 'shopify_order_id': '5820173270120' },
+    fulfillmentType: 'physical',
+  },
+
+  /* ═══ so_gc_001: 礼品卡订单 ═══ */
+  so_gc_001: {
+    id: 'so_gc_001',
+    orderNo: 'SO-20260605-GC01',
+    platformOrderNo: '#SH-7291600',
+    confirmationNumber: 'GC0001',
+    referenceNo: '',
+    channel: 'Shopify',
+    merchant: 'US Store',
+    sourceType: 'web',
+    status: '处理中',
+    financialStatus: '已支付',
+    fulfillmentStatus: '卡号生成中',
+    riskLevel: 'low',
+    exception: '',
+    createdAt: '2026-06-05 10:30:00',
+    updatedAt: '2026-06-05 10:32:00',
+    currency: 'USD',
+    subtotal: '$100.00',
+    totalDiscount: '$0.00',
+    totalShipping: '$0.00',
+    totalTax: '$0.00',
+    totalPrice: '$100.00',
+    taxesIncluded: false,
+    paymentGateway: 'Stripe',
+    discountCodes: [],
+    lineItems: [
+      {
+        id: 'li_gc_001',
+        sku: 'GC-USD-100',
+        title: 'Gift Card',
+        variantTitle: '$100 USD',
+        quantity: 1,
+        unit: '张',
+        unitPrice: '$100.00',
+        grossSubtotal: '$100.00',
+        discount: '$0.00',
+        tax: '$0.00',
+        subtotal: '$100.00',
+        fulfillmentStatus: '待发卡',
+        weight: 0,
+        requiresShipping: false,
+      }
+    ],
+    customer: {
+      name: 'Olivia Chen',
+      email: 'olivia@example.com',
+      phone: '+1 415-555-0188',
+      ordersCount: 3,
+      totalSpent: '$340.00',
+      tags: [],
+      acceptsMarketing: true,
+    },
+    shippingAddress: {
+      name: 'Olivia Chen',
+      phone: '+1 415-555-0188',
+      address1: '1 Market St',
+      city: 'San Francisco',
+      province: 'CA',
+      country: 'US',
+      zip: '94105',
+      formatted: '1 Market St, San Francisco, CA 94105, US',
+    },
+    billingAddress: {
+      name: 'Olivia Chen',
+      phone: '+1 415-555-0188',
+      address1: '1 Market St',
+      city: 'San Francisco',
+      province: 'CA',
+      country: 'US',
+      zip: '94105',
+      formatted: '1 Market St, San Francisco, CA 94105, US',
+    },
+    shippingMethod: '电子邮件发送',
+    fulfillments: [],
+    transactions: [
+      { id: 'txn_gc001', kind: 'sale', gateway: 'Stripe', method: 'Visa ****8812', amount: '$100.00', currency: 'USD', status: 'success', createdAt: '2026-06-05 10:30:22', gatewayReference: 'ch_gc001...' }
+    ],
+    refunds: [],
+    events: [
+      { id: 'evt_gc001_3', time: '2026-06-05 10:32:00', actor: '系统', actorRole: 'automation', title: '礼品卡生成中', description: '正在生成卡号和 PIN，生成后自动发送至 recipient@example.com', type: 'system' },
+      { id: 'evt_gc001_2', time: '2026-06-05 10:30:22', actor: 'Stripe', actorRole: 'payment_gateway', title: '支付成功', description: 'Visa ****8812 收款 $100.00', type: 'payment' },
+      { id: 'evt_gc001_1', time: '2026-06-05 10:30:00', actor: 'Olivia Chen', actorRole: 'customer', title: '订单创建', description: '通过 Shopify Web Checkout 提交礼品卡订单', type: 'customer' },
+    ],
+    note: '送给朋友的生日礼物',
+    tags: ['gift-card'],
+    profitability: { costComplete: true, currency: 'USD' },
+    additionalFees: [],
+    fulfillmentType: 'gift_card',
+    giftCardConfig: {
+      faceValue: '$100.00',
+      cardNumber: undefined,
+      pin: undefined,
+      expiryDate: '2027-06-05',
+      cardStatus: 'pending_issue',
+      recipientEmail: 'recipient@example.com',
+    },
+    platformMeta: { 'shopify_order_id': '5820173271600' },
+  },
+
+  /* ═══ so_rental_001: 租赁订单 ═══ */
+  so_rental_001: {
+    id: 'so_rental_001',
+    orderNo: 'SO-20260601-RN01',
+    platformOrderNo: '#SH-7291700',
+    confirmationNumber: 'RN0001',
+    referenceNo: 'RENTAL-ENT-2026-001',
+    channel: 'Shopify',
+    merchant: 'US Store',
+    sourceType: 'web',
+    status: '处理中',
+    financialStatus: '已支付',
+    fulfillmentStatus: '已发货',
+    riskLevel: 'low',
+    exception: '',
+    createdAt: '2026-06-01 09:00:00',
+    updatedAt: '2026-06-02 14:00:00',
+    currency: 'USD',
+    subtotal: '$450.00',
+    totalDiscount: '$0.00',
+    totalShipping: '$0.00',
+    totalTax: '$36.00',
+    totalPrice: '$486.00',
+    taxesIncluded: false,
+    paymentGateway: 'Stripe',
+    discountCodes: [],
+    lineItems: [
+      {
+        id: 'li_rn_001',
+        sku: 'CAM-PRO-RENTAL-30D',
+        title: 'Professional Camera Kit',
+        variantTitle: 'Sony A7IV / 30-Day Rental',
+        quantity: 1,
+        unit: '套',
+        unitPrice: '$450.00',
+        grossSubtotal: '$450.00',
+        discount: '$0.00',
+        tax: '$36.00',
+        subtotal: '$450.00',
+        costSnapshot: 0,
+        fulfillmentStatus: '已发出',
+        weight: 2500,
+        requiresShipping: true,
+      }
+    ],
+    customer: {
+      name: 'Marcus Webb',
+      email: 'marcus@filmcrew.com',
+      phone: '+1 310-555-0177',
+      ordersCount: 5,
+      totalSpent: '$2,200.00',
+      tags: ['professional', 'repeat-renter'],
+      acceptsMarketing: false,
+    },
+    shippingAddress: {
+      name: 'Marcus Webb',
+      phone: '+1 310-555-0177',
+      address1: '789 Sunset Blvd',
+      city: 'Los Angeles',
+      province: 'CA',
+      country: 'US',
+      zip: '90028',
+      formatted: '789 Sunset Blvd, Los Angeles, CA 90028, US',
+    },
+    billingAddress: {
+      name: 'Marcus Webb',
+      phone: '+1 310-555-0177',
+      address1: '789 Sunset Blvd',
+      city: 'Los Angeles',
+      province: 'CA',
+      country: 'US',
+      zip: '90028',
+      formatted: '789 Sunset Blvd, Los Angeles, CA 90028, US',
+    },
+    shippingMethod: 'FedEx Overnight',
+    fulfillments: [
+      {
+        id: 'ful_rn001',
+        status: 'delivered',
+        carrier: 'FedEx',
+        trackingNumber: '7489203999001',
+        trackingUrl: 'https://www.fedex.com/fedextrack/?trknbr=7489203999001',
+        fulfillmentOrderNo: 'FO-20260601-RN01',
+        outboundOrderNo: 'OB-20260601-RN01',
+        outboundStatus: '已出库',
+        packageNo: 'PKG-RN01',
+        lineItemIds: ['li_rn_001'],
+        shippedAt: '2026-06-01 16:00',
+        deliveredAt: '2026-06-02 10:30',
+        warehouse: 'US-West-LAX',
+        shippingMode: 'express',
+      }
+    ],
+    transactions: [
+      { id: 'txn_rn001', kind: 'sale', gateway: 'Stripe', method: 'Mastercard ****3344', amount: '$486.00', currency: 'USD', status: 'success', createdAt: '2026-06-01 09:00:44', gatewayReference: 'ch_rn001...' }
+    ],
+    refunds: [],
+    events: [
+      { id: 'evt_rn001_5', time: '2026-06-02 10:30:00', actor: 'FedEx', actorRole: 'carrier', title: '租赁设备已送达', description: '签收人: M. Webb · 租赁期自今日起计，到期日 2026-07-02', type: 'logistics', trackingNode: 'delivered' },
+      { id: 'evt_rn001_4', time: '2026-06-01 16:00:00', actor: 'US-West-LAX', actorRole: 'warehouse_staff', title: '设备出库', description: '租赁设备 Camera Kit × 1 出库，FedEx Overnight 取件', type: 'fulfillment' },
+      { id: 'evt_rn001_3', time: '2026-06-01 10:00:00', actor: '系统', actorRole: 'automation', title: '押金已扣押', description: '$200.00 押金已从 Mastercard ****3344 预授权', type: 'payment' },
+      { id: 'evt_rn001_2', time: '2026-06-01 09:00:44', actor: 'Stripe', actorRole: 'payment_gateway', title: '支付成功', description: 'Mastercard ****3344 收款 $486.00（含押金 $200.00）', type: 'payment' },
+      { id: 'evt_rn001_1', time: '2026-06-01 09:00:00', actor: 'Marcus Webb', actorRole: 'customer', title: '订单创建', description: '租赁订单提交，租期 30 天', type: 'customer' },
+    ],
+    note: '设备需在 2026-07-02 前归还，逾期每日加收 $25',
+    tags: ['rental', 'professional-equipment'],
+    profitability: { costComplete: false, costPendingNote: '租赁设备折旧按月计算', currency: 'USD' },
+    additionalFees: [],
+    fulfillmentType: 'rental',
+    rentalConfig: {
+      rentalStartDate: '2026-06-02',
+      rentalEndDate: '2026-07-02',
+      depositAmount: '$200.00',
+      depositStatus: 'held',
+      rentalStatus: 'active',
+    },
+    platformMeta: { 'shopify_order_id': '5820173271700' },
   }
 };

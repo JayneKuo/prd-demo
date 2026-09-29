@@ -4,11 +4,12 @@ import {
   DetailPageTemplate,
   DetailSectionCard,
   StatusTimeline,
+  ChangeLog,
   type DetailSection,
-  type TimelineEvent
+  type TimelineEvent,
+  type ChangeEntry
 } from '@/components/admin/detail-panel';
 import { MetadataPanel } from '@/components/admin/metadata-panel';
-import { StatusBadge } from '@/components/admin/status-badge';
 
 /* ─── Mock order data ─── */
 const orderBasicInfo: DetailSection = {
@@ -54,7 +55,7 @@ const orderItems: OrderItem[] = [
   { sku: 'SKU-C107', name: '数据线 Type-C 1.5m', spec: '白色', quantity: 3, unitPrice: '¥ 39.00', subtotal: '¥ 117.00' }
 ];
 
-/* ─── Timeline ─── */
+/* ─── Timeline events ─── */
 const timelineEvents: TimelineEvent[] = [
   { time: '2024-06-15 09:32', title: '订单创建', description: '客户通过 Shopify 下单', status: 'completed' },
   { time: '2024-06-15 09:33', title: '支付成功', description: '微信支付 ¥ 2,380.00', status: 'completed' },
@@ -62,6 +63,52 @@ const timelineEvents: TimelineEvent[] = [
   { time: '—', title: '仓库拣货', description: '等待仓库分配拣货任务', status: 'current' },
   { time: '—', title: '打包发货', status: 'pending' },
   { time: '—', title: '客户签收', status: 'pending' }
+];
+
+/* ─── Change log entries ─── */
+const changeEntries: ChangeEntry[] = [
+  {
+    actor: '王小明',
+    actorType: 'user',
+    time: '2024-06-15 14:22',
+    action: '修改收货地址',
+    field: '收货地址',
+    from: '陆家嘴环路 1000 号 25F',
+    to: '张江路 100 号 3F'
+  },
+  {
+    actor: '王小明',
+    actorType: 'user',
+    time: '2024-06-15 14:20',
+    action: '修改商品数量',
+    field: 'SKU-B023 数量',
+    from: '1',
+    to: '2'
+  },
+  {
+    actor: '系统',
+    actorType: 'system',
+    time: '2024-06-15 10:00',
+    action: '订单状态变更',
+    field: '订单状态',
+    from: '待处理',
+    to: '处理中'
+  },
+  {
+    actor: '支付网关',
+    actorType: 'gateway',
+    time: '2024-06-15 09:33',
+    action: '支付回调确认',
+    field: '支付状态',
+    from: '待支付',
+    to: '已支付'
+  },
+  {
+    actor: '系统',
+    actorType: 'system',
+    time: '2024-06-15 09:32',
+    action: '订单创建'
+  }
 ];
 
 /* ─── Page ─── */
@@ -84,8 +131,10 @@ export default function OrderDetailPage() {
         <ArrowLeft className="size-3.5" aria-hidden="true" />
         返回订单列表
       </Link>
-      {/* Basic info + metadata sidebar */}
+
+      {/* Main content + right sidebar */}
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
+        {/* Left: main content */}
         <div className="space-y-5">
           <DetailSectionCard section={orderBasicInfo} />
 
@@ -161,23 +210,7 @@ export default function OrderDetailPage() {
               { label: '客服备注', value: '无' }
             ]}
           />
-          <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)]">
-            <div className="border-b border-[var(--border-subtle)] px-4 py-3 text-[13px] font-semibold text-[var(--foreground)]">操作记录</div>
-            <div className="space-y-2 p-4 text-[12px] text-[var(--muted)]">
-              <div className="rounded-lg bg-[var(--surface-subtle)] px-3 py-2">
-                <span className="font-medium text-[var(--foreground)]">系统</span> · 自动确认订单
-                <span className="ml-2 text-[11px]">06-15 10:00</span>
-              </div>
-              <div className="rounded-lg bg-[var(--surface-subtle)] px-3 py-2">
-                <span className="font-medium text-[var(--foreground)]">支付网关</span> · 收到支付回调
-                <span className="ml-2 text-[11px]">06-15 09:33</span>
-              </div>
-              <div className="rounded-lg bg-[var(--surface-subtle)] px-3 py-2">
-                <span className="font-medium text-[var(--foreground)]">客户</span> · 提交订单
-                <span className="ml-2 text-[11px]">06-15 09:32</span>
-              </div>
-            </div>
-          </section>
+          <ChangeLog entries={changeEntries} />
         </div>
       </div>
     </DetailPageTemplate>

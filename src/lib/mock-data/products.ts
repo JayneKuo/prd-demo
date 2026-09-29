@@ -21,6 +21,8 @@ export type VariantOption = {
   value: string;  // 属性值，如 "黑色"、"M"
 };
 
+export type CostSource = 'manual' | 'wms_receipt';
+
 export type ProductVariant = {
   id: string;
   /** Seller SKU：卖家自定义的变体 SKU，用于在各渠道标识该变体 */
@@ -31,6 +33,12 @@ export type ProductVariant = {
   price: number;
   compareAtPrice?: number;
   costPrice?: number;
+  /**
+   * 成本来源：
+   * - manual: 商家手动录入（兜底）
+   * - wms_receipt: WMS 采购入库回传（优先，最准确）
+   */
+  costSource?: CostSource;
   weight?: number;  // 克
   stock: number;
   barcode?: string;
@@ -106,9 +114,9 @@ export const mockProducts: Product[] = [
       { name: '颜色', values: ['午夜黑', '珍珠白', '星空蓝'] }
     ],
     variants: [
-      { id: 'var_001_1', sku: 'WEP-BLK-001', channelSkus: { Shopify: 'SP-WEP-BLK', SHEIN: 'SH-WEP-BLK-US' }, options: [{ name: '颜色', value: '午夜黑' }], price: 89.99, compareAtPrice: 129.99, costPrice: 32.00, weight: 210, stock: 450, barcode: '8901234567890' },
-      { id: 'var_001_2', sku: 'WEP-WHT-001', channelSkus: { Shopify: 'SP-WEP-WHT', SHEIN: 'SH-WEP-WHT-US' }, options: [{ name: '颜色', value: '珍珠白' }], price: 89.99, compareAtPrice: 129.99, costPrice: 32.00, weight: 210, stock: 320, barcode: '8901234567891' },
-      { id: 'var_001_3', sku: 'WEP-BLU-001', channelSkus: { Shopify: 'SP-WEP-BLU', SHEIN: 'SH-WEP-BLU-US' }, options: [{ name: '颜色', value: '星空蓝' }], price: 94.99, compareAtPrice: 129.99, costPrice: 34.00, weight: 210, stock: 180, barcode: '8901234567892' }
+      { id: 'var_001_1', sku: 'WEP-BLK-001', channelSkus: { Shopify: 'SP-WEP-BLK', SHEIN: 'SH-WEP-BLK-US' }, options: [{ name: '颜色', value: '午夜黑' }], price: 89.99, compareAtPrice: 129.99, costPrice: 32.00, costSource: 'wms_receipt', weight: 210, stock: 450, barcode: '8901234567890' },
+      { id: 'var_001_2', sku: 'WEP-WHT-001', channelSkus: { Shopify: 'SP-WEP-WHT', SHEIN: 'SH-WEP-WHT-US' }, options: [{ name: '颜色', value: '珍珠白' }], price: 89.99, compareAtPrice: 129.99, costPrice: 32.00, costSource: 'wms_receipt', weight: 210, stock: 320, barcode: '8901234567891' },
+      { id: 'var_001_3', sku: 'WEP-BLU-001', channelSkus: { Shopify: 'SP-WEP-BLU', SHEIN: 'SH-WEP-BLU-US' }, options: [{ name: '颜色', value: '星空蓝' }], price: 94.99, compareAtPrice: 129.99, costPrice: 34.00, costSource: 'wms_receipt', weight: 210, stock: 180, barcode: '8901234567892' }
     ],
     images: [
       { id: 'img_001_1', url: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400', alt: 'Wireless Earbuds Pro 午夜黑' },
@@ -136,12 +144,12 @@ export const mockProducts: Product[] = [
       { name: '尺寸', values: ['标准版', '迷你版'] }
     ],
     variants: [
-      { id: 'var_002_1', sku: 'TP-BLK-STD', channelSkus: { Shopify: 'SP-TP-BLK-S' }, options: [{ name: '颜色', value: '黑色' }, { name: '尺寸', value: '标准版' }], price: 79.00, costPrice: 28.00, weight: 850, stock: 820, barcode: '7891234500001' },
-      { id: 'var_002_2', sku: 'TP-BLK-MINI', channelSkus: { Shopify: 'SP-TP-BLK-M' }, options: [{ name: '颜色', value: '黑色' }, { name: '尺寸', value: '迷你版' }], price: 59.00, costPrice: 22.00, weight: 560, stock: 440, barcode: '7891234500002' },
-      { id: 'var_002_3', sku: 'TP-GRY-STD', channelSkus: { Shopify: 'SP-TP-GRY-S' }, options: [{ name: '颜色', value: '深灰' }, { name: '尺寸', value: '标准版' }], price: 79.00, costPrice: 28.00, weight: 850, stock: 380, barcode: '7891234500003' },
-      { id: 'var_002_4', sku: 'TP-GRY-MINI', channelSkus: { Shopify: 'SP-TP-GRY-M' }, options: [{ name: '颜色', value: '深灰' }, { name: '尺寸', value: '迷你版' }], price: 59.00, costPrice: 22.00, weight: 560, stock: 210, barcode: '7891234500004' },
-      { id: 'var_002_5', sku: 'TP-OLV-STD', channelSkus: { Shopify: 'SP-TP-OLV-S' }, options: [{ name: '颜色', value: '橄榄绿' }, { name: '尺寸', value: '标准版' }], price: 82.00, costPrice: 29.00, weight: 850, stock: 155, barcode: '7891234500005' },
-      { id: 'var_002_6', sku: 'TP-OLV-MINI', channelSkus: { Shopify: 'SP-TP-OLV-M' }, options: [{ name: '颜色', value: '橄榄绿' }, { name: '尺寸', value: '迷你版' }], price: 62.00, costPrice: 23.00, weight: 560, stock: 90, barcode: '7891234500006' }
+      { id: 'var_002_1', sku: 'TP-BLK-STD', channelSkus: { Shopify: 'SP-TP-BLK-S' }, options: [{ name: '颜色', value: '黑色' }, { name: '尺寸', value: '标准版' }], price: 79.00, costPrice: 28.00, costSource: 'manual', weight: 850, stock: 820, barcode: '7891234500001' },
+      { id: 'var_002_2', sku: 'TP-BLK-MINI', channelSkus: { Shopify: 'SP-TP-BLK-M' }, options: [{ name: '颜色', value: '黑色' }, { name: '尺寸', value: '迷你版' }], price: 59.00, costPrice: 22.00, costSource: 'manual', weight: 560, stock: 440, barcode: '7891234500002' },
+      { id: 'var_002_3', sku: 'TP-GRY-STD', channelSkus: { Shopify: 'SP-TP-GRY-S' }, options: [{ name: '颜色', value: '深灰' }, { name: '尺寸', value: '标准版' }], price: 79.00, costPrice: 28.00, costSource: 'manual', weight: 850, stock: 380, barcode: '7891234500003' },
+      { id: 'var_002_4', sku: 'TP-GRY-MINI', channelSkus: { Shopify: 'SP-TP-GRY-M' }, options: [{ name: '颜色', value: '深灰' }, { name: '尺寸', value: '迷你版' }], price: 59.00, costPrice: 22.00, costSource: 'manual', weight: 560, stock: 210, barcode: '7891234500004' },
+      { id: 'var_002_5', sku: 'TP-OLV-STD', channelSkus: { Shopify: 'SP-TP-OLV-S' }, options: [{ name: '颜色', value: '橄榄绿' }, { name: '尺寸', value: '标准版' }], price: 82.00, costPrice: 29.00, costSource: 'manual', weight: 850, stock: 155, barcode: '7891234500005' },
+      { id: 'var_002_6', sku: 'TP-OLV-MINI', channelSkus: { Shopify: 'SP-TP-OLV-M' }, options: [{ name: '颜色', value: '橄榄绿' }, { name: '尺寸', value: '迷你版' }], price: 62.00, costPrice: 23.00, costSource: 'manual', weight: 560, stock: 90, barcode: '7891234500006' }
     ],
     images: [
       { id: 'img_002_1', url: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400', alt: 'Transit Pack 黑色标准版' }
@@ -167,10 +175,10 @@ export const mockProducts: Product[] = [
       { name: '颜色', values: ['石墨黑', '月白', '沙漠橙', '深海蓝'] }
     ],
     variants: [
-      { id: 'var_003_1', sku: 'DC16-BLK', channelSkus: { Shopify: 'SP-DC16-BLK' }, options: [{ name: '颜色', value: '石墨黑' }], price: 39.99, compareAtPrice: 49.99, costPrice: 12.00, weight: 45, stock: 1240, barcode: '6971234560001' },
-      { id: 'var_003_2', sku: 'DC16-WHT', channelSkus: { Shopify: 'SP-DC16-WHT' }, options: [{ name: '颜色', value: '月白' }], price: 39.99, compareAtPrice: 49.99, costPrice: 12.00, weight: 45, stock: 980, barcode: '6971234560002' },
-      { id: 'var_003_3', sku: 'DC16-ONG', channelSkus: { Shopify: 'SP-DC16-ONG' }, options: [{ name: '颜色', value: '沙漠橙' }], price: 44.99, compareAtPrice: 49.99, costPrice: 13.00, weight: 45, stock: 420, barcode: '6971234560003' },
-      { id: 'var_003_4', sku: 'DC16-BLU', channelSkus: { Shopify: 'SP-DC16-BLU' }, options: [{ name: '颜色', value: '深海蓝' }], price: 44.99, compareAtPrice: 49.99, costPrice: 13.00, weight: 45, stock: 560, barcode: '6971234560004' }
+      { id: 'var_003_1', sku: 'DC16-BLK', channelSkus: { Shopify: 'SP-DC16-BLK' }, options: [{ name: '颜色', value: '石墨黑' }], price: 39.99, compareAtPrice: 49.99, costPrice: 12.00, costSource: 'wms_receipt', weight: 45, stock: 1240, barcode: '6971234560001' },
+      { id: 'var_003_2', sku: 'DC16-WHT', channelSkus: { Shopify: 'SP-DC16-WHT' }, options: [{ name: '颜色', value: '月白' }], price: 39.99, compareAtPrice: 49.99, costPrice: 12.00, costSource: 'wms_receipt', weight: 45, stock: 980, barcode: '6971234560002' },
+      { id: 'var_003_3', sku: 'DC16-ONG', channelSkus: { Shopify: 'SP-DC16-ONG' }, options: [{ name: '颜色', value: '沙漠橙' }], price: 44.99, compareAtPrice: 49.99, costPrice: 13.00, costSource: 'wms_receipt', weight: 45, stock: 420, barcode: '6971234560003' },
+      { id: 'var_003_4', sku: 'DC16-BLU', channelSkus: { Shopify: 'SP-DC16-BLU' }, options: [{ name: '颜色', value: '深海蓝' }], price: 44.99, compareAtPrice: 49.99, costPrice: 13.00, costSource: 'wms_receipt', weight: 45, stock: 560, barcode: '6971234560004' }
     ],
     images: [
       { id: 'img_003_1', url: 'https://images.unsplash.com/photo-1601784551446-20c9e07cdbdb?w=400', alt: 'Dock Case 石墨黑' }

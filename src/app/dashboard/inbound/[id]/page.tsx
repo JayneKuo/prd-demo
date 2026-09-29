@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import React, { useState, useCallback } from 'react';
-import { ArrowLeft, Copy, Check, Package, Truck, AlertTriangle, Clock3, MapPin, FileText, CheckCircle2, Circle, Tag, ClipboardCheck } from 'lucide-react';
+import { ArrowLeft, Copy, Check, Package, AlertTriangle, Clock3, FileText, CheckCircle2, Circle, Tag, DollarSign, AlertCircle, Info } from 'lucide-react';
 import { StatusBadge } from '@/components/admin/status-badge';
-import { inboundOrders } from '@/lib/mock-data/inbound';
+import { inboundOrders, type InboundLineItem } from '@/lib/mock-data/inbound';
 import { cn } from '@/lib/utils';
 import { INTERNAL_LINK_LABELS, INTERNAL_LINK_ROUTES } from '@/lib/types/references';
 
@@ -75,7 +75,7 @@ function buildEvents(row: typeof inboundOrders[0]): Evt[] {
 }
 
 /* ─── Tabs ─── */
-const mainTabs = ['商品清单', '收货信息'] as const;
+const mainTabs = ['商品清单', '采购成本', '收货信息'] as const;
 type MainTab = (typeof mainTabs)[number];
 
 /* ─── Page ─── */
@@ -316,8 +316,7 @@ export default function InboundDetailPage({ params }: { params: Promise<{ id: st
                     {tab === '收货信息' && isCompleted && <span className="ml-1.5 inline-flex size-1.5 rounded-full bg-[var(--success)]" />}
                     {tab === '收货信息' && !isCompleted && <span className="ml-1.5 text-[10px] text-[var(--muted)]">待完成</span>}
                   </button>
-                ))}
-              </div>
+                ))}              </div>
             </div>
 
             {/* ── Tab: 商品清单 ── */}
@@ -385,6 +384,11 @@ export default function InboundDetailPage({ params }: { params: Promise<{ id: st
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* ── Tab: 采购成本 ── */}
+            {activeTab === '采购成本' && (
+              <InboundCostTab row={row} />
             )}
 
             {/* ── Tab: 收货信息 ── */}
@@ -577,11 +581,14 @@ export default function InboundDetailPage({ params }: { params: Promise<{ id: st
             </div>
           </section>
 
+          {/* 入库成本概览 */}
+          <InboundCostSideCard row={row} />
+
           {/* 供应商信息 */}
           {row.supplier && (
             <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)]">
               <div className="border-b border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3">
-                <h2 className="flex items-center gap-2 text-[13px] font-semibold text-[var(--foreground)]"><Truck className="size-4 text-[var(--muted)]" />供应商</h2>
+                <h2 className="flex items-center gap-2 text-[13px] font-semibold text-[var(--foreground)]"><FileText className="size-4 text-[var(--muted)]" />供应商</h2>
               </div>
               <div className="px-4 py-3 space-y-2.5 text-[12px]">
                 <div className="flex justify-between"><span className="text-[var(--muted)]">供应商名称</span><span className="font-medium text-[var(--foreground)]">{row.supplier}</span></div>
@@ -594,7 +601,7 @@ export default function InboundDetailPage({ params }: { params: Promise<{ id: st
           {/* 质检信息 */}
           <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)]">
             <div className="border-b border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3">
-              <h2 className="flex items-center gap-2 text-[13px] font-semibold text-[var(--foreground)]"><ClipboardCheck className="size-4 text-[var(--muted)]" />质检信息</h2>
+              <h2 className="flex items-center gap-2 text-[13px] font-semibold text-[var(--foreground)]"><Tag className="size-4 text-[var(--muted)]" />质检信息</h2>
             </div>
             <div className="px-4 py-3 space-y-2.5 text-[12px]">
               <div className="flex justify-between"><span className="text-[var(--muted)]">质检状态</span><StatusBadge status={row.qcStatus} /></div>
@@ -640,5 +647,328 @@ export default function InboundDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── 采购成本 Tab ────────────────────────────────────────────────────────────
+
+function InboundCostTab({ row }: { row: typeof inboundOrders[0] }) {
+  // 本地维护每行成本编辑状态（前端 mock，不持久化）
+  const [costs, setCosts] = useState<Record<string, { unitCost: number; costStatus: 'entered' | 'pending' | 'wms_synced' }>>(() => {
+    const init: Record<string, { unitCost: number; costStatus: 'entered' | 'pending' | 'wms_synced' }> = {};
+    row.lineItems?.forEach((l) => {
+      init[l.sku] = { unitCost: l.unitCost ?? 0, costStatus: l.costStatus };
+    });
+    return init;
+  });
+
+  const handleCostChange = (sku: string, unitCost: number) => {
+    setCosts((prev) => ({ ...prev, [sku]: { unitCost, costStatus: 'entered' } }));
+  };
+
+  const lineItems = row.lineItems;
+  const hasCostData = lineItems && lineItems.length > 0;
+  const pendingCount = lineItems?.filter((l) => (costs[l.sku]?.costStatus ?? l.costStatus) === 'pending').length ?? 0;
+  const enteredCount = lineItems?.filter((l) => (costs[l.sku]?.costStatus ?? l.costStatus) === 'entered').length ?? 0;
+  const wmsCount = lineItems?.filter((l) => (costs[l.sku]?.costStatus ?? l.costStatus) === 'wms_synced').length ?? 0;
+  const computedTotal = lineItems?.reduce((s, l) => {
+    const c = costs[l.sku];
+    const unitCost = c ? c.unitCost : (l.unitCost ?? 0);
+    return s + unitCost * l.plannedQty;
+  }, 0) ?? 0;
+
+  return (
+    <div>
+      {/* Header bar */}
+      <div className="flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--surface)] px-4 py-3">
+        <div className="flex items-center gap-3">
+          <span className="text-[12px] text-[var(--muted)]">
+            采购单价 · 入库总成本 · 成本来源追踪
+          </span>
+          {pendingCount > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-inset ring-amber-200">
+              <AlertCircle className="size-3" />
+              {pendingCount} 行待录入
+            </span>
+          )}
+        </div>
+        <span className="text-[12px] text-[var(--muted)]">
+          {row.costCurrency ?? 'USD'} {computedTotal > 0 ? `$${computedTotal.toFixed(2)}` : '—'}
+        </span>
+      </div>
+
+      {!hasCostData ? (
+        <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
+          <DollarSign className="size-10 text-[var(--border)]" />
+          <p className="mt-3 text-[14px] font-medium text-[var(--foreground)]">暂无成本数据</p>
+          <p className="mt-1 text-[12px] text-[var(--muted)]">
+            请录入采购单价，或等待 WMS 入库完成后自动回传
+          </p>
+          <button className="mt-4 flex h-8 items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3 text-[13px] font-medium text-white hover:opacity-90">
+            录入成本
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* Cost source legend */}
+          <div className="flex items-center gap-4 border-b border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-2">
+            <div className="flex items-center gap-1.5 text-[11px] text-[var(--muted)]">
+              <Info className="size-3" />
+              成本来源：
+            </div>
+            {wmsCount > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                <span className="size-1.5 rounded-full bg-emerald-500" />WMS 回传 {wmsCount} 行
+              </span>
+            )}
+            {enteredCount > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-inset ring-blue-200">
+                <span className="size-1.5 rounded-full bg-blue-500" />手动录入 {enteredCount} 行
+              </span>
+            )}
+            {pendingCount > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-inset ring-amber-200">
+                <span className="size-1.5 rounded-full bg-amber-400" />待录入 {pendingCount} 行
+              </span>
+            )}
+          </div>
+
+          {/* Cost table */}
+          <div className="overflow-x-auto">
+            <table className="min-w-full border-collapse text-left text-[13px]">
+              <thead className="bg-[var(--surface-subtle)] text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted-foreground)]">
+                <tr>
+                  <th className="whitespace-nowrap px-4 py-2.5">商品</th>
+                  <th className="whitespace-nowrap px-3 py-2.5">SKU</th>
+                  <th className="whitespace-nowrap px-3 py-2.5 text-right">计划数</th>
+                  <th className="whitespace-nowrap px-3 py-2.5 text-right">实收数</th>
+                  <th className="whitespace-nowrap px-3 py-2.5 text-right">单价</th>
+                  <th className="whitespace-nowrap px-3 py-2.5 text-right">小计</th>
+                  <th className="whitespace-nowrap px-3 py-2.5 text-center">成本来源</th>
+                  <th className="whitespace-nowrap px-3 py-2.5">批次</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border-subtle)]">
+                {lineItems.map((item, i) => (
+                  <CostLineRow
+                    key={i}
+                    item={item}
+                    editedCost={costs[item.sku]}
+                    onCostChange={(unitCost) => handleCostChange(item.sku, unitCost)}
+                  />
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-[var(--border)] bg-[var(--surface-subtle)]">
+                  <td colSpan={5} className="px-4 py-3 text-right text-[12px] font-semibold text-[var(--muted-foreground)]">入库总成本</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-right text-[14px] font-semibold text-[var(--foreground)]">
+                    {computedTotal > 0 ? `$${computedTotal.toFixed(2)}` : '—'}
+                  </td>
+                  <td colSpan={2} className="px-3 py-3 text-[11px] text-[var(--muted)]">{row.costCurrency ?? 'USD'}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          {/* Cost note */}
+          <div className="border-t border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3">
+            <p className="text-[11px] text-[var(--muted)]">
+              入库成本将更新对应 SKU 的库存成本台账，并作为后续订单利润计算的商品成本基础。
+              WMS 回传成本具有最高优先级，手动录入成本作为兜底。
+            </p>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function CostLineRow({
+  item,
+  editedCost,
+  onCostChange,
+}: {
+  item: InboundLineItem;
+  editedCost?: { unitCost: number; costStatus: 'entered' | 'pending' | 'wms_synced' };
+  onCostChange: (unitCost: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+
+  const currentStatus = editedCost?.costStatus ?? item.costStatus;
+  const currentUnitCost = editedCost ? editedCost.unitCost : (item.unitCost ?? 0);
+  const totalCost = currentUnitCost * item.plannedQty;
+  const canEdit = currentStatus !== 'wms_synced'; // WMS 回传不可手动改
+
+  const costStatusMap = {
+    wms_synced: { label: 'WMS 回传', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200', dot: 'bg-emerald-500' },
+    entered:    { label: '手动录入', cls: 'bg-blue-50 text-blue-700 ring-blue-200',           dot: 'bg-blue-500' },
+    pending:    { label: '待录入',   cls: 'bg-amber-50 text-amber-700 ring-amber-200',        dot: 'bg-amber-400' },
+  };
+  const src = costStatusMap[currentStatus];
+
+  const startEdit = () => {
+    if (!canEdit) return;
+    setDraft(currentUnitCost > 0 ? currentUnitCost.toFixed(2) : '');
+    setEditing(true);
+  };
+
+  const commitEdit = () => {
+    const val = parseFloat(draft);
+    if (!isNaN(val) && val >= 0) {
+      onCostChange(val);
+    }
+    setEditing(false);
+  };
+
+  const cancelEdit = () => setEditing(false);
+
+  return (
+    <tr className="group transition-colors hover:bg-[var(--surface-subtle)]">
+      <td className="px-4 py-3">
+        <div className="text-[13px] font-medium text-[var(--foreground)]">{item.name}</div>
+        <div className="text-[11px] text-[var(--muted)]">{item.weight ? `${item.weight} kg` : '—'}</div>
+      </td>
+      <td className="whitespace-nowrap px-3 py-3 font-mono text-[11px] text-[var(--foreground)]">{item.sku}</td>
+      <td className="whitespace-nowrap px-3 py-3 text-right text-[var(--foreground)]">{item.plannedQty}</td>
+      <td className="whitespace-nowrap px-3 py-3 text-right font-medium text-[var(--foreground)]">
+        {item.receivedQty !== undefined ? item.receivedQty : '—'}
+      </td>
+
+      {/* 单价 — 可编辑 */}
+      <td className="whitespace-nowrap px-3 py-3 text-right">
+        {editing ? (
+          <div className="flex items-center justify-end gap-1">
+            <span className="text-[var(--muted)]">$</span>
+            <input
+              autoFocus
+              type="number"
+              step="0.01"
+              min="0"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') cancelEdit(); }}
+              onBlur={commitEdit}
+              className="w-20 rounded border border-[var(--primary)] bg-[var(--surface)] px-1.5 py-0.5 text-right text-[12px] text-[var(--foreground)] outline-none focus:ring-1 focus:ring-[var(--primary)]"
+            />
+          </div>
+        ) : (
+          <button
+            onClick={startEdit}
+            title={canEdit ? '点击录入单价' : 'WMS 回传成本，不可手动修改'}
+            className={cn(
+              'group/cost inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[12px] transition-colors',
+              canEdit
+                ? 'cursor-pointer hover:bg-[var(--surface-hover)]'
+                : 'cursor-default'
+            )}
+          >
+            {currentUnitCost > 0 ? (
+              <span className="font-medium text-[var(--foreground)]">${currentUnitCost.toFixed(2)}</span>
+            ) : (
+              <span className="font-medium text-[var(--danger)]">点击录入</span>
+            )}
+            {canEdit && (
+              <span className="text-[10px] text-[var(--muted)] opacity-0 transition-opacity group-hover/cost:opacity-100">
+                ✎
+              </span>
+            )}
+          </button>
+        )}
+      </td>
+
+      {/* 小计 */}
+      <td className="whitespace-nowrap px-3 py-3 text-right">
+        {totalCost > 0 ? (
+          <span className="font-semibold text-[var(--foreground)]">${totalCost.toFixed(2)}</span>
+        ) : (
+          <span className="text-[var(--muted)]">—</span>
+        )}
+      </td>
+
+      <td className="whitespace-nowrap px-3 py-3 text-center">
+        <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset', src.cls)}>
+          <span className={cn('size-1.5 rounded-full', src.dot)} />
+          {src.label}
+        </span>
+      </td>
+      <td className="whitespace-nowrap px-3 py-3 font-mono text-[11px] text-[var(--muted)]">
+        {item.lotNo ?? '—'}
+      </td>
+    </tr>
+  );
+}
+
+// ─── 右侧入库成本卡片 ────────────────────────────────────────────────────────
+
+function InboundCostSideCard({ row }: { row: typeof inboundOrders[0] }) {
+  const lineItems = row.lineItems;
+  if (!lineItems || lineItems.length === 0) {
+    return (
+      <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)]">
+        <div className="border-b border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3">
+          <h2 className="flex items-center gap-2 text-[13px] font-semibold text-[var(--foreground)]">
+            <DollarSign className="size-4 text-[var(--muted)]" />入库成本
+          </h2>
+        </div>
+        <div className="px-4 py-4 text-center">
+          <p className="text-[12px] text-[var(--muted)]">暂无成本数据</p>
+          <button className="mt-2 text-[12px] font-medium text-[var(--primary)] hover:underline">录入成本 →</button>
+        </div>
+      </section>
+    );
+  }
+
+  const totalCost = lineItems.reduce((s, l) => s + (l.totalCost ?? 0), 0);
+  const pendingCount = lineItems.filter((l) => l.costStatus === 'pending').length;
+  const wmsCount = lineItems.filter((l) => l.costStatus === 'wms_synced').length;
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)]">
+      <div className="border-b border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3">
+        <h2 className="flex items-center gap-2 text-[13px] font-semibold text-[var(--foreground)]">
+          <DollarSign className="size-4 text-[var(--muted)]" />入库成本
+        </h2>
+      </div>
+      <div className="px-4 py-3 space-y-2.5 text-[12px]">
+        <div className="flex justify-between">
+          <span className="text-[var(--muted)]">入库总成本</span>
+          <span className="text-[15px] font-semibold text-[var(--foreground)]">
+            {totalCost > 0 ? `$${totalCost.toFixed(2)}` : '—'}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-[var(--muted)]">币种</span>
+          <span className="text-[var(--foreground)]">{row.costCurrency ?? 'USD'}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-[var(--muted)]">商品行数</span>
+          <span className="text-[var(--foreground)]">{lineItems.length}</span>
+        </div>
+        <div className="h-px bg-[var(--border-subtle)]" />
+        <div className="flex justify-between">
+          <span className="text-[var(--muted)]">WMS 回传</span>
+          <span className="font-medium text-emerald-600">{wmsCount} 行</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-[var(--muted)]">待录入</span>
+          <span className={cn('font-medium', pendingCount > 0 ? 'text-amber-600' : 'text-[var(--muted-foreground)]')}>
+            {pendingCount} 行
+          </span>
+        </div>
+        {pendingCount > 0 && (
+          <div className="flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5">
+            <AlertCircle className="size-3.5 shrink-0 text-amber-600" />
+            <span className="text-[11px] text-amber-700">成本不完整，将影响利润计算精度</span>
+          </div>
+        )}
+        <button
+          onClick={() => {/* 跳转到采购成本 Tab */}}
+          className="mt-1 w-full rounded-lg border border-[var(--border)] py-1.5 text-[12px] font-medium text-[var(--foreground)] hover:bg-[var(--surface-subtle)]"
+        >
+          查看成本明细
+        </button>
+      </div>
+    </section>
   );
 }

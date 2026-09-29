@@ -17,6 +17,7 @@ type ShellState = {
   themePreset: ThemePreset;
   customAccentColor: string;
   timezone: string;
+  compactLayout: boolean;
   setSidebarCollapsed: (value: boolean) => void;
   setCompanyId: (value: string) => void;
   setMerchantScope: (value: MerchantScope) => void;
@@ -26,6 +27,7 @@ type ShellState = {
   setCustomAccentColor: (value: string) => void;
   resetThemeAppearance: () => void;
   setTimezone: (value: string) => void;
+  setCompactLayout: (value: boolean) => void;
 };
 
 const ShellStateContext = createContext<ShellState | null>(null);
@@ -39,13 +41,14 @@ export function ShellStateProvider({ children }: { children: React.ReactNode }) 
   const [themePreset, setThemePresetState] = useState<ThemePreset>(themeConfig.preset);
   const [customAccentColor, setCustomAccentColorState] = useState<string>(themeConfig.brandAccent);
   const [timezone, setTimezone] = useState<string>(TIMEZONES[0]);
+  const [compactLayout, setCompactLayout] = useState(false);
 
   useEffect(() => {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
 
     try {
-      const parsed = JSON.parse(raw) as Partial<Pick<ShellState, 'sidebarCollapsed' | 'companyId' | 'merchantScope' | 'locale' | 'themeMode' | 'themePreset' | 'customAccentColor' | 'timezone'>>;
+      const parsed = JSON.parse(raw) as Partial<Pick<ShellState, 'sidebarCollapsed' | 'companyId' | 'merchantScope' | 'locale' | 'themeMode' | 'themePreset' | 'customAccentColor' | 'timezone' | 'compactLayout'>>;
       if (typeof parsed.sidebarCollapsed === 'boolean') setSidebarCollapsed(parsed.sidebarCollapsed);
       if (parsed.companyId && isCompanyId(parsed.companyId)) setCompanyIdState(parsed.companyId);
       if (parsed.merchantScope && isMerchantScope(parsed.merchantScope)) {
@@ -59,15 +62,24 @@ export function ShellStateProvider({ children }: { children: React.ReactNode }) 
         setCustomAccentColorState(normalizeThemeColor(parsed.customAccentColor) ?? themeConfig.brandAccent);
       }
       if (parsed.timezone && TIMEZONES.includes(parsed.timezone as (typeof TIMEZONES)[number])) setTimezone(parsed.timezone);
+      if (typeof parsed.compactLayout === 'boolean') setCompactLayout(parsed.compactLayout);
     } catch {}
   }, []);
 
   useEffect(() => {
     window.localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ sidebarCollapsed, companyId, merchantScope, locale, themeMode, themePreset, customAccentColor, timezone })
+      JSON.stringify({ sidebarCollapsed, companyId, merchantScope, locale, themeMode, themePreset, customAccentColor, timezone, compactLayout })
     );
-  }, [sidebarCollapsed, companyId, merchantScope, locale, themeMode, themePreset, customAccentColor, timezone]);
+  }, [sidebarCollapsed, companyId, merchantScope, locale, themeMode, themePreset, customAccentColor, timezone, compactLayout]);
+
+  useEffect(() => {
+    if (compactLayout) {
+      document.documentElement.dataset.compact = 'true';
+    } else {
+      delete document.documentElement.dataset.compact;
+    }
+  }, [compactLayout]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -129,6 +141,7 @@ export function ShellStateProvider({ children }: { children: React.ReactNode }) 
       themePreset,
       customAccentColor,
       timezone,
+      compactLayout,
       setSidebarCollapsed,
       setCompanyId,
       setMerchantScope,
@@ -137,7 +150,8 @@ export function ShellStateProvider({ children }: { children: React.ReactNode }) 
       setThemePreset,
       setCustomAccentColor,
       resetThemeAppearance,
-      setTimezone
+      setTimezone,
+      setCompactLayout
     }),
     [
       sidebarCollapsed,
@@ -148,6 +162,7 @@ export function ShellStateProvider({ children }: { children: React.ReactNode }) 
       themePreset,
       customAccentColor,
       timezone,
+      compactLayout,
       setCompanyId,
       setMerchantScope,
       setThemePreset,
