@@ -98,11 +98,9 @@ export const merchantNavigationGroups: NavGroup[] = [
     defaultOpen: false,
     items: [
       { title: { 'zh-CN': '财务概览', 'en-US': 'Finance Overview' }, href: '/dashboard/finance', capabilities: ['finance:read'], icon: 'layout-dashboard' },
-      { title: { 'zh-CN': '应收', 'en-US': 'Receivables' }, href: '/dashboard/receivables', capabilities: ['finance:read'], icon: 'trending-up' },
-      { title: { 'zh-CN': '应付', 'en-US': 'Payables' }, href: '/dashboard/payables', capabilities: ['finance:read'], icon: 'trending-down' },
-      { title: { 'zh-CN': '费用', 'en-US': 'Expenses' }, href: '/dashboard/expenses', capabilities: ['finance:read'], icon: 'receipt' },
-      { title: { 'zh-CN': '对账', 'en-US': 'Reconciliation' }, href: '/dashboard/reconciliation', capabilities: ['finance:read'], icon: 'scale' },
-      { title: { 'zh-CN': '结算', 'en-US': 'Settlement' }, href: '/dashboard/settlement', capabilities: ['finance:read'], icon: 'banknote' }
+      { title: { 'zh-CN': '应收账款', 'en-US': 'Accounts Receivable' }, href: '/dashboard/receivables', capabilities: ['finance:read'], icon: 'trending-up' },
+      { title: { 'zh-CN': '应付账款', 'en-US': 'Accounts Payable' }, href: '/dashboard/payables', capabilities: ['finance:read'], icon: 'trending-down' },
+      { title: { 'zh-CN': '财务报表', 'en-US': 'Financial Reports' }, href: '/dashboard/reports/finance', capabilities: ['finance:read'], icon: 'bar-chart-2' },
     ]
   },
   {
@@ -114,7 +112,6 @@ export const merchantNavigationGroups: NavGroup[] = [
       { title: { 'zh-CN': '库存报表', 'en-US': 'Inventory Reports' }, href: '/dashboard/reports/inventory', capabilities: ['reports:read'], icon: 'bar-chart-2' },
       { title: { 'zh-CN': '采购报表', 'en-US': 'Purchasing Reports' }, href: '/dashboard/reports/purchasing', capabilities: ['reports:read'], icon: 'file-bar-chart' },
       { title: { 'zh-CN': '履约报表', 'en-US': 'Fulfillment Reports' }, href: '/dashboard/reports/fulfillment', capabilities: ['reports:read'], icon: 'timer' },
-      { title: { 'zh-CN': '财务报表', 'en-US': 'Financial Reports' }, href: '/dashboard/reports/finance', capabilities: ['reports:read'], icon: 'calculator' }
     ]
   },
 

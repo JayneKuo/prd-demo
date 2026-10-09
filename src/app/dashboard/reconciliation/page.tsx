@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { RefreshCw, Download, CheckCircle2, AlertTriangle, Clock3, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
+import { RefreshCw, Download, CheckCircle2, AlertTriangle, Clock3, ChevronDown, ChevronUp, ArrowRight, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   reconcileKpi,
@@ -75,6 +76,19 @@ export default function ReconciliationPage() {
 
   return (
     <div className="mx-auto max-w-[1440px] pt-5 lg:pt-6">
+
+      {/* ── 位置提示横幅（此页已从主导航移除，作为工具页保留）── */}
+      <div className="mb-4 flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] px-4 py-3">
+        <Info className="size-4 shrink-0 text-[var(--muted)]" />
+        <p className="text-[13px] text-[var(--muted)]">
+          财务对账功能已整合至
+          <Link href="/dashboard/receivables" className="mx-1 font-semibold text-[var(--primary)] underline underline-offset-2 hover:opacity-80">
+            应收账款
+          </Link>
+          中。此页继续保留用于库存 & 综合对账。
+        </p>
+      </div>
+
       {/* ── 页头 ── */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>

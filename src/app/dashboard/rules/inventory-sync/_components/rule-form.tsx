@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, ChevronDown, ChevronLeft, Loader2, Play, Upload, MapPin } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronLeft, Loader2, Play, Upload, MapPin, Plus, X, Zap, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { parseSkuImportFile } from './sku-import';
 
@@ -51,11 +51,76 @@ const WAREHOUSES = [
 
 const REALTIME_EVENTS = ['库存归零', 'SKU 状态变更', '库存超阈值', '入库完成'] as const;
 
+// 模拟 SKU 数据（实际项目从 API 获取）
+const MOCK_SKUS = [
+  { code: 'SKU-A001', name: '红色圆领T恤 S码',    qty: 156 },
+  { code: 'SKU-A002', name: '红色圆领T恤 M码',    qty: 234 },
+  { code: 'SKU-A003', name: '红色圆领T恤 L码',    qty: 88  },
+  { code: 'SKU-A004', name: '红色圆领T恤 XL码',   qty: 45  },
+  { code: 'SKU-B001', name: '蓝色条纹衬衫 S码',   qty: 210 },
+  { code: 'SKU-B002', name: '蓝色条纹衬衫 M码',   qty: 318 },
+  { code: 'SKU-B003', name: '蓝色条纹衬衫 L码',   qty: 127 },
+  { code: 'SKU-C001', name: '黑色运动裤 S码',     qty: 445 },
+  { code: 'SKU-C002', name: '黑色运动裤 M码',     qty: 532 },
+  { code: 'SKU-C003', name: '黑色运动裤 L码',     qty: 289 },
+  { code: 'SKU-D001', name: '白色帆布鞋 38',      qty: 68  },
+  { code: 'SKU-D002', name: '白色帆布鞋 39',      qty: 134 },
+  { code: 'SKU-D003', name: '白色帆布鞋 40',      qty: 156 },
+  { code: 'SKU-D004', name: '白色帆布鞋 41',      qty: 98  },
+  { code: 'SKU-D005', name: '白色帆布鞋 42',      qty: 72  },
+  { code: 'SKU-E001', name: '保温水杯 350ml 黑',  qty: 892 },
+  { code: 'SKU-E002', name: '保温水杯 500ml 黑',  qty: 756 },
+  { code: 'SKU-E003', name: '保温水杯 500ml 白',  qty: 634 },
+  { code: 'SKU-F001', name: '无线蓝牙耳机 Pro',   qty: 234 },
+  { code: 'SKU-F002', name: '无线蓝牙耳机 Lite',  qty: 456 },
+];
+
+// 货主预设选项
+const OWNER_OPTIONS: { value: string; sub: string }[] = [
+  { value: '货主 A（品牌方）',   sub: 'OWN-001' },
+  { value: '货主 B（代工厂）',   sub: 'OWN-002' },
+  { value: '货主 C（分销商）',   sub: 'OWN-003' },
+  { value: '华南品牌代理',       sub: 'OWN-004' },
+  { value: '北美直营仓',         sub: 'OWN-005' },
+  { value: '欧盟认证货主',       sub: 'OWN-006' },
+  { value: '跨境直发供应商',     sub: 'OWN-007' },
+];
+
+// Retailer 标识预设（EDI 对接用）
+const RETAILER_OPTIONS: { value: string; sub: string }[] = [
+  { value: 'WALMART_US',    sub: 'Walmart'    },
+  { value: 'TARGET_US',     sub: 'Target'     },
+  { value: 'COSTCO_US',     sub: 'Costco'     },
+  { value: 'KROGER_US',     sub: 'Kroger'     },
+  { value: 'HOME_DEPOT_US', sub: 'Home Depot' },
+  { value: 'WAYFAIR_US',    sub: 'Wayfair'    },
+  { value: 'AMAZON_US',     sub: 'Amazon US'  },
+  { value: 'TIKTOK_US',     sub: 'TikTok Shop US' },
+  { value: 'SHOPIFY_US',    sub: 'Shopify US' },
+];
+
+// 规则名称常用模板
+const RULE_NAME_TEMPLATES: { value: string; sub: string }[] = [
+  { value: 'Walmart EDI · 每日同步',      sub: 'Retailer 渠道' },
+  { value: 'Target EDI · 每日同步',       sub: 'Retailer 渠道' },
+  { value: 'Costco EDI · 每日同步',       sub: 'Retailer 渠道' },
+  { value: 'Kroger EDI · 每日同步',       sub: 'Retailer 渠道' },
+  { value: '货主 A → 全渠道同步',          sub: '货主维度'      },
+  { value: '货主 B → Costco 专供同步',     sub: '货主维度'      },
+  { value: '预售 SKU 同步规则',            sub: 'SKU 规则'     },
+  { value: '不可用 SKU 强制置零',          sub: 'SKU 规则'     },
+  { value: '紧急缺货实时推送',             sub: '同步计划'      },
+  { value: '周末全量补充同步',             sub: '同步计划'      },
+  { value: 'EDI 推送失败重试',             sub: '异常处理'      },
+  { value: '库存差异预警',                 sub: '异常处理'      },
+];
+
 type PlatformTargetLocation = { mode: 'preset' | 'custom'; presetId: string; customCode: string };
 type QtyMode   = 'full' | 'deduct' | 'ratio';
 type SkuMode   = 'all'  | 'include' | 'exclude';
 type SkuBy     = 'sku_list' | 'tag' | 'category';
 type OwnerMode = 'all'  | 'include' | 'exclude';
+type SkuLevelConfig = { skuCode: string; overrideType: 'ratio' | 'fixed' | 'deduct'; value: string };
 
 type FormState = {
   // 基本信息
@@ -93,11 +158,15 @@ type FormState = {
   syncRetailerSkuName: boolean;
   includeBarcode: boolean;
   // 执行策略
-  frequency: 'daily' | 'interval' | 'realtime' | 'pull';
+  frequency: 'daily' | 'interval' | 'realtime' | 'pull' | 'scheduled';
   execTimes: string[];
   intervalMinutes: string;
   pushUrl: string;
   realtimeEvents: string[];
+  scheduledDatetimes: string[];
+  // SKU 差异化配置
+  skuLevelOverrideEnabled: boolean;
+  skuLevelConfigs: SkuLevelConfig[];
   // 异常处理
   retryMax: string;
   retryInterval: string;
@@ -139,6 +208,9 @@ const DEFAULT_FORM: FormState = {
   intervalMinutes: '60',
   pushUrl: '',
   realtimeEvents: ['库存归零'],
+  scheduledDatetimes: [''],
+  skuLevelOverrideEnabled: false,
+  skuLevelConfigs: [],
   retryMax: '3',
   retryInterval: '5',
   onFailure: 'alert_wait',
@@ -376,6 +448,344 @@ function PlatformTargetLocationSection({ channelId, channelName, value, onChange
   );
 }
 
+// ─── Tags + ComboBox（多选：货主等字段用） ────────────────────────────────────
+
+function TagsComboBox({ value, onChange, options, placeholder }: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; sub?: string }[];
+  placeholder?: string;
+}) {
+  const [draft, setDraft] = useState('');
+  const [open, setOpen] = useState(false);
+
+  const tags = useMemo(
+    () => value.split(',').map((s) => s.trim()).filter(Boolean),
+    [value],
+  );
+
+  const filtered = useMemo(() => {
+    const kw = draft.trim().toLowerCase();
+    return options.filter(
+      (o) =>
+        !tags.includes(o.value) &&
+        (!kw || o.value.toLowerCase().includes(kw) || (o.sub && o.sub.toLowerCase().includes(kw))),
+    );
+  }, [options, draft, tags]);
+
+  const addTag = (tag: string) => {
+    const t = tag.trim();
+    if (!t || tags.includes(t)) return;
+    onChange([...tags, t].join(', '));
+    setDraft('');
+    setOpen(false);
+  };
+
+  const removeTag = (tag: string) => onChange(tags.filter((t) => t !== tag).join(', '));
+
+  const isExactMatch = options.some((o) => o.value === draft.trim()) || tags.includes(draft.trim());
+  const showDropdown = open && (filtered.length > 0 || (draft.trim() && !isExactMatch));
+
+  return (
+    <div className="space-y-2">
+      {/* 已选标签 */}
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {tags.map((tag) => (
+            <span key={tag}
+              className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--foreground)]">
+              {tag}
+              <button type="button" onClick={() => removeTag(tag)}
+                className="text-[var(--muted)] hover:text-red-500 leading-none">×</button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* 搜索输入 + 下拉 */}
+      <div className="relative">
+        <input
+          type="text"
+          value={draft}
+          onChange={(e) => { setDraft(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && draft.trim()) { e.preventDefault(); addTag(draft); } }}
+          placeholder={placeholder}
+          autoComplete="off"
+          className="h-9 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 pr-8 text-[13px] outline-none placeholder:text-[var(--muted)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10"
+        />
+        <button type="button" tabIndex={-1} onClick={() => setOpen((v) => !v)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--foreground)]">
+          <ChevronDown className={cn('size-4 transition-transform', open && 'rotate-180')} />
+        </button>
+
+        {showDropdown && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+            <div className="absolute left-0 top-full z-20 mt-1.5 w-full overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)]">
+              {filtered.length > 0 && (
+                <div className="max-h-48 overflow-y-auto py-1">
+                  {filtered.map((opt) => (
+                    <button key={opt.value} type="button"
+                      onClick={() => addTag(opt.value)}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] transition-colors hover:bg-[var(--surface-subtle)]">
+                      <span className="flex-1 text-[var(--foreground)]">{opt.value}</span>
+                      {opt.sub && <span className="shrink-0 text-[11px] text-[var(--muted)]">{opt.sub}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {draft.trim() && !isExactMatch && (
+                <div className={cn('p-1.5', filtered.length > 0 && 'border-t border-[var(--border-subtle)]')}>
+                  <button type="button"
+                    onClick={() => addTag(draft)}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12px] text-[var(--muted)] transition-colors hover:bg-[var(--surface-subtle)] hover:text-[var(--foreground)]">
+                    <Plus className="size-3.5 shrink-0" />
+                    新增 &ldquo;{draft.trim()}&rdquo;
+                  </button>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── 可搜索 + 自定义新增的 ComboBox ─────────────────────────────────────────
+
+type ComboBoxOption = { value: string; sub?: string };
+
+function ComboBox({ value, onChange, options, placeholder, id, errorState }: {
+  value: string;
+  onChange: (v: string) => void;
+  options: ComboBoxOption[];
+  placeholder?: string;
+  id?: string;
+  errorState?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const filtered = useMemo(() => {
+    if (!value.trim()) return options;
+    const kw = value.trim().toLowerCase();
+    return options.filter(
+      (o) => o.value.toLowerCase().includes(kw) || (o.sub && o.sub.toLowerCase().includes(kw))
+    );
+  }, [options, value]);
+
+  const isExactMatch = options.some((o) => o.value === value.trim());
+  const showDropdown = open && (filtered.length > 0 || (value.trim() && !isExactMatch));
+
+  return (
+    <div className="relative">
+      <input
+        id={id}
+        type="text"
+        value={value}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        placeholder={placeholder}
+        autoComplete="off"
+        className={cn(
+          'h-10 w-full rounded-xl border bg-[var(--surface)] px-3 pr-8 text-[13px] outline-none focus:ring-2',
+          errorState
+            ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
+            : 'border-[var(--border)] focus:border-[var(--primary)] focus:ring-[var(--primary)]/10'
+        )}
+      />
+      <button type="button" tabIndex={-1}
+        onClick={() => setOpen((v) => !v)}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--foreground)]">
+        <ChevronDown className={cn('size-4 transition-transform', open && 'rotate-180')} />
+      </button>
+
+      {showDropdown && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-full z-20 mt-1.5 w-full overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)]">
+            {filtered.length > 0 && (
+              <div className="max-h-52 overflow-y-auto py-1">
+                {filtered.map((opt) => (
+                  <button key={opt.value} type="button"
+                    onClick={() => { onChange(opt.value); setOpen(false); }}
+                    className={cn(
+                      'flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] transition-colors hover:bg-[var(--surface-subtle)]',
+                      value === opt.value && 'bg-[var(--primary-soft)]'
+                    )}>
+                    <span className="flex-1 text-[var(--foreground)]">{opt.value}</span>
+                    {opt.sub && <span className="shrink-0 text-[11px] text-[var(--muted)]">{opt.sub}</span>}
+                    {value === opt.value && <span className="shrink-0 text-[11px] text-[var(--primary)]">✓</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+            {value.trim() && !isExactMatch && (
+              <div className={cn('p-1.5', filtered.length > 0 && 'border-t border-[var(--border-subtle)]')}>
+                <button type="button"
+                  onClick={() => { onChange(value.trim()); setOpen(false); }}
+                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12px] text-[var(--muted)] transition-colors hover:bg-[var(--surface-subtle)] hover:text-[var(--foreground)]">
+                  <Plus className="size-3.5 shrink-0" />
+                  新增 &ldquo;{value.trim()}&rdquo;
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── SKU 搜索选择面板（Section ③ 和 Section ④ 共用） ──────────────────────────
+
+type SkuPickerPanelProps = {
+  alreadySelected: Set<string>;
+  onAdd: (codes: string[]) => void;
+  footerHint?: string;
+};
+
+function SkuPickerPanel({ alreadySelected, onAdd, footerHint }: SkuPickerPanelProps) {
+  const [mode, setMode] = useState<'single' | 'batch'>('single');
+  const [query, setQuery] = useState('');
+  const [batchText, setBatchText] = useState('');
+  const [batchCommitted, setBatchCommitted] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
+
+  const results = useMemo(() => {
+    if (mode === 'single') {
+      if (!query.trim()) return [];
+      const kw = query.trim().toLowerCase();
+      return MOCK_SKUS.filter(
+        (s) => !alreadySelected.has(s.code) &&
+               (s.code.toLowerCase().includes(kw) || s.name.toLowerCase().includes(kw))
+      );
+    }
+    if (!batchCommitted || !batchText.trim()) return [];
+    const inputCodes = new Set(batchText.split(/[\n,，\s]+/).map((s) => s.trim()).filter(Boolean));
+    return MOCK_SKUS.filter((s) => !alreadySelected.has(s.code) && inputCodes.has(s.code));
+  }, [mode, query, batchText, batchCommitted, alreadySelected]);
+
+  const notFound = useMemo(() => {
+    if (mode !== 'batch' || !batchCommitted) return [];
+    const inputCodes = batchText.split(/[\n,，\s]+/).map((s) => s.trim()).filter(Boolean);
+    const found = new Set(results.map((s) => s.code));
+    return Array.from(new Set(inputCodes)).filter((c) => !found.has(c));
+  }, [mode, batchText, batchCommitted, results]);
+
+  const handleBatchSearch = () => {
+    setBatchCommitted(true);
+    const inputCodes = new Set(batchText.split(/[\n,，\s]+/).map((s) => s.trim()).filter(Boolean));
+    const matched = MOCK_SKUS.filter((s) => !alreadySelected.has(s.code) && inputCodes.has(s.code)).map((s) => s.code);
+    setSelected(matched);
+  };
+
+  const handleAdd = () => {
+    if (!selected.length) return;
+    onAdd(selected);
+    setSelected([]);
+    setQuery('');
+    setBatchText('');
+    setBatchCommitted(false);
+  };
+
+  return (
+    <div className="space-y-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+      {/* 模式切换 */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[11px] font-medium text-[var(--foreground)]">搜索添加 SKU</div>
+        <div className="flex overflow-hidden rounded-lg border border-[var(--border)] text-[11px]">
+          <button type="button" onClick={() => { setMode('single'); setSelected([]); }}
+            className={cn('px-3 py-1 transition-colors', mode === 'single' ? 'bg-[var(--primary)] text-white' : 'bg-[var(--surface)] text-[var(--muted)] hover:bg-[var(--surface-subtle)]')}>
+            单个搜索
+          </button>
+          <button type="button" onClick={() => { setMode('batch'); setSelected([]); }}
+            className={cn('border-l border-[var(--border)] px-3 py-1 transition-colors', mode === 'batch' ? 'bg-[var(--primary)] text-white' : 'bg-[var(--surface)] text-[var(--muted)] hover:bg-[var(--surface-subtle)]')}>
+            批量搜索
+          </button>
+        </div>
+      </div>
+
+      {mode === 'single' && (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-[var(--muted)]" />
+          <input type="text" value={query} onChange={(e) => { setQuery(e.target.value); setSelected([]); }}
+            placeholder="搜索 SKU 编码或名称…"
+            className="h-9 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] pl-9 pr-3 text-[12px] outline-none placeholder:text-[var(--muted)] focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/10" />
+        </div>
+      )}
+
+      {mode === 'batch' && (
+        <div className="space-y-2">
+          <textarea value={batchText}
+            onChange={(e) => { setBatchText(e.target.value); setBatchCommitted(false); setSelected([]); }}
+            placeholder={'粘贴多个 SKU 编码，每行一个或逗号分隔\n例：SKU-A001\nSKU-B002, SKU-C003'}
+            rows={3}
+            className="w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[12px] outline-none placeholder:text-[var(--muted)] focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/10"
+          />
+          <button type="button" onClick={handleBatchSearch} disabled={!batchText.trim()}
+            className="flex h-8 items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-[12px] font-medium transition-colors hover:bg-[var(--surface-subtle)] disabled:opacity-40">
+            <Search className="size-3.5" />搜索
+          </button>
+        </div>
+      )}
+
+      {mode === 'batch' && batchCommitted && notFound.length > 0 && (
+        <div className="rounded-lg bg-amber-50 px-3 py-1.5 text-[11px] text-amber-700">
+          {notFound.length} 个编码未找到：{notFound.slice(0, 5).join('、')}{notFound.length > 5 ? ' 等' : ''}
+        </div>
+      )}
+
+      {results.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-[11px] text-[var(--muted)]">
+            <button type="button" onClick={() => setSelected(results.map((s) => s.code))} className="hover:text-[var(--foreground)]">全选</button>
+            <span>·</span>
+            <button type="button" onClick={() => setSelected([])} className="hover:text-[var(--foreground)]">清空</button>
+            <span className="ml-auto">
+              {selected.length > 0
+                ? <span className="text-[var(--primary)]">已选 {selected.length} 个</span>
+                : `共 ${results.length} 个结果`}
+            </span>
+          </div>
+          <div className="max-h-48 divide-y divide-[var(--border-subtle)] overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)]">
+            {results.map((sku) => {
+              const sel = selected.includes(sku.code);
+              return (
+                <button key={sku.code} type="button"
+                  onClick={() => setSelected(sel ? selected.filter((c) => c !== sku.code) : [...selected, sku.code])}
+                  className={cn('flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-[var(--surface-subtle)]', sel && 'bg-[var(--primary-soft)]')}>
+                  <div className={cn('flex size-4 shrink-0 items-center justify-center rounded border transition-colors',
+                    sel ? 'border-[var(--primary)] bg-[var(--primary)] text-white' : 'border-[var(--border)]')}>
+                    {sel && <span className="text-[9px] font-bold leading-none">✓</span>}
+                  </div>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-mono text-[12px] font-medium text-[var(--foreground)]">{sku.code}</span>
+                    <span className="block truncate text-[11px] text-[var(--muted)]">{sku.name}</span>
+                  </span>
+                  <span className="shrink-0 tabular-nums text-[11px] text-[var(--muted)]">{sku.qty} 件</span>
+                </button>
+              );
+            })}
+          </div>
+          <button type="button" onClick={handleAdd} disabled={selected.length === 0}
+            className="flex h-9 w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--primary)] text-[12px] font-medium text-[var(--primary-foreground)] transition hover:opacity-90 disabled:opacity-40">
+            <Plus className="size-3.5" />添加选中的 {selected.length || ''} 个 SKU
+          </button>
+        </div>
+      )}
+
+      {((mode === 'single' && query.trim() && results.length === 0) ||
+        (mode === 'batch' && batchCommitted && results.length === 0 && notFound.length === 0)) && (
+        <div className="py-3 text-center text-[11px] text-[var(--muted)]">没有找到可添加的 SKU</div>
+      )}
+
+      {footerHint && <div className="text-[10px] text-[var(--muted)]">{footerHint}</div>}
+    </div>
+  );
+}
+
 // ─── 主表单 ─────────────────────────────────────────────────────────────────
 
 export default function InventorySyncRuleForm({ editId }: { editId: string | null }) {
@@ -384,9 +794,11 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [runningNow, setRunningNow] = useState(false);
   const [skuImportMsg, setSkuImportMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [skuSearch, setSkuSearch] = useState('');
-  const [skuDraft, setSkuDraft] = useState('');
+  const [skuOverrideSearch, setSkuOverrideSearch] = useState('');
+
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((cur) => ({ ...cur, [key]: value }));
@@ -418,6 +830,14 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
   const syncSkuList = (items: string[]) =>
     set('skuList', Array.from(new Set(items.map((s) => s.trim()).filter(Boolean))).join(','));
 
+  // Section ④ 差异化配置：已配置的过滤列表（保留原始 index 供更新）
+  const filteredSkuOverrideConfigs = useMemo(() => {
+    const kw = skuOverrideSearch.trim().toLowerCase();
+    return form.skuLevelConfigs
+      .map((cfg, originalIdx) => ({ cfg, originalIdx }))
+      .filter(({ cfg }) => !kw || cfg.skuCode.toLowerCase().includes(kw));
+  }, [form.skuLevelConfigs, skuOverrideSearch]);
+
   const handleSkuFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -425,18 +845,10 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
       const parsed = await parseSkuImportFile(file);
       syncSkuList(parsed.values);
       setSkuImportMsg({ type: 'success', text: `已导入 ${parsed.values.length} 个 SKU，来源列：${parsed.sourceColumn}${parsed.warnings.length ? `；${parsed.warnings.join('；')}` : ''}` });
-      setSkuSearch(''); setSkuDraft('');
+      setSkuSearch('');
     } catch (err) {
       setSkuImportMsg({ type: 'error', text: err instanceof Error ? err.message : 'SKU 文件导入失败' });
     } finally { e.target.value = ''; }
-  };
-
-  const handleAddSkuDraft = () => {
-    const items = skuDraft.split(/[\n,，]/).map((s) => s.trim()).filter(Boolean);
-    if (!items.length) return;
-    syncSkuList([...skuItems, ...items]);
-    setSkuDraft('');
-    setSkuImportMsg({ type: 'success', text: `已补充 ${items.length} 个 SKU` });
   };
 
   const handleSave = async () => {
@@ -450,6 +862,12 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
     await new Promise((r) => setTimeout(r, 800));
     setSaving(false); setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleRunNow = async () => {
+    setRunningNow(true);
+    await new Promise((r) => setTimeout(r, 1200));
+    setRunningNow(false);
   };
 
   return (
@@ -475,9 +893,13 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
         <Section title="基本信息">
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_200px_160px]">
             <Field label="规则名称" required>
-              <Input value={form.name} onChange={(v) => set('name', v)}
+              <ComboBox
+                value={form.name}
+                onChange={(v) => set('name', v)}
+                options={RULE_NAME_TEMPLATES}
                 placeholder="如：Walmart EDI · 货主 A · 每日同步"
-                className={!form.name ? 'border-red-200 focus:border-red-400 focus:ring-red-100' : undefined} />
+                errorState={!form.name}
+              />
             </Field>
             <Field label="启用状态">
               <Select value={form.status} onChange={(v) => set('status', v as FormState['status'])}>
@@ -515,12 +937,14 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
             {ediSelected && (
               <div className="space-y-3">
                 <Field label="Retailer" required hint="EDI 对接时对方的 retailer 标识，同步报文中会用到。">
-                  <input id="retailer-input" type="text" value={form.retailerInput}
-                    onChange={(e) => set('retailerInput', e.target.value)}
+                  <ComboBox
+                    id="retailer-input"
+                    value={form.retailerInput}
+                    onChange={(v) => set('retailerInput', v)}
+                    options={RETAILER_OPTIONS}
                     placeholder="如：WALMART_US"
-                    className={cn('h-10 w-full rounded-xl border bg-[var(--surface)] px-3 text-[13px] outline-none focus:ring-2',
-                      form.retailerInput ? 'border-[var(--border)] focus:border-[var(--primary)] focus:ring-[var(--primary)]/10'
-                                         : 'border-red-300 focus:border-red-400 focus:ring-red-100')} />
+                    errorState={!form.retailerInput}
+                  />
                 </Field>
               </div>
             )}
@@ -548,8 +972,12 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
                     <ChipButton active={form.ownerMode === 'exclude'} onClick={() => set('ownerMode', 'exclude')}>排除货主</ChipButton>
                   </div>
                   {form.ownerMode !== 'all' && (
-                    <Input value={form.ownerInput} onChange={(v) => set('ownerInput', v)}
-                      placeholder={form.ownerMode === 'include' ? '货主名称，多个用逗号分隔' : '要排除的货主名称'} />
+                    <TagsComboBox
+                      value={form.ownerInput}
+                      onChange={(v) => set('ownerInput', v)}
+                      options={OWNER_OPTIONS}
+                      placeholder={form.ownerMode === 'include' ? '搜索或输入货主名称…' : '搜索或输入要排除的货主…'}
+                    />
                   )}
                 </div>
               </Field>
@@ -585,7 +1013,7 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
 
                 {form.skuMode !== 'all' && (
                   <div className="space-y-3">
-                    <Select value={form.skuBy} onChange={(v) => { set('skuBy', v as SkuBy); setSkuImportMsg(null); setSkuSearch(''); setSkuDraft(''); }} className="max-w-[200px]">
+                    <Select value={form.skuBy} onChange={(v) => { set('skuBy', v as SkuBy); setSkuImportMsg(null); setSkuSearch(''); }} className="max-w-[200px]">
                       <option value="sku_list">SKU 列表</option>
                       <option value="tag">标签</option>
                       <option value="category">品类</option>
@@ -596,16 +1024,14 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
 
                     {form.skuBy === 'sku_list' && (
                       <div className="space-y-3">
-                        {/* 手动输入 */}
-                        <div className="flex gap-2">
-                          <Input value={skuDraft} onChange={setSkuDraft}
-                            placeholder="粘贴 SKU，逗号或换行分隔"
-                            className={!skuItems.length ? 'border-red-200 focus:border-red-400 focus:ring-red-100' : undefined} />
-                          <button type="button" onClick={handleAddSkuDraft}
-                            className="h-10 shrink-0 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 text-[12px] font-medium transition-colors hover:bg-[var(--surface-subtle)]">
-                            添加
-                          </button>
-                        </div>
+                        {/* SKU 搜索选择 */}
+                        <SkuPickerPanel
+                          alreadySelected={new Set(skuItems)}
+                          onAdd={(codes) => {
+                            syncSkuList([...skuItems, ...codes]);
+                            setSkuImportMsg({ type: 'success', text: `已添加 ${codes.length} 个 SKU` });
+                          }}
+                        />
                         {/* 文件导入 */}
                         <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3">
                           <div>
@@ -627,25 +1053,99 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
                         {skuItems.length > 0 && (
                           <div className="space-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3">
                             <div className="flex items-center justify-between gap-3">
-                              <span className="text-[12px] text-[var(--muted)]">已选 {skuItems.length} 个 SKU{skuSearch ? ` · 匹配 ${filteredSkuItems.length} 个` : ''}</span>
+                              <span className="text-[12px] text-[var(--muted)]">
+                                已选 {skuItems.length} 个 SKU{skuSearch ? ` · 匹配 ${filteredSkuItems.length} 个` : ''}
+                                {form.skuLevelConfigs.filter((c) => skuItems.includes(c.skuCode)).length > 0 && (
+                                  <span className="ml-2 text-[var(--primary)]">
+                                    · {form.skuLevelConfigs.filter((c) => skuItems.includes(c.skuCode)).length} 个已配置差异化
+                                  </span>
+                                )}
+                              </span>
                               <div className="flex items-center gap-3">
                                 <Input value={skuSearch} onChange={setSkuSearch} placeholder="搜索…" className="h-8 w-40 text-[11px]" />
-                                <button type="button" onClick={() => { syncSkuList([]); setSkuSearch(''); setSkuDraft(''); setSkuImportMsg(null); }}
-                                  className="text-[12px] text-[var(--muted)] hover:text-red-500">清空</button>
+                                <button type="button" onClick={() => {
+                                  syncSkuList([]);
+                                  set('skuLevelConfigs', form.skuLevelConfigs.filter((c) => !skuItems.includes(c.skuCode)));
+                                  setSkuSearch(''); setSkuImportMsg(null);
+                                }} className="text-[12px] text-[var(--muted)] hover:text-red-500">清空</button>
                               </div>
                             </div>
-                            <div className="max-h-44 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-3">
+                            {/* 列标签 */}
+                            <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-1.5">
+                              <span className="flex-1 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">SKU 编码</span>
+                              <span className="w-32 shrink-0 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">计算规则</span>
+                              <span className="w-20 shrink-0 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">值</span>
+                              <span className="size-5 shrink-0" />
+                            </div>
+                            {/* 内联差异化配置列表 */}
+                            <div className="max-h-56 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)]">
                               {filteredSkuItems.length > 0 ? (
-                                <div className="flex flex-wrap gap-2">
-                                  {filteredSkuItems.map((sku) => (
-                                    <span key={sku} className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] px-2.5 py-0.5 text-[11px] font-medium">
-                                      {sku}
-                                      <button type="button" onClick={() => syncSkuList(skuItems.filter((s) => s !== sku))} className="text-[var(--muted)] hover:text-red-500">×</button>
-                                    </span>
-                                  ))}
+                                <div className="divide-y divide-[var(--border-subtle)]">
+                                  {filteredSkuItems.map((sku) => {
+                                    const overrideIdx = form.skuLevelConfigs.findIndex((c) => c.skuCode === sku);
+                                    const override = overrideIdx >= 0 ? form.skuLevelConfigs[overrideIdx] : null;
+                                    const overrideType = override?.overrideType ?? '';
+                                    return (
+                                      <div key={sku} className="flex items-center gap-2 px-3 py-1.5">
+                                        <span className="min-w-0 flex-1 truncate font-mono text-[12px] font-medium text-[var(--foreground)]">{sku}</span>
+                                        <select
+                                          value={overrideType}
+                                          onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (!val) {
+                                              // 恢复整体规则：移除该 SKU 的覆盖配置
+                                              set('skuLevelConfigs', form.skuLevelConfigs.filter((c) => c.skuCode !== sku));
+                                            } else if (override) {
+                                              const next = [...form.skuLevelConfigs];
+                                              next[overrideIdx] = { ...next[overrideIdx], overrideType: val as SkuLevelConfig['overrideType'] };
+                                              set('skuLevelConfigs', next);
+                                            } else {
+                                              set('skuLevelConfigs', [...form.skuLevelConfigs, { skuCode: sku, overrideType: val as SkuLevelConfig['overrideType'], value: '' }]);
+                                            }
+                                          }}
+                                          className="h-7 w-32 shrink-0 rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-1.5 text-[11px] text-[var(--foreground)] outline-none focus:border-[var(--primary)]">
+                                          <option value="">整体规则</option>
+                                          <option value="ratio">同步比例（%）</option>
+                                          <option value="fixed">固定数量（件）</option>
+                                          <option value="deduct">扣减数量（件）</option>
+                                        </select>
+                                        <div className="relative w-20 shrink-0">
+                                          <input
+                                            type="number"
+                                            value={override?.value ?? ''}
+                                            disabled={!overrideType}
+                                            onChange={(e) => {
+                                              if (overrideIdx >= 0) {
+                                                const next = [...form.skuLevelConfigs];
+                                                next[overrideIdx] = { ...next[overrideIdx], value: e.target.value };
+                                                set('skuLevelConfigs', next);
+                                              }
+                                            }}
+                                            placeholder={overrideType === 'ratio' ? '80' : overrideType ? '50' : '—'}
+                                            className={cn(
+                                              'h-7 w-full rounded-lg border px-2 pr-5 text-[11px] outline-none',
+                                              overrideType
+                                                ? 'border-[var(--border)] bg-[var(--surface-subtle)] focus:border-[var(--primary)]'
+                                                : 'border-transparent bg-transparent text-[var(--muted)] cursor-default'
+                                            )}
+                                          />
+                                          {overrideType === 'ratio' && (
+                                            <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-[var(--muted)]">%</span>
+                                          )}
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            syncSkuList(skuItems.filter((s) => s !== sku));
+                                            set('skuLevelConfigs', form.skuLevelConfigs.filter((c) => c.skuCode !== sku));
+                                          }}
+                                          className="size-5 shrink-0 text-center text-[13px] leading-none text-[var(--muted)] hover:text-red-500">×</button>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               ) : (
-                                <div className="text-[11px] text-[var(--muted)]">没有匹配的 SKU</div>
+                                <div className="px-3 py-4 text-center text-[11px] text-[var(--muted)]">没有匹配的 SKU</div>
                               )}
                             </div>
                           </div>
@@ -712,6 +1212,144 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
               <div className="mb-1 text-[11px] font-medium text-[var(--muted)]">计算公式</div>
               <div className="font-mono text-[13px] text-[var(--foreground)]">{quantityFormula}</div>
             </div>
+
+            {/* SKU 差异化配置：仅在非"仅同步指定 SKU + SKU 列表"模式下显示，避免用户在两处维护同一个 SKU 列表 */}
+            {!(form.skuMode === 'include' && form.skuBy === 'sku_list') && (
+            <div className="border-t border-[var(--border-subtle)] pt-5 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[13px] font-medium text-[var(--foreground)]">SKU 差异化配置</div>
+                  <div className="mt-0.5 text-[11px] text-[var(--muted)]">
+                    为特定 SKU 设置独立的同步比例或数量，覆盖上方整体设置；未列出的 SKU 仍遵循整体规则。
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={form.skuLevelOverrideEnabled}
+                  onClick={() => set('skuLevelOverrideEnabled', !form.skuLevelOverrideEnabled)}
+                  className={cn(
+                    'relative mt-0.5 inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]',
+                    form.skuLevelOverrideEnabled ? 'bg-[var(--primary)]' : 'bg-[var(--border)]'
+                  )}>
+                  <span className={cn(
+                    'pointer-events-none inline-block size-4 rounded-full bg-white shadow-sm transition-transform',
+                    form.skuLevelOverrideEnabled ? 'translate-x-4' : 'translate-x-0'
+                  )} />
+                </button>
+              </div>
+
+              {form.skuLevelOverrideEnabled && (
+                <div className="space-y-3">
+
+                  {/* SKU 搜索选择 */}
+                  <SkuPickerPanel
+                    alreadySelected={new Set(form.skuLevelConfigs.map((c) => c.skuCode))}
+                    onAdd={(codes) => set('skuLevelConfigs', [
+                      ...form.skuLevelConfigs,
+                      ...codes.map((skuCode) => ({ skuCode, overrideType: 'ratio' as const, value: '' })),
+                    ])}
+                    footerHint="未在下方列表中的 SKU 均遵循上方整体计算规则。"
+                  />
+
+                  {/* 已添加列表 */}
+                  {form.skuLevelConfigs.length > 0 && (
+                    <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]">
+
+                      {/* 工具栏 */}
+                      <div className="flex items-center gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2">
+                        <span className="flex-1 text-[11px] text-[var(--muted)]">
+                          已配置 <strong className="text-[var(--foreground)]">{form.skuLevelConfigs.filter((c) => c.skuCode.trim()).length}</strong> 个 SKU
+                          {skuOverrideSearch && filteredSkuOverrideConfigs.length !== form.skuLevelConfigs.length && (
+                            <span>，匹配 {filteredSkuOverrideConfigs.length} 个</span>
+                          )}
+                        </span>
+                        <div className="relative">
+                          <Search className="absolute left-2 top-1/2 size-3 -translate-y-1/2 text-[var(--muted)]" />
+                          <input
+                            type="text"
+                            value={skuOverrideSearch}
+                            onChange={(e) => setSkuOverrideSearch(e.target.value)}
+                            placeholder="搜索 SKU…"
+                            className="h-7 w-36 rounded-lg border border-[var(--border)] bg-[var(--surface)] pl-6 pr-2 text-[11px] outline-none focus:border-[var(--primary)]"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { set('skuLevelConfigs', []); setSkuOverrideSearch(''); }}
+                          className="text-[11px] text-[var(--muted)] hover:text-red-500">清空</button>
+                      </div>
+
+                      {/* 列标签 */}
+                      <div className="grid grid-cols-[minmax(0,2fr)_160px_120px_32px] gap-2 border-b border-[var(--border-subtle)] bg-[var(--surface)] px-3 py-1.5">
+                        <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">SKU 编码</span>
+                        <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">计算方式</span>
+                        <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">值</span>
+                        <span />
+                      </div>
+
+                      {/* 配置行 */}
+                      <div className="max-h-64 divide-y divide-[var(--border-subtle)] overflow-y-auto bg-[var(--surface)]">
+                        {filteredSkuOverrideConfigs.length > 0 ? (
+                          filteredSkuOverrideConfigs.map(({ cfg, originalIdx }) => (
+                            <div key={originalIdx} className="grid grid-cols-[minmax(0,2fr)_160px_120px_32px] items-center gap-2 px-3 py-1.5">
+                              <span className="min-w-0 truncate font-mono text-[12px] font-medium text-[var(--foreground)]">{cfg.skuCode}</span>
+                              <select
+                                value={cfg.overrideType}
+                                onChange={(e) => {
+                                  const next = [...form.skuLevelConfigs];
+                                  next[originalIdx] = { ...next[originalIdx], overrideType: e.target.value as SkuLevelConfig['overrideType'] };
+                                  set('skuLevelConfigs', next);
+                                }}
+                                className="h-8 rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2 text-[11px] outline-none focus:border-[var(--primary)]">
+                                <option value="ratio">同步比例（%）</option>
+                                <option value="fixed">固定数量（件）</option>
+                                <option value="deduct">扣减数量（件）</option>
+                              </select>
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  value={cfg.value}
+                                  onChange={(e) => {
+                                    const next = [...form.skuLevelConfigs];
+                                    next[originalIdx] = { ...next[originalIdx], value: e.target.value };
+                                    set('skuLevelConfigs', next);
+                                  }}
+                                  placeholder={cfg.overrideType === 'ratio' ? '80' : '50'}
+                                  className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2 pr-6 text-[11px] outline-none focus:border-[var(--primary)]"
+                                />
+                                {cfg.overrideType === 'ratio' && (
+                                  <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-[var(--muted)]">%</span>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => set('skuLevelConfigs', form.skuLevelConfigs.filter((_, idx) => idx !== originalIdx))}
+                                className="flex size-8 items-center justify-center rounded-lg text-[var(--muted)] transition-colors hover:text-red-500">
+                                <X className="size-3.5" />
+                              </button>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="px-3 py-4 text-center text-[11px] text-[var(--muted)]">
+                            {skuOverrideSearch ? `没有包含"${skuOverrideSearch}"的 SKU` : '暂无配置'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 汇总提示 */}
+                  {form.skuLevelConfigs.filter((c) => c.skuCode.trim()).length > 0 && (
+                    <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-[11px] text-blue-700">
+                      <Zap className="size-3 shrink-0" />
+                      已为 <strong>{form.skuLevelConfigs.filter((c) => c.skuCode.trim()).length}</strong> 个 SKU 配置差异化规则，其余 SKU 遵循整体计算设置。
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            )}{/* end !(include + sku_list) conditional */}
           </div>
         </Section>
 
@@ -743,16 +1381,18 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
             <div className="space-y-4">
               <div className="text-[13px] font-medium text-[var(--foreground)]">执行频率</div>
               <div className="flex flex-wrap gap-2">
-                <ChipButton active={form.frequency === 'daily'}    onClick={() => set('frequency', 'daily')}>每日定时</ChipButton>
-                <ChipButton active={form.frequency === 'interval'} onClick={() => set('frequency', 'interval')}>按时间间隔</ChipButton>
-                <ChipButton active={form.frequency === 'realtime'} onClick={() => set('frequency', 'realtime')}>实时触发</ChipButton>
-                <ChipButton active={form.frequency === 'pull'}     onClick={() => set('frequency', 'pull')}>拉取模式</ChipButton>
+                <ChipButton active={form.frequency === 'daily'}     onClick={() => set('frequency', 'daily')}>每日定时</ChipButton>
+                <ChipButton active={form.frequency === 'interval'}  onClick={() => set('frequency', 'interval')}>按时间间隔</ChipButton>
+                <ChipButton active={form.frequency === 'realtime'}  onClick={() => set('frequency', 'realtime')}>实时触发</ChipButton>
+                <ChipButton active={form.frequency === 'scheduled'} onClick={() => set('frequency', 'scheduled')}>指定日期时间</ChipButton>
+                <ChipButton active={form.frequency === 'pull'}      onClick={() => set('frequency', 'pull')}>拉取模式</ChipButton>
               </div>
               <div className="text-[11px] text-[var(--muted)]">
-                {form.frequency === 'daily'    && '每天在指定时刻执行同步，可设置多个时间点。'}
-                {form.frequency === 'interval' && '按固定时间间隔循环执行。'}
-                {form.frequency === 'realtime' && '库存发生特定变化时立即触发同步。'}
-                {form.frequency === 'pull'     && 'Retailer 主动拉取，系统不主动推送，无需配置推送地址。'}
+                {form.frequency === 'daily'     && '每天在指定时刻执行同步，可设置多个时间点。'}
+                {form.frequency === 'interval'  && '按固定时间间隔循环执行。'}
+                {form.frequency === 'realtime'  && '库存发生特定变化时立即触发同步。'}
+                {form.frequency === 'scheduled' && '在指定的一个或多个固定日期时刻各触发一次同步，适用于大促预热、节假日补货等不规律场景。'}
+                {form.frequency === 'pull'      && 'Retailer 主动拉取，系统不主动推送，无需配置推送地址。'}
               </div>
 
               {form.frequency === 'daily' && (
@@ -805,6 +1445,41 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
                         {ev}
                       </button>;
                     })}
+                  </div>
+                </Field>
+              )}
+
+              {form.frequency === 'scheduled' && (
+                <Field label="指定同步时间" hint="可添加多个时间点，系统将在每个指定时刻各触发一次同步。执行完毕后规则自动置为停用。">
+                  <div className="space-y-2">
+                    {form.scheduledDatetimes.map((dt, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <input
+                          type="datetime-local"
+                          value={dt}
+                          onChange={(e) => {
+                            const next = [...form.scheduledDatetimes];
+                            next[i] = e.target.value;
+                            set('scheduledDatetimes', next);
+                          }}
+                          className="h-10 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10"
+                        />
+                        {form.scheduledDatetimes.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => set('scheduledDatetimes', form.scheduledDatetimes.filter((_, idx) => idx !== i))}
+                            className="flex size-8 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--muted)] transition-colors hover:border-red-300 hover:text-red-500">
+                            <X className="size-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => set('scheduledDatetimes', [...form.scheduledDatetimes, ''])}
+                      className="flex h-8 items-center gap-1 rounded-lg border border-dashed border-[var(--border)] px-3 text-[12px] text-[var(--muted)] transition-colors hover:border-[var(--primary)]/50 hover:text-[var(--primary)]">
+                      + 添加时间点
+                    </button>
                   </div>
                 </Field>
               )}
@@ -863,6 +1538,15 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
             <button type="button" onClick={() => { set('status', 'draft'); handleSave(); }}
               className="flex h-9 items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 text-[13px] font-medium transition-colors hover:bg-[var(--surface-subtle)]">
               存为草稿
+            </button>
+            <button
+              type="button"
+              onClick={handleRunNow}
+              disabled={runningNow || !form.name.trim()}
+              title={!form.name.trim() ? '请先填写规则名称' : '立即执行一次同步，不受执行频率限制'}
+              className="flex h-9 items-center gap-1.5 rounded-xl border border-[var(--primary)] px-4 text-[13px] font-medium text-[var(--primary)] transition-colors hover:bg-[var(--primary-soft)] disabled:cursor-not-allowed disabled:opacity-50">
+              {runningNow ? <Loader2 className="size-3.5 animate-spin" /> : <Zap className="size-3.5" />}
+              {runningNow ? '执行中…' : '立即执行'}
             </button>
             <button type="button" onClick={handleSave} disabled={saving}
               className="flex h-9 items-center gap-1.5 rounded-xl bg-[var(--primary)] px-4 text-[13px] font-semibold text-[var(--primary-foreground)] shadow-[var(--shadow-soft)] transition hover:opacity-90 disabled:opacity-60">
