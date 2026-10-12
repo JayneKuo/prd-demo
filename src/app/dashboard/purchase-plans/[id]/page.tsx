@@ -844,7 +844,7 @@ export default function PurchasePlanDetailPage() {
                         <InfoRow label="审批人" value={plan.approver || '自动分配'} />
                         {plan.approveRemark && (
                           <div className="mt-2 rounded-lg bg-[var(--surface-subtle)] px-3 py-2.5 text-[12px] text-[var(--muted)] leading-relaxed border border-[var(--border-subtle)]">
-                            "{plan.approveRemark}"
+                            &quot;{plan.approveRemark}&quot;
                           </div>
                         )}
                       </div>

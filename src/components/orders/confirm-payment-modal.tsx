@@ -71,7 +71,7 @@ export function ConfirmPaymentModal({ detail, orderState, onConfirm, onClose }: 
             <div className="text-[12px] text-amber-700 space-y-1">
               <p className="font-semibold">确认后将执行：</p>
               <ul className="list-disc list-inside space-y-0.5">
-                <li>将支付状态标记为"已支付"</li>
+                <li>将支付状态标记为&quot;已支付&quot;</li>
                 <li>订单进入待处理队列，可生成履约单</li>
                 <li>如支付网关已授权，将自动触发扣款</li>
               </ul>

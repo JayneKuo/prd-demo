@@ -777,12 +777,12 @@ function BillEntryDrawer({ open, onClose }: { open: boolean; onClose: () => void
                     className={cn(inputCls, form.category === '运输费' ? 'font-mono' : '')} />
                   {form.category === '运输费' && (
                     <p className="mt-1 text-[10px] text-[var(--muted)]">
-                      可在"出库单"或"运输"模块中查找运单号
+                      可在&quot;出库单&quot;或&quot;运输&quot;模块中查找运单号
                     </p>
                   )}
                   {form.category === '仓储费' && (
                     <p className="mt-1 text-[10px] text-[var(--muted)]">
-                      可在"仓库/库位"模块查看对应仓库的服务合同
+                      可在&quot;仓库/库位&quot;模块查看对应仓库的服务合同
                     </p>
                   )}
                 </FieldRow>

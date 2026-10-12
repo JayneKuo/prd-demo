@@ -6,6 +6,7 @@ import { ArrowLeft, CheckCircle2, Circle, Clock3, CreditCard, ExternalLink, File
 import { StatusBadge } from '@/components/admin/status-badge';
 import { orders } from '@/lib/mock-data/orders';
 import { getOrderDetail, type OrderDetail, type FulfillmentPackage, type PackageUnit, type OrderEvent, type RefundRecord, type UpstreamChange } from '@/lib/mock-data/order-details';
+import { warehouses as warehouseList } from '@/lib/mock-data/warehouses';
 import { cn } from '@/lib/utils';
 import { OrderTimeline } from '@/components/dashboard/order-timeline';
 import { CreateFulfillmentModal, type CreateFulfillmentResult } from '@/components/orders/create-fulfillment-modal';
@@ -2449,8 +2450,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <div className="px-5 py-4">
               <label className="mb-1.5 block text-[12px] font-medium text-[var(--foreground)]">选择目标仓库 <span className="text-[var(--danger)]">*</span></label>
               {(() => {
-                const { warehouses: whs } = require('@/lib/mock-data/warehouses');
-                return (whs as { id: string; code: string; name: string; active: boolean }[]).filter((w) => w.active).map((wh) => (
+                return warehouseList.filter((w) => w.active).map((wh) => (
                   <button
                     key={wh.id}
                     onClick={() => setRerouteWarehouseId(wh.id)}
@@ -2473,8 +2473,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <button
                 disabled={!rerouteWarehouseId}
                 onClick={() => {
-                  const { warehouses: whs } = require('@/lib/mock-data/warehouses');
-                  const wh = (whs as { id: string; code: string }[]).find((w) => w.id === rerouteWarehouseId);
+                  const wh = warehouseList.find((w) => w.id === rerouteWarehouseId);
                   if (!wh) return;
                   dispatch({ type: 'REROUTE_FULFILLMENT', fulfillmentId: rerouteModal, newWarehouseCode: wh.code, newWarehouseId: wh.id });
                   setRerouteModal(null);
