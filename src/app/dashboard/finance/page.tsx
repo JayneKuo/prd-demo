@@ -1,10 +1,11 @@
 ﻿'use client';
 
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import Link from 'next/link';
 import {
   AlertTriangle, CheckCircle2, Clock,
   TrendingUp, TrendingDown, ChevronRight, X, Calendar,
+  BookOpen, ArrowRight, ChevronDown, ExternalLink, BookMarked,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -13,7 +14,15 @@ import {
   channelFinanceCards,
   arApSnapshot,
   financeAlerts,
+  financeFlowLanes,
+  actorMeta,
   type FinanceAlert,
+  type FlowLane,
+  type FlowStep,
+  type FeeItem,
+  type FinancialLine,
+  STEP_FINANCIALS,
+  LANE_ARROW_CONFIG,
 } from '@/lib/mock-data/finance-dashboard';
 
 // ─── utils ────────────────────────────────────────────────────────────────────
@@ -102,6 +111,7 @@ const DATE_RANGES: { key: DateRange; label: string }[] = [
 export default function FinanceDashboardPage() {
   const [dateRange, setDateRange] = useState<DateRange>('this-month');
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [flowOpen, setFlowOpen] = useState(false);
 
   const kpi        = financeDashboardKpi;
   const highAlerts = financeAlerts.filter(a => a.severity === 'high' && !dismissed.has(a.id));
@@ -122,8 +132,17 @@ export default function FinanceDashboardPage() {
         </div>
 
         {/* 日期范围选择器 */}
-        <div className="flex items-center gap-1 self-start rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 sm:self-auto">
-          <Calendar className="ml-1.5 size-3.5 shrink-0 text-[var(--muted)]" />
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <button
+            onClick={() => setFlowOpen(true)}
+            className="flex shrink-0 items-center gap-2 rounded-lg border border-[var(--primary)] bg-[var(--primary-soft)] px-3.5 py-2 text-[13px] font-semibold text-[var(--primary)] transition hover:bg-[var(--primary)] hover:text-white"
+          >
+            <BookOpen className="size-4" />
+            查看财务业务流程
+            <ArrowRight className="size-3.5" />
+          </button>
+          <div className="flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1">
+            <Calendar className="ml-1.5 size-3.5 shrink-0 text-[var(--muted)]" />
           {DATE_RANGES.map(r => (
             <button
               key={r.key}
@@ -138,6 +157,7 @@ export default function FinanceDashboardPage() {
               {r.label}
             </button>
           ))}
+          </div>
         </div>
       </div>
 
@@ -436,10 +456,12 @@ function AgingBar({ items }: {
           </div>
         ))}
       </div>
+
+      {/* ── 业务流程面板 ── */}
+      {flowOpen && <FinanceFlowPanel onClose={() => setFlowOpen(false)} />}
     </div>
   );
 }
-
 // ─── AR / AP Card ─────────────────────────────────────────────────────────────
 
 function ArApCard() {
@@ -745,5 +767,531 @@ function OtherAlertsSection({ alerts }: { alerts: FinanceAlert[] }) {
         ))}
       </div>
     </div>
+  );
+}
+
+// ─── Finance Flow Panel ───────────────────────────────────────────────────────
+// Tab 切换（O2C / P2P / R2R）+ 步骤网格 + 无滚动条 · US GAAP
+
+type LaneId = 'o2c' | 'p2p' | 'r2r';
+
+const LANE_TABS: { id: LaneId; label: string; labelEn: string; steps: number }[] = [
+  { id: 'o2c', label: '订单→收款',  labelEn: 'Order-to-Cash',    steps: 10 },
+  { id: 'p2p', label: '采购→付款',  labelEn: 'Procure-to-Pay',   steps: 6  },
+  { id: 'r2r', label: '记账→报告',  labelEn: 'Record-to-Report', steps: 6  },
+];
+
+const LANE_COLORS: Record<FlowLane['colorScheme'], {
+  tab: string; tabActive: string; border: string; hdrBg: string; hdrText: string;
+  seqBg: string; keyBorder: string; keyBg: string; tag: string;
+}> = {
+  blue: {
+    tab:       'text-blue-700 hover:bg-blue-50',
+    tabActive: 'bg-blue-600 text-white',
+    border:    'border-blue-400', hdrBg: 'bg-blue-50', hdrText: 'text-blue-800',
+    seqBg:     'bg-blue-500',    keyBorder: 'border-blue-300', keyBg: 'bg-blue-50/60',
+    tag:       'bg-blue-100 text-blue-700',
+  },
+  violet: {
+    tab:       'text-violet-700 hover:bg-violet-50',
+    tabActive: 'bg-violet-600 text-white',
+    border:    'border-violet-400', hdrBg: 'bg-violet-50', hdrText: 'text-violet-800',
+    seqBg:     'bg-violet-500',    keyBorder: 'border-violet-300', keyBg: 'bg-violet-50/60',
+    tag:       'bg-violet-100 text-violet-700',
+  },
+  emerald: {
+    tab:       'text-emerald-700 hover:bg-emerald-50',
+    tabActive: 'bg-emerald-600 text-white',
+    border:    'border-emerald-400', hdrBg: 'bg-emerald-50', hdrText: 'text-emerald-800',
+    seqBg:     'bg-emerald-500',    keyBorder: 'border-emerald-300', keyBg: 'bg-emerald-50/60',
+    tag:       'bg-emerald-100 text-emerald-700',
+  },
+};
+
+// ─── Finance Flow Panel ───────────────────────────────────────────────────────
+// 横向流程带箭头 · 点击步骤在行下方展开 · 2 列详情布局
+
+function FinanceFlowPanel({ onClose }: { onClose: () => void }) {
+  const [activeLaneId, setActiveLaneId] = useState<LaneId>('o2c');
+  const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
+
+  const lane     = financeFlowLanes.find(l => l.id === activeLaneId)!;
+  const c        = LANE_COLORS[lane.colorScheme];
+  const arrowCfg = LANE_ARROW_CONFIG[activeLaneId];
+
+  function switchLane(id: LaneId) {
+    setActiveLaneId(id);
+    setExpandedStepId(null);
+  }
+
+  function toggleStep(id: string) {
+    setExpandedStepId(prev => prev === id ? null : id);
+  }
+
+  const { rowSize, rowBreakIndex, arrows } = arrowCfg;
+
+  const rows: FlowStep[][] = [];
+  for (let i = 0; i < lane.steps.length; i += rowSize) {
+    rows.push(lane.steps.slice(i, i + rowSize));
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-white">
+
+      {/* ── 顶部固定栏 ── */}
+      <div className="shrink-0 border-b border-[var(--border)] bg-white px-6 py-3.5">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <BookMarked className="size-5 shrink-0 text-[var(--primary)]" />
+            <div>
+              <div className="text-[16px] font-bold text-[var(--foreground)]">
+                Finance Business Process Flow
+              </div>
+              <div className="text-[11px] text-[var(--muted)]">
+                OMS 财务业务流程 · US GAAP · ASC 606 · 点击步骤查看详情与资金明细
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--muted)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--foreground)]"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        {/* Tab 切换 */}
+        <div className="mt-3 flex items-center gap-1">
+          {LANE_TABS.map((tab) => {
+            const isActive = tab.id === activeLaneId;
+            const tabLane  = financeFlowLanes.find(l => l.id === tab.id)!;
+            const tc       = LANE_COLORS[tabLane.colorScheme];
+            return (
+              <button
+                key={tab.id}
+                onClick={() => switchLane(tab.id as LaneId)}
+                className={cn(
+                  'flex items-center gap-2 rounded-lg px-3.5 py-2 text-[13px] font-semibold transition-all',
+                  isActive ? tc.tabActive : tc.tab,
+                )}
+              >
+                <span className={cn(
+                  'flex size-5 items-center justify-center rounded-full text-[10px] font-bold',
+                  isActive ? 'bg-white/30 text-white' : 'bg-white text-[var(--muted)]',
+                )}>
+                  {tab.steps}
+                </span>
+                <span className="hidden sm:block">{tab.labelEn}</span>
+                <span className="text-[11px] opacity-80">{tab.label}</span>
+              </button>
+            );
+          })}
+          <div className="ml-auto hidden items-center gap-4 text-[10px] text-[var(--muted)] lg:flex">
+            <span className="flex items-center gap-1.5">
+              <span className="size-1.5 rounded-full bg-amber-400" />关键会计事件
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="size-1.5 rounded-full bg-emerald-400" />含资金明细
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 主体（隐藏滚动条）── */}
+      <div
+        className="flex-1 overflow-y-auto"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}
+      >
+        <div className="mx-auto max-w-[1440px] space-y-3 p-5">
+
+          {/* 泳道标题 */}
+          <div className={cn('rounded-xl border-l-[4px] px-4 py-3', c.border, c.hdrBg)}>
+            <div className="flex items-baseline gap-2">
+              <h3 className={cn('text-[14px] font-bold', c.hdrText)}>{lane.title}</h3>
+              <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', c.tag)}>
+                {lane.steps.length} 个步骤
+              </span>
+            </div>
+            <p className="mt-0.5 text-[11px] text-[var(--muted)]">{lane.subtitle}</p>
+          </div>
+
+          {/* 步骤行 + 展开区 */}
+          {rows.map((row, rowIdx) => {
+            const rowStart      = rowIdx * rowSize;
+            const expandedInRow = row.find(s => s.id === expandedStepId);
+
+            return (
+              <div key={rowIdx}>
+                {rowIdx > 0 && (
+                  <RowBreakConnector label={arrows[rowBreakIndex]} />
+                )}
+                <div className="flex items-stretch gap-0">
+                  {row.map((step, stepInRow) => {
+                    const globalIdx   = rowStart + stepInRow;
+                    const isLastInRow = stepInRow === row.length - 1;
+
+                    return (
+                      <Fragment key={step.id}>
+                        <StepFlowCard
+                          step={step}
+                          colors={c}
+                          isExpanded={step.id === expandedStepId}
+                          onClick={() => toggleStep(step.id)}
+                        />
+                        {!isLastInRow && (
+                          <ArrowConnector label={arrows[globalIdx]} />
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </div>
+                {expandedInRow && (
+                  <ExpandedStepDetail
+                    step={expandedInRow}
+                    onClose={() => toggleStep(expandedInRow.id)}
+                  />
+                )}
+              </div>
+            );
+          })}
+
+          {/* 参考资料 */}
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-4 py-2.5 text-[10px] text-[var(--muted)]">
+            <span className="font-semibold text-[var(--foreground)]">References · </span>
+            ASC 606 / IFRS 15 Revenue Recognition · ASC 330 Inventory (FIFO / WA) · US GAAP Accrual Basis · SOX Internal Controls · US Sales Tax Nexus
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Step Flow Card ───────────────────────────────────────────────────────────
+
+function StepFlowCard({
+  step, colors, isExpanded, onClick,
+}: {
+  step: FlowStep;
+  colors: (typeof LANE_COLORS)['blue'];
+  isExpanded: boolean;
+  onClick: () => void;
+}) {
+  const am           = actorMeta[step.actorType];
+  const hasFinancial = !!STEP_FINANCIALS[step.id];
+
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'flex flex-1 flex-col rounded-xl border p-3 text-left transition-all min-h-[88px]',
+        step.isKeyEvent
+          ? cn('border-t-4', colors.border, 'bg-white')
+          : 'border border-[var(--border)] bg-white',
+        isExpanded
+          ? cn('shadow-md ring-2 ring-[var(--primary)] ring-offset-1', colors.hdrBg)
+          : 'hover:border-[var(--primary)] hover:shadow-sm',
+      )}
+    >
+      <div className="mb-1.5 flex items-center justify-between">
+        <span className={cn(
+          'flex size-5 items-center justify-center rounded-full text-[9px] font-bold text-white',
+          colors.seqBg,
+        )}>
+          {step.seq}
+        </span>
+        <div className="flex items-center gap-1">
+          {step.isKeyEvent  && <span className="size-1.5 rounded-full bg-amber-400" title="关键会计事件" />}
+          {hasFinancial     && <span className="size-1.5 rounded-full bg-emerald-400" title="含资金明细" />}
+        </div>
+      </div>
+      <div className="flex-1 text-[11px] font-semibold leading-tight text-[var(--foreground)] line-clamp-2">
+        {step.titleCn}
+      </div>
+      <span className={cn('mt-1.5 block truncate rounded px-1 py-0.5 text-[9px] font-medium', am.bg, am.text)}>
+        {am.label}
+      </span>
+    </button>
+  );
+}
+
+// ─── Arrow Connector ──────────────────────────────────────────────────────────
+
+function ArrowConnector({ label }: { label: string }) {
+  return (
+    <div
+      className="flex w-12 shrink-0 flex-col items-center justify-center gap-0.5"
+      style={{ paddingTop: '18px' }}
+    >
+      <span
+        className="max-w-[44px] truncate text-center text-[8px] font-medium leading-tight text-[var(--muted)]"
+        title={label}
+      >
+        {label}
+      </span>
+      <div className="flex items-center">
+        <div className="h-px w-4 border-t border-dashed border-[var(--border)]" />
+        <ArrowRight className="size-3 shrink-0 text-[var(--muted)]" />
+      </div>
+    </div>
+  );
+}
+
+// ─── Row Break Connector ──────────────────────────────────────────────────────
+
+function RowBreakConnector({ label }: { label: string }) {
+  return (
+    <div className="my-1 flex justify-end pr-2">
+      <div className="flex flex-col items-end gap-0.5">
+        <span className="text-[9px] font-medium text-[var(--muted)]">{label}</span>
+        <div className="flex items-center gap-0.5">
+          <div className="h-3 w-px border-l border-dashed border-[var(--border)]" />
+          <ChevronDown className="size-2.5 text-[var(--muted)]" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Expanded Step Detail ─────────────────────────────────────────────────────
+
+function ExpandedStepDetail({ step, onClose }: { step: FlowStep; onClose: () => void }) {
+  const am               = actorMeta[step.actorType];
+  const [acctOpen, setAcctOpen] = useState(!!step.isKeyEvent);
+  const hasFees   = (step.fees?.length ?? 0) > 0;
+  const hasAcct   = !!(step.accountingNote || step.accountingNoteCn);
+  const hasIssues = (step.commonIssues?.length ?? 0) > 0;
+  const breakdown = STEP_FINANCIALS[step.id];
+
+  return (
+    <div className="mt-2 overflow-hidden rounded-xl border-2 border-[var(--primary)] bg-[var(--surface)] shadow-lg">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--surface-subtle)] px-5 py-3">
+        <div className="flex flex-wrap items-center gap-3 min-w-0">
+          <span className="text-[11px] text-[var(--muted)]">Step {step.seq}</span>
+          {step.isKeyEvent && (
+            <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+              <span className="size-1.5 rounded-full bg-amber-400" />关键财务事件
+            </span>
+          )}
+          <h4 className="text-[15px] font-bold text-[var(--foreground)]">{step.titleCn}</h4>
+          <span className="text-[11px] text-[var(--muted)]">{step.title}</span>
+          <span className={cn('rounded-md px-2 py-0.5 text-[11px] font-semibold', am.bg, am.text)}>
+            {step.actor}
+          </span>
+        </div>
+        <button
+          onClick={onClose}
+          className="flex size-7 shrink-0 items-center justify-center rounded-lg text-[var(--muted)] transition hover:bg-[var(--surface-hover)]"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+
+      <div className="grid gap-5 p-5 lg:grid-cols-[1fr_400px]">
+        {/* 左列 */}
+        <div className="space-y-4">
+          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-blue-600">💡 简单说</p>
+            <p className="text-[13px] font-medium leading-snug text-blue-900">{step.summary}</p>
+          </div>
+          <div>
+            <SectionLabel>发生了什么</SectionLabel>
+            <p className="whitespace-pre-line text-[13px] leading-relaxed text-[var(--foreground)]">
+              {step.whatHappens}
+            </p>
+          </div>
+          {breakdown && breakdown.length > 0 && (
+            <div>
+              <SectionLabel icon="💵">资金明细</SectionLabel>
+              <p className="mb-2 text-[10px] italic text-[var(--muted)]">
+                示例订单：商品 $80 − 优惠券 $5 + 运费 $10 + 税 $8 = 客户实付 $93 · 利润 $29（34.1%）
+              </p>
+              <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+                {breakdown.map((line, i) => (
+                  <FinancialLineRow key={i} line={line} isLast={i === breakdown.length - 1} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 右列 */}
+        <div className="space-y-4">
+          {hasFees && (
+            <div>
+              <SectionLabel icon="💰">本步骤可能产生的费用</SectionLabel>
+              <div className="space-y-2">
+                {step.fees!.map((fee) => <FeeCard key={fee.nameEn} fee={fee} />)}
+              </div>
+            </div>
+          )}
+          {hasAcct && (
+            <div>
+              <button
+                onClick={() => setAcctOpen(v => !v)}
+                className="flex w-full items-center justify-between py-0.5"
+              >
+                <SectionLabel icon="📊" className="mb-0">财务处理 / Accounting</SectionLabel>
+                <ChevronDown className={cn('size-4 text-[var(--muted)] transition-transform', acctOpen && 'rotate-180')} />
+              </button>
+              {acctOpen && (
+                <div className="mt-2 space-y-2.5">
+                  {step.accountingNoteCn && (
+                    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] px-4 py-3">
+                      <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--muted-foreground)]">
+                        会计分录说明（中文）
+                      </p>
+                      <p className="whitespace-pre-line text-[12px] leading-relaxed text-[var(--foreground)]">
+                        {step.accountingNoteCn}
+                      </p>
+                    </div>
+                  )}
+                  {step.accountingNote && (
+                    <div className="rounded-xl border border-[var(--border)] bg-[#0f172a] px-4 py-3">
+                      <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                        Journal Entry (Professional)
+                      </p>
+                      <pre className="whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-slate-200">
+                        {step.accountingNote}
+                      </pre>
+                    </div>
+                  )}
+                  {step.standardCn && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                      <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-amber-600">
+                        📖 会计准则参考
+                      </p>
+                      <p className="text-[12px] leading-relaxed text-amber-900">{step.standardCn}</p>
+                      {step.standard && (
+                        <p className="mt-1.5 font-mono text-[9px] leading-relaxed text-amber-700 opacity-80">
+                          {step.standard}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          {hasIssues && (
+            <div>
+              <SectionLabel icon="⚠️">注意事项 / 常见问题</SectionLabel>
+              <ul className="space-y-2">
+                {step.commonIssues!.map((issue, i) => (
+                  <li key={i} className="flex items-start gap-2 text-[12px] leading-snug text-[var(--foreground)]">
+                    <span className="mt-0.5 size-1.5 shrink-0 rounded-full bg-amber-400" />
+                    <span>{issue}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {step.moduleLink && (
+            <Link
+              href={step.moduleLink}
+              className="inline-flex items-center gap-2 rounded-lg border border-[var(--primary)] bg-[var(--primary-soft)] px-3.5 py-2 text-[12px] font-semibold text-[var(--primary)] transition hover:bg-[var(--primary)] hover:text-white"
+            >
+              <ExternalLink className="size-3.5" />
+              在 OMS 中查看此模块
+            </Link>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Financial Line Row ───────────────────────────────────────────────────────
+
+function FinancialLineRow({ line, isLast }: { line: FinancialLine; isLast: boolean }) {
+  if (line.type === 'note' && line.amount === '') {
+    return (
+      <div className="border-t border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-1.5">
+        <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--muted-foreground)]">
+          {line.label}
+        </span>
+      </div>
+    );
+  }
+
+  const amtCls =
+    line.type === 'inflow'   ? 'text-emerald-600 font-semibold'                  :
+    line.type === 'outflow'  ? 'text-rose-600 font-semibold'                     :
+    line.type === 'total'    ? 'text-[var(--foreground)] font-bold text-[13px]'  :
+    line.type === 'subtotal' ? 'text-[var(--foreground)] font-semibold'          :
+    'text-[var(--muted)]';
+
+  const rowBg =
+    line.type === 'total'    ? 'bg-[var(--surface-subtle)]'      :
+    line.type === 'subtotal' ? 'bg-[var(--surface-subtle)]/50'   : '';
+
+  return (
+    <div className={cn(
+      'flex items-start justify-between gap-3 px-3 py-2 text-[12px]',
+      !isLast && 'border-b border-[var(--border-subtle)]',
+      rowBg,
+      line.type === 'total' && 'border-t-2 border-[var(--border)]',
+    )}>
+      <div className="min-w-0 flex-1">
+        <span className={cn(
+          'leading-snug',
+          line.type === 'total'    ? 'font-bold text-[var(--foreground)]'                    :
+          line.type === 'subtotal' ? 'font-semibold text-[var(--foreground)]'                :
+          line.type === 'note'     ? 'text-[11px] italic text-[var(--muted-foreground)]'     :
+          'text-[var(--foreground)]',
+        )}>
+          {line.label}
+        </span>
+        {line.labelEn && line.type !== 'note' && (
+          <span className="ml-1.5 text-[10px] text-[var(--muted)]">{line.labelEn}</span>
+        )}
+        {line.note && (
+          <p className="mt-0.5 text-[10px] italic text-[var(--muted)]">{line.note}</p>
+        )}
+      </div>
+      <span className={cn('shrink-0 tabular-nums', amtCls)}>{line.amount}</span>
+    </div>
+  );
+}
+
+// ─── 费用卡片 ─────────────────────────────────────────────────────────────────
+
+function FeeCard({ fee }: { fee: FeeItem }) {
+  const payerConfig: Record<FeeItem['payer'], { label: string; cls: string }> = {
+    '商家':     { label: '商家承担', cls: 'bg-rose-50 text-rose-700 ring-rose-200' },
+    '平台代扣': { label: '平台代扣', cls: 'bg-orange-50 text-orange-700 ring-orange-200' },
+    '客户':     { label: '客户承担', cls: 'bg-sky-50 text-sky-700 ring-sky-200' },
+    '—':        { label: '无',       cls: 'bg-[var(--surface-subtle)] text-[var(--muted-foreground)] ring-[var(--border)]' },
+  };
+  const pc = payerConfig[fee.payer];
+  return (
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-[12px] font-semibold text-[var(--foreground)]">{fee.name}</div>
+          <div className="text-[10px] text-[var(--muted)]">{fee.nameEn}</div>
+        </div>
+        <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset', pc.cls)}>
+          {pc.label}
+        </span>
+      </div>
+      <p className="mt-1.5 text-[11px] leading-snug text-[var(--muted)]">{fee.description}</p>
+      <div className="mt-2 inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5">
+        <span className="text-[10px] text-[var(--muted)]">费率：</span>
+        <span className="font-mono text-[10px] font-semibold text-[var(--foreground)]">{fee.typical}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── 小工具 ───────────────────────────────────────────────────────────────────
+
+function SectionLabel({ icon, children, className }: {
+  icon?: string; children: React.ReactNode; className?: string;
+}) {
+  return (
+    <p className={cn('mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[var(--muted-foreground)]', className)}>
+      {icon && <span>{icon}</span>}
+      {children}
+    </p>
   );
 }
