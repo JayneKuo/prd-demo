@@ -254,6 +254,9 @@ export default function FinanceDashboardPage() {
 
       {/* ── 中/低优先级待处理 ── */}
       {otherAlerts.length > 0 && <OtherAlertsSection alerts={otherAlerts} />}
+
+      {/* ── 业务流程面板 ── */}
+      {flowOpen && <FinanceFlowPanel onClose={() => setFlowOpen(false)} />}
     </div>
   );
 }
@@ -456,9 +459,6 @@ function AgingBar({ items }: {
           </div>
         ))}
       </div>
-
-      {/* ── 业务流程面板 ── */}
-      {flowOpen && <FinanceFlowPanel onClose={() => setFlowOpen(false)} />}
     </div>
   );
 }
