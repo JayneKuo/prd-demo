@@ -335,10 +335,10 @@ export type FlowStep = {
 };
 
 export type FlowLane = {
-  id: 'o2c' | 'p2p' | 'r2r';
+  id: 'o2c' | 'p2p' | 'r2r' | 'b2b';
   title: string;
   subtitle: string;
-  colorScheme: 'blue' | 'violet' | 'emerald';
+  colorScheme: 'blue' | 'violet' | 'emerald' | 'amber';
   steps: FlowStep[];
 };
 
@@ -417,6 +417,7 @@ export const financeFlowLanes: FlowLane[] = [
           '退款处理时间 T+3~5 个工作日，客户往往期望立即到账',
           '多货币支付：记账时应按"交易日"汇率，而非"收款日"汇率',
         ],
+        moduleLink: '/dashboard/reconciliation',
         isKeyEvent: true,
       },
       {
@@ -520,6 +521,13 @@ export const financeFlowLanes: FlowLane[] = [
           '住宅附加费经常漏计入成本模型，导致每单利润虚高',
         ],
         moduleLink: '/dashboard/shipments',
+        accountingNote:
+          'When shipped (accrual):\nDr: Freight Expense (Accrued)  6200\nCr: Accrued Liabilities – Carrier\n\n' +
+          'When actual carrier invoice received:\nDr: Accrued Liabilities\nDr/Cr: Freight Expense (variance)\nCr: Accounts Payable',
+        accountingNoteCn:
+          '发货时做计提（账单还没到）：\n借：运费费用（计提）6200  → 当期费用确认\n贷：应计负债 — 承运商  → 暂记负债\n\n' +
+          '实际运单账单到达后调整：\n借：应计负债  → 清零之前的计提\n借/贷：运费差异  → 实际比预估多/少的部分\n贷：应付账款  → 确认真实债务\n\n' +
+          '注意：运费成本在出货时确认（配比原则），不是账单到达时确认。',
       },
       {
         id: 'o2c-6', seq: 6,
@@ -537,6 +545,15 @@ export const financeFlowLanes: FlowLane[] = [
             description: '首次配送失败重新安排时产生',
             typical: '$3.50–$10.00 / 次', payer: '商家' },
         ],
+        accountingNote:
+          'Signed Delivery (POD) triggers Revenue Recognition\n' +
+          'No separate journal entry at this step.\n' +
+          'See next step: o2c-7 Revenue Recognition.',
+        accountingNoteCn:
+          '签收事件触发收入确认（参见下一步"收入确认"）。\n' +
+          '本步骤本身不产生独立的会计分录——签收只是触发信号。\n\n' +
+          '例外：若发生退货，需在此时记录退货成本：\n' +
+          '借：退货损失 / 应计费用\n贷：应付账款（承运商退货运费）',
         commonIssues: [
           '"显示已送达"但买家称未收 → 需提供 GPS 送达截图作为 POD 证据',
           '物业代收包裹 → 签收时间与买家实际取件时间不同，影响退货窗口',
@@ -577,6 +594,7 @@ export const financeFlowLanes: FlowLane[] = [
           '月末截止（Cutoff）：月底最后几天发出的货必须在签收后才能算当月收入',
           '订阅类产品：按服务期均摊确认，而非一次性全额确认',
         ],
+        moduleLink: '/dashboard/finance',
         isKeyEvent: true,
       },
       {
@@ -625,6 +643,13 @@ export const financeFlowLanes: FlowLane[] = [
           '退款时序差异：退款在 A 周期发生，但平台扣款在 B 周期结算',
         ],
         moduleLink: '/dashboard/settlement',
+        accountingNote:
+          'When settlement report received:\nDr: Platform Settlement Receivable\nCr: Platform Receivable (Deferred)\n\n' +
+          'Platform fees recognized:\nDr: Platform Fees 6300\nCr: Platform Settlement Receivable',
+        accountingNoteCn:
+          '收到结算报告时：\n借：平台结算应收款  → 确认即将到账的金额\n贷：平台代收款（前期预收）  → 清除之前的平台代收\n\n' +
+          '平台费用同时确认：\n借：平台佣金费用 6300  → 佣金/FBA费/广告费入费用科目\n贷：平台结算应收款  → 从应收款中扣除\n\n' +
+          '结果：净结算金额 = 应收款余额，等待资金到账。',
         isKeyEvent: true,
       },
       {
@@ -656,6 +681,12 @@ export const financeFlowLanes: FlowLane[] = [
           '到账延迟 1~2 个工作日：不影响财务记账日期，但影响实际资金调度',
         ],
         moduleLink: '/dashboard/reconciliation',
+        accountingNote:
+          'Dr: Cash / Bank\nCr: Platform Settlement Receivable\n\nIf variance:\nDr/Cr: Foreign Exchange Gain/Loss (or Variance Account)',
+        accountingNoteCn:
+          '资金实际到账时：\n借：银行存款  → 现金增加，真实入账\n贷：平台结算应收款  → 之前登记的"等待到账"清零\n\n' +
+          '如有差异（如 $42.50 不符）：\n借/贷：汇兑损益（或对账差异科目）  → 记录差异，后续追查原因\n\n' +
+          '到账后，现金流量表"经营活动现金流入"科目更新。',
       },
       {
         id: 'o2c-10', seq: 10,
@@ -699,6 +730,7 @@ export const financeFlowLanes: FlowLane[] = [
           '科目映射错误 → OMS 费用类别与 NetSuite 科目编号不对应，造成串项',
           '汇率不一致 → OMS 和 ERP 使用不同来源的汇率，双系统余额出现轻微差异',
         ],
+        moduleLink: '/dashboard/reconciliation',
         isKeyEvent: true,
       },
     ],
@@ -712,7 +744,53 @@ export const financeFlowLanes: FlowLane[] = [
     colorScheme: 'violet',
     steps: [
       {
-        id: 'p2p-1', seq: 1,
+        id: 'p2p-0', seq: 1,
+        title: 'Vendor Master Setup',
+        titleCn: '供应商档案配置（Vendor Master）',
+        actor: 'Finance / OMS', actorType: 'finance',
+        summary: '在 OMS 中建立供应商档案——付款条款、费率合同、银行账号——P2P 全流程的数据基础',
+        whatHappens:
+          '所有 P2P 操作（收账单、核验、审批、付款）的参数都来自供应商档案。档案不完整，后续每一步都会出错。\n\n' +
+          '─── 供应商档案必填字段 ──────────────────────────────────\n' +
+          '基础信息：\n' +
+          '• 供应商名称 / 法人主体名\n' +
+          '• Tax ID / EIN（用于税务报告，如 1099-NEC）\n' +
+          '• 注册地址 / 账单地址\n\n' +
+          '付款配置（P2P 核心）：\n' +
+          '• 默认付款条款：Net 30 / Net 45 / Net 60 / 2-10 Net 30\n' +
+          '• 付款方式：ACH / Wire / 虚拟信用卡\n' +
+          '• 银行账号 + ACH Routing Number（Wire 付款必须）\n' +
+          '• 付款币种：USD / GBP / EUR\n\n' +
+          '费率合同（Rate Card）：\n' +
+          '• 各服务项目单价（拣货费 / 包装费 / 仓储费 / 运费区间等）\n' +
+          '• 合同有效期（到期提醒，防止按过期费率核验）\n' +
+          '• 附加费配置（燃油附加费 / 住宅附加费等，三方核验用）\n\n' +
+          '联系人：\n' +
+          '• 账单联系人邮箱（Invoice Submission）\n' +
+          '• 账单接收格式：PDF 邮件 / EDI 810 / 在线门户\n\n' +
+          '─── 档案变更管理 ────────────────────────────────────────\n' +
+          '费率变动 → 更新 Rate Card 并注明生效日期（影响三方核验的比价基准）\n' +
+          '账号变动 → 需双渠道验证（电话 + 书面），防止"银行账号欺诈"攻击\n' +
+          '条款变动 → 需合同附件支撑，财务审批后生效',
+        fees: [],
+        accountingNote:
+          'No journal entry — vendor master setup is a configuration step.\nAll payment terms and rate cards configured here drive downstream AP calculations.',
+        accountingNoteCn:
+          '供应商档案配置不产生会计分录，它是系统参数设置。\n\n' +
+          '但它直接决定：\n' +
+          '• 到期日计算（付款条款 → 逾期判定）\n' +
+          '• 三方核验基准（Rate Card → OMS 预估金额）\n' +
+          '• 付款指令（银行账号 → 转账路由）\n\n' +
+          '档案配置错误会导致：错误的到期日、核验比对失败、打款到错误账户。',
+        commonIssues: [
+          '费率合同过期未更新 → 三方核验基准错误，每期都会产生"假差异"',
+          '银行账号变更未双渠道验证 → 供应商欺诈高发场景，务必电话确认',
+          '付款条款未在档案中维护 → OMS 无法自动算到期日，需人工录入',
+        ],
+        moduleLink: '/dashboard/payables',
+      },
+      {
+        id: 'p2p-1', seq: 2,
         title: 'Vendor Invoice Received',
         titleCn: '收到供应商账单',
         actor: 'Vendor / 供应商', actorType: 'vendor',
@@ -720,17 +798,33 @@ export const financeFlowLanes: FlowLane[] = [
         whatHappens:
           '供应商（ShipBob、XPO、FedEx、UPS 等）按月或按结算周期发来服务账单。账单形式多样：PDF 邮件、在线 Portal 下载、EDI 电子账单。\n\n' +
           '财务人员将账单录入 OMS 的应付账款（AP）模块，系统自动识别供应商、费用类型和到期日，创建待处理应付记录。\n\n' +
-          '关键信息：账单金额、账单日期、付款到期日（Net 30/45/60）、费用明细。',
+          '关键信息：账单金额、账单日期、付款到期日（Net 30/45/60）、费用明细。\n\n' +
+          '─── 到期日计算规则 ───────────────────────────────────\n' +
+          '到期日 = 账单日 + 付款条款天数\n\n' +
+          '• 即期（Due on Receipt）→ 账单日当天\n' +
+          '• Net 14 → 账单日 + 14 天（ShipBob 小额账单常见）\n' +
+          '• Net 30 → 账单日 + 30 天（最常见，FedEx / UPS / 3PL）\n' +
+          '• Net 45 / 60 → 账单日 + 45 / 60 天（大额长期合同）\n' +
+          '• 2/10 Net 30 → 10 天内付款享 2% 折扣；否则 30 天内全额付\n\n' +
+          '注意：部分供应商从"收到账单日"起算，部分从"账单日期"起算，需以合同为准。\n' +
+          'OMS 在到期前 7 天自动发出预警提醒，到期前 3 天升级通知。',
         fees: [],
         commonIssues: [
           '账单格式各异（PDF / CSV / EDI）→ 手动录入耗时，建议接入 EDI 自动解析',
-          '账单到达比实际服务期滞后 15~45 天 → 需在月末"计提"估算应付',
+          '账单到达比实际服务期滞后 15~45 天 → 需在月末"计提"估算应付；注意此时到期日尚未明确，先用估算到期日',
           'ShipBob 账单项目繁多 → 需逐项核对（存储/拣货/入库/退货处理）',
+          '到期日争议：供应商从"账单日"算，商家从"收到日"算 → 合同应明确以哪一方日期为准',
         ],
         moduleLink: '/dashboard/payables',
+        accountingNote:
+          'Invoice received — pending verification, no entry yet.\n\nOnce 3-Way Match approved:\nDr: Expense Account (6100/6200/6300)\nCr: Accounts Payable',
+        accountingNoteCn:
+          '账单录入阶段：暂不做正式记账，只记录"待核验"状态。\n\n' +
+          '三方核验通过后才做正式分录：\n借：费用科目（仓储费 6100 / 运费 6200 / 平台费 6300）\n贷：应付账款\n\n' +
+          '如果月末账单还没到但服务已发生，需先"计提"（Accrual）：\n借：费用科目\n贷：应计负债\n账单到达且核验后再将应计负债转为应付账款。',
       },
       {
-        id: 'p2p-2', seq: 2,
+        id: 'p2p-2', seq: 3,
         title: '3-Way Match',
         titleCn: '三方核验（防多付的关键控制）',
         actor: 'OMS Finance', actorType: 'oms',
@@ -757,19 +851,33 @@ export const financeFlowLanes: FlowLane[] = [
         isKeyEvent: true,
       },
       {
-        id: 'p2p-3', seq: 3,
+        id: 'p2p-3', seq: 4,
         title: 'Cost Allocation',
         titleCn: '成本分摊到订单',
         actor: 'OMS Finance', actorType: 'finance',
         summary: '将仓储费 / 运费等分摊到每个订单，才能算清楚每单真正的利润',
         whatHappens:
-          '一笔 3PL 月度账单（如 ShipBob 9 月仓储费 $5,480）覆盖了本月所有订单。需要将这笔总费用"分"到每个订单，才能准确计算订单级利润。\n\n' +
-          '常见分摊方法（可在 OMS 中配置）：\n' +
-          '• 按订单数量平均分（最简单）\n' +
-          '• 按包裹重量比例分（适合运费）\n' +
-          '• 按商品体积比例分（适合仓储费）\n' +
-          '• 按月度时间比例分（适合固定月租）\n\n' +
-          '分摊完成后，OMS 的订单利润数据更新，支持渠道 / SKU / 客户维度的盈利分析。',
+          '一笔 3PL 月度账单（如 ShipBob 9 月账单 $5,715）覆盖了本月所有订单。需要将这笔总费用"分"到每个订单，才能准确计算订单级利润。\n\n' +
+          '─── 四种分摊公式（按费用类型选择）─────────────────────────\n\n' +
+          '① 平均分摊法（最简单，适合操作固定费）\n' +
+          '  单订单分摊 = 月度账单总额 ÷ 当月出库订单总数\n' +
+          '  示例：$5,715 ÷ 1,600 单 = $3.57 / 单\n\n' +
+          '② 重量比例法（适合运费，最贴近实际成本驱动）\n' +
+          '  单订单分摊 = 月度账单总额 × (该订单实际重量 ÷ 当月所有出库订单总重量)\n' +
+          '  示例：FedEx $18,620 × (0.9 kg ÷ 1,440 kg) = $11.64 / 单\n\n' +
+          '③ 体积 × 库龄法（适合仓储费，最精准但最复杂）\n' +
+          '  SKU 仓储分摊 = 月度仓储费 × (SKU 体积 × 在库天数 ÷ Σ 所有 SKU 体积 × 在库天数)\n' +
+          '  再按订单中该 SKU 的件数占比分摊到订单\n' +
+          '  示例：WE-PRO-BLK 体积 0.5CF × 30 天 ÷ 全仓 1,538 CF·天 × $2,600 = $25.36 → 再分到含该 SKU 的各订单\n\n' +
+          '④ 行数比例法（适合拣货费，每行耗时相近）\n' +
+          '  单订单分摊 = 月度拣货费 × (该订单商品行数 ÷ 当月所有订单商品行数之和)\n' +
+          '  示例：$425 拣货费 × (3 行 ÷ 4,280 行) = $0.30 / 单\n\n' +
+          '─── 组合分摊（推荐）─────────────────────────────────────────\n' +
+          '  拣货费     → 行数比例法\n' +
+          '  包装 / 操作费 → 平均分摊法（每单操作量近似）\n' +
+          '  运费       → 重量比例法\n' +
+          '  仓储费     → 体积 × 库龄法（或简化为体积比例法）\n\n' +
+          '分摊完成后，OMS 订单利润数据更新，支持渠道 / SKU / 客户维度的盈利分析。',
         fees: [],
         accountingNote:
           'Dr: Order-level COGS / Fulfillment Cost\nCr: Expense Accrual Clearing Account',
@@ -786,7 +894,7 @@ export const financeFlowLanes: FlowLane[] = [
         moduleLink: '/dashboard/expenses',
       },
       {
-        id: 'p2p-4', seq: 4,
+        id: 'p2p-4', seq: 5,
         title: 'Approval Workflow',
         titleCn: '付款审批流程',
         actor: 'Finance / 管理层', actorType: 'finance',
@@ -796,16 +904,39 @@ export const financeFlowLanes: FlowLane[] = [
           '• < $1,000：OMS 系统自动审批通过\n' +
           '• $1,000 – $10,000：财务经理（Finance Manager）审批\n' +
           '• > $10,000：财务总监（Controller / CFO）审批\n\n' +
-          '有争议的账单（差异未解决）进入"争议（Dispute）"流程，暂停付款，联系供应商确认后再重启审批。审批记录在 OMS 中留存完整日志，满足内控和审计要求。',
+          '有争议的账单（差异未解决）进入"争议（Dispute）"流程，暂停付款，联系供应商确认后再重启审批。审批记录在 OMS 中留存完整日志，满足内控和审计要求。\n\n' +
+          '─── 逾期判定逻辑 ────────────────────────────────────\n' +
+          '逾期触发条件：当前日期 > 到期日（Due Date） 且 余额未清（balanceDue > 0）\n\n' +
+          '  逾期天数 = max(0, 今日 − 到期日)\n' +
+          '  逾期金额 = 账单余额（balanceDue）\n\n' +
+          '逾期分级与处置：\n' +
+          '• 1–7 天：⚠️ 预警黄色 — 正常审批流程，附带提醒注释\n' +
+          '• 8–30 天：🟠 紧急橙色 — 自动升级财务经理，安排最近付款批次\n' +
+          '• 31 天以上：🔴 严重红色 — 升级 CFO，触发供应商关系评估；可能计收滞纳金\n\n' +
+          '滞纳金（Late Payment Penalty）：\n' +
+          '• 合同通常约定：账单余额 × 1.5% / 月（= 年化 18%）\n' +
+          '• 从到期日次日起计，按日折算：余额 × (1.5% ÷ 30) × 逾期天数\n' +
+          '• 示例：$8,420 逾期 15 天 → 滞纳金 = $8,420 × 1.5% ÷ 30 × 15 = $63.15\n\n' +
+          '早付款折扣（如 2/10 Net 30）：\n' +
+          '• 折扣窗口 = 账单日 + 10 天；超过窗口则折扣失效，按全额付\n' +
+          '• 年化收益率 ≈ 2% ÷ 20 天 × 365 天 ≈ 36.5%，通常值得优先付款',
         fees: [],
         commonIssues: [
           '审批人出差或假期 → 建议设置代理审批人（Backup Approver）机制',
           '争议账单长期挂起 → 影响供应商关系，应设置最长 10 个工作日的处理 SLA',
+          '逾期未支付导致供应商暂停服务（3PL 可能拒绝新入库单）→ 需在系统中设置逾期前 7 天强制预警',
+          '早付款折扣窗口（如 2/10）过期后无法补救 → OMS 应在折扣截止前 2 天推送提醒',
         ],
         moduleLink: '/dashboard/payables',
+        accountingNote:
+          'No journal entry at this step.\nApproval is a workflow control, not an accounting event.',
+        accountingNoteCn:
+          '审批流程本身不产生会计分录——它是内控流程，不是资金事件。\n\n' +
+          '只有在审批通过后，应付账款才正式入账（参见上一步三方核验的分录）。\n\n' +
+          '审批拒绝 → 账单进入"争议"状态，暂不入账，联系供应商处理后重新发起。',
       },
       {
-        id: 'p2p-5', seq: 5,
+        id: 'p2p-5', seq: 6,
         title: 'Payment Execution',
         titleCn: '执行付款',
         actor: 'Finance / Treasury', actorType: 'finance',
@@ -844,10 +975,11 @@ export const financeFlowLanes: FlowLane[] = [
           '国际付款汇率 → 应在付款当天锁定汇率，避免汇率波动风险',
           '重复付款风险 → 同一账单收到两份（邮件 + 邮寄），需系统去重控制',
         ],
+        moduleLink: '/dashboard/payables',
         isKeyEvent: true,
       },
       {
-        id: 'p2p-6', seq: 6,
+        id: 'p2p-6', seq: 7,
         title: 'GL Journal Entry & ERP Sync',
         titleCn: 'ERP 总账记账（应付清零）',
         actor: 'OMS → ERP (NetSuite/QB)', actorType: 'erp',
@@ -872,6 +1004,7 @@ export const financeFlowLanes: FlowLane[] = [
           '计提金额与实际账单差异 > 5% → 需检查成本模型准确性',
           'ERP 科目映射错误 → 费用被计入错误科目，影响管理报表分类',
         ],
+        moduleLink: '/dashboard/reconciliation',
       },
     ],
   },
@@ -902,6 +1035,14 @@ export const financeFlowLanes: FlowLane[] = [
           '3PL 账单延迟到达：服务已发生但账单未到，需按估算金额计提',
           '跨时区订单：不同时区的"月末最后一天"可能导致归期争议',
         ],
+        moduleLink: '/dashboard/reconciliation',
+        accountingNote:
+          'No journal entry — this is a completeness check procedure.\n' +
+          'Identify missing entries: unrecognized revenue, unaccrued expenses, unmatched settlements.',
+        accountingNoteCn:
+          '完整性检查本身不产生会计分录，它是关账流程的"质检环节"。\n\n' +
+          '检查目标：\n• 有没有已签收但未确认收入的订单？\n• 有没有服务已使用但未计提的费用？\n• 有没有已到账但未核销的结算款？\n\n' +
+          '发现漏项 → 立即补做对应分录，确保报表完整准确。',
       },
       {
         id: 'r2r-2', seq: 2,
@@ -922,6 +1063,12 @@ export const financeFlowLanes: FlowLane[] = [
           '退款时序：客户在 A 周期退货，平台在 B 周期才扣回退款',
         ],
         moduleLink: '/dashboard/reconciliation',
+        accountingNote:
+          'No new journal entry — reconciliation is a verification step.\n\nOn variance found:\nDr/Cr: Variance Account (temp)\nCr/Dr: Settlement Receivable\n→ Investigate and resolve within SLA.',
+        accountingNoteCn:
+          '对账本身不产生新的会计分录，是核查已有分录的准确性。\n\n' +
+          '发现差异时的处理：\n借/贷：差异暂挂科目  → 临时记录差异金额\n贷/借：渠道结算应收款  → 调整至实际金额\n\n' +
+          '差异原因查明后：消除暂挂科目，做正确的调整分录。\n常见：退款时序错位、广告费跨期、平台库存损耗赔偿等。',
         isKeyEvent: true,
       },
       {
@@ -943,6 +1090,12 @@ export const financeFlowLanes: FlowLane[] = [
           '汇率差异：英镑/欧元账单换算为美元时，OMS 和供应商使用不同汇率',
         ],
         moduleLink: '/dashboard/reconciliation',
+        accountingNote:
+          'No journal entry — this is a variance investigation step.\n\nWhen variance is confirmed and resolved:\nDr/Cr: Expense Account (6100/6200/6300)\nCr/Dr: Accrued Liabilities (adjust accrual to actual)',
+        accountingNoteCn:
+          '差异核查本身不产生分录，是确认"预估 vs 实际"差距的分析步骤。\n\n' +
+          '差异确认并解决后，做调整分录：\n借/贷：费用科目（仓储 6100 / 运费 6200 / 平台费 6300）\n贷/借：应计负债  → 将月初计提调整到实际金额\n\n' +
+          '核心目的：确保当期费用精确反映实际发生额，而非估算值。',
       },
       {
         id: 'r2r-4', seq: 4,
@@ -992,6 +1145,13 @@ export const financeFlowLanes: FlowLane[] = [
           '锁定后发现数据错误 → 需走审批才能解锁或补做调整分录',
         ],
         moduleLink: '/dashboard/reconciliation',
+        accountingNote:
+          'No new journal entry — Period Lock is an internal control procedure.\n\nAll entries from O2C + P2P are pushed to ERP GL.\nTrial Balance verified: Total Debits = Total Credits.',
+        accountingNoteCn:
+          '期间锁定不产生新的会计分录，它是对所有已做分录的"封存"操作。\n\n' +
+          '锁定前确认：试算平衡表借贷双方相等（Total Dr = Total Cr）。\n\n' +
+          '锁定后：该月所有科目余额固定，任何修改都需审批并留审计轨迹。\n' +
+          '这是 SOX 404 内控合规的强制要求——防止历史数据被篡改。',
         isKeyEvent: true,
       },
       {
@@ -1017,6 +1177,314 @@ export const financeFlowLanes: FlowLane[] = [
           'P&L 与 OMS 利润数字不一致：常因科目分类差异，需做差异说明',
         ],
         moduleLink: '/dashboard/reports/finance',
+        accountingNote:
+          'No journal entry — financial reports are outputs, not inputs.\n\nReports generated from accumulated GL balances:\nP&L, Balance Sheet, Cash Flow Statement.',
+        accountingNoteCn:
+          '财务报表输出不产生新的会计分录——报表是对所有已入账数据的"汇总展示"。\n\n' +
+          '三大报表来源：\n• 损益表（P&L）：收入 − 成本 − 费用 = 净利润\n• 资产负债表：资产 = 负债 + 所有者权益（某时点快照）\n• 现金流量表：经营/投资/融资活动的实际现金流\n\n' +
+          '特别注意：损益表的"利润"和现金流量表的"现金流"可以差异很大（权责发生制原因）。',
+        isKeyEvent: true,
+      },
+    ],
+  },
+
+  // ═══ B2B O2C — 企业客户应收全流程 ═══════════════════════════════════════
+  {
+    id: 'b2b',
+    title: 'B2B Order-to-Cash (B2B O2C)',
+    subtitle: '企业客户先发货后开票 · PO 驱动 · AR 账龄追踪 · 收款核销',
+    colorScheme: 'amber',
+    steps: [
+      {
+        id: 'b2b-0', seq: 1,
+        title: 'Customer Master Setup',
+        titleCn: 'B2B 客户档案配置（Customer Master）',
+        actor: 'Finance / Sales', actorType: 'finance',
+        summary: '建立 B2B 客户档案——授信额度、账期、开票信息——信用审核和开票流程的数据基础',
+        whatHappens:
+          '每个 B2B 客户在 OMS 中必须有完整档案，信用审核和开票才能自动化运转。\n\n' +
+          '─── 客户档案必填字段 ──────────────────────────────────────\n' +
+          '基础信息：\n' +
+          '• 公司法人名称（与发票抬头完全一致）\n' +
+          '• Tax ID / EIN（发票必须印上，否则客户 AP 无法过税务审核）\n' +
+          '• 开票地址（Bill-to Address）\n' +
+          '• 收货地址（Ship-to Address，可多个）\n\n' +
+          '授信与账期配置（信用审核的数据来源）：\n' +
+          '• 授信额度（Credit Limit）：单位 USD，超出则触发人工审批\n' +
+          '• 付款条款：Net 30 / Net 45 / Net 60 / Net 90\n' +
+          '• 信用评级：A（优质）/ B（一般）/ C（需关注）/ 预付款\n' +
+          '• 历史 DSO 参考值（辅助评级判断）\n\n' +
+          '开票配置（开票流程的数据来源）：\n' +
+          '• 开票方式：邮件 PDF / EDI 810 / 供应商门户上传\n' +
+          '• AR 联系人邮箱（AP 部门专用，不能是采购联系人）\n' +
+          '• Tax Exempt 状态 + 免税证书（Resale Certificate）有效期\n' +
+          '• 发票账期起算规则：收到日 / 认可日（大客户常见）\n\n' +
+          '付款配置：\n' +
+          '• 付款方式：Wire / ACH / 支票\n' +
+          '• 银行收款账户（我方收款账号，打印在发票上）\n\n' +
+          '─── 档案变更管理 ─────────────────────────────────────────\n' +
+          '授信额度调整 → 需财务经理审批并注明调整原因和有效期\n' +
+          '免税证书过期 → 系统预警，续签前开票须按默认税率处理\n' +
+          'AR 联系人变更 → 立即更新，否则发票会打进"黑洞"',
+        fees: [],
+        accountingNote:
+          'No journal entry — customer master setup is a configuration step.\nCredit limit and payment terms configured here control AR exposure and invoice terms.',
+        accountingNoteCn:
+          '客户档案配置不产生会计分录，但它直接决定：\n\n' +
+          '• 信用审核能否自动通过（授信额度）\n' +
+          '• 发票的到期日（账期天数）\n' +
+          '• AR 逾期判定（到期日 + 今日对比）\n' +
+          '• 发票税务处理（免税 or 含税）\n\n' +
+          '档案配置错误的后果：\n' +
+          '账期设错 → 提前催款影响客户关系；免税状态过期 → 漏收税款产生税务风险。',
+        commonIssues: [
+          '开票抬头与客户实际公司名不一致 → 客户 AP 拒付，需开 Credit Memo 重新开票',
+          '免税证书过期未续签 → 开出发票无税，但法律上应收税，产生税务敞口',
+          'AR 联系人邮箱未更新 → 发票发到错误邮箱，账期白白流失',
+          '授信额度长期不复审 → 老客户经营状况恶化但额度未降，坏账风险累积',
+        ],
+        moduleLink: '/dashboard/receivables',
+      },
+      {
+        id: 'b2b-1', seq: 2,
+        title: 'B2B PO Received',
+        titleCn: 'B2B 下单（接收采购订单）',
+        actor: 'Sales Channel / 渠道', actorType: 'channel',
+        summary: '企业客户发来采购订单（PO），OMS 创建 B2B 订单，库存预锁，等待信用审核',
+        whatHappens:
+          'B2B 订单通常通过以下方式进入 OMS：\n\n' +
+          '• EDI 850（电子采购订单，大型零售商如 Walmart、Target 必用）\n' +
+          '• 邮件 / 传真 PO → 人工录入\n' +
+          '• 商家自建 B2B 门户（客户登录后直接下单）\n' +
+          '• API 对接（ERP 到 ERP）\n\n' +
+          'B2B 订单与 B2C 的关键区别：\n' +
+          '• 无需立即支付——先发货，后根据账期收款\n' +
+          '• 必须携带客户 PO 号（客户 AP 核销时必须对应 PO）\n' +
+          '• 通常数量大、SKU 种类多，需要行项目明细\n' +
+          '• 订单金额较大 → 必须先做信用审核，再安排发货',
+        fees: [],
+        commonIssues: [
+          'EDI 850 字段映射错误 → PO 号、数量、单位不一致，需人工核对',
+          '客户 PO 号未录入 OMS → 开票后客户 AP 无法核销，导致付款延迟',
+          'B2B 订单误按 B2C 流程处理 → 触发预付款要求，客户体验差',
+        ],
+        moduleLink: '/dashboard/orders',
+      },
+      {
+        id: 'b2b-2', seq: 3,
+        title: 'Credit Check & Terms',
+        titleCn: '信用审核（授信 & 账期设定）',
+        actor: 'Finance / OMS', actorType: 'finance',
+        summary: '查信用额度、设定账期（Net 30/45/60）——决定能不能先发货、发多少',
+        whatHappens:
+          '信用审核是 B2B O2C 的"门卫"，防止坏账风险：\n\n' +
+          '① 信用额度检查（Credit Limit Check）\n' +
+          '   本次 PO 金额 + 当前未付应收 ≤ 客户授信额度 → 通过\n' +
+          '   超出额度 → 需财务审批或要求预付款\n\n' +
+          '② 账期设定（Payment Terms Assignment）\n' +
+          '   新客户：通常 Net 30，或要求首单预付\n' +
+          '   老客户（信用良好）：Net 45 / Net 60\n' +
+          '   优质客户（如 Walmart）：Net 60 / Net 90\n\n' +
+          '③ 信用评分参考维度\n' +
+          '   • 历史付款记录（DSO 是否稳定）\n' +
+          '   • 当前逾期金额\n' +
+          '   • 年度采购量\n' +
+          '   • 是否有担保 / 信用保险\n\n' +
+          '审核通过 → OMS 自动设定该订单账期，进入发货流程\n' +
+          '审核拒绝 → 订单挂起，联系客户协商付款方式',
+        fees: [],
+        accountingNote:
+          'No journal entry at credit check.\nOrder placed on hold pending credit approval.',
+        accountingNoteCn:
+          '信用审核本身不产生会计分录，它是业务控制节点。\n\n' +
+          '通过审核后，在 OMS 中记录：\n' +
+          '• 客户授信额度（Credit Limit）\n' +
+          '• 本订单账期（Payment Terms）\n' +
+          '• 预计应收到期日 = 发票日 + 账期天数\n\n' +
+          '这些参数在后续开票和 AR 追踪中自动使用。',
+        commonIssues: [
+          '信用额度不更新 → 老客户采购量增加但额度未同步调高，频繁触发人工审批',
+          '新客户首单 → 建议设置"首单预付 50%，余款 Net 30"的过渡策略',
+          '季节性大单（Q4）→ 临时提额需 CFO 审批并记录有效期',
+        ],
+        isKeyEvent: true,
+      },
+      {
+        id: 'b2b-3', seq: 4,
+        title: 'Ship + Invoice Generation',
+        titleCn: '发货 + 开具销售发票（AR Invoice）',
+        actor: 'WMS + Finance / OMS', actorType: 'finance',
+        summary: '货物出库的同时生成正式销售发票，这是应收账款正式成立的时刻',
+        whatHappens:
+          'B2B 发货与开票是同步触发的：货物出库 → 系统自动生成 AR Invoice。\n\n' +
+          '─── 开票维度选择 ───────────────────────────────────────\n' +
+          '• 一单一票（Order-level）：每张 PO 对应一张发票，适合大单、首次合作\n' +
+          '• 客户周期合并（Customer-level）：本月所有订单合并一张，减少对方 AP 处理量\n' +
+          '• 分批发货分批开票（Partial）：按实际发货量开票，未发部分不计应收\n\n' +
+          '─── 发票必含字段 ───────────────────────────────────────\n' +
+          '• 发票抬头：客户公司名、地址、Tax ID / EIN\n' +
+          '• 行项目明细：每个 SKU 的描述、数量、单价、小计（B2B 必须，客户 AP 需逐行核对 PO）\n' +
+          '• 付款条款：Net 30（印在发票上）\n' +
+          '• 到期日：Invoice Date + 30 天（明确标注）\n' +
+          '• 关联 PO 号：客户的采购订单号（核销必须）\n' +
+          '• 付款说明：银行账号、ACH Routing Number、支票抬头\n' +
+          '• 税务处理：B2B 通常 Tax Exempt（凭客户免税证书），或含税（需分开列示）',
+        fees: [],
+        accountingNote:
+          'Dr: Accounts Receivable (AR)  1200\nCr: Revenue (recognized)  4000\nCr: Sales Tax Payable (if applicable)  2200\n\n' +
+          'Simultaneously:\nDr: COGS  5000\nCr: Inventory  1300',
+        accountingNoteCn:
+          '发货+开票时同时发生两笔分录：\n\n' +
+          '① 确认应收和收入：\n借：应收账款（AR）1200  → 客户欠我们的钱\n贷：销售收入 4000  → 收入正式确认（货已交付）\n\n' +
+          '② 结转库存成本：\n借：销货成本（COGS）5000\n贷：库存资产 1300  → 库存减少\n\n' +
+          '注意：B2B 收入在发货/交付时确认（ASC 606），不等收到现金。',
+        standard: 'ASC 606 — Revenue recognized at point of control transfer (delivery). AR recorded at invoice amount.',
+        standardCn:
+          'B2B 收入确认：控制权（Control）转移给客户时确认收入。通常为"货物交付给承运商"或"客户签收"时点，以合同约定为准（FOB Shipping Point vs. FOB Destination）。\n\n' +
+          'FOB Shipping Point：货物交给承运商即确认收入（出库即开票）\n' +
+          'FOB Destination：货物到达客户仓库才确认收入（签收后开票）',
+        commonIssues: [
+          '发票抬头与客户注册信息不符 → 客户 AP 拒付，需重新开票（Credit Memo + 新发票）',
+          '分批发货漏开发票 → 已发货但未入账应收，导致 AR 余额偏低',
+          '行项目明细与客户 PO 数量不一致 → 触发客户三方核验失败，付款延迟',
+        ],
+        moduleLink: '/dashboard/orders',
+        isKeyEvent: true,
+      },
+      {
+        id: 'b2b-4', seq: 5,
+        title: 'Invoice Delivery',
+        titleCn: '发票交付',
+        actor: 'Finance / OMS', actorType: 'finance',
+        summary: '把发票发给客户财务——方式要对，否则客户收不到就不会付款',
+        whatHappens:
+          '发票生成后必须及时送达客户 AP 部门，常用方式：\n\n' +
+          '• 邮件 PDF（最常见）：发至客户 AP 专用邮箱（ap@company.com）\n' +
+          '• EDI 810（电子发票）：大型零售商强制要求，格式标准化，自动进入客户 ERP\n' +
+          '• 客户门户上传：部分企业客户要求在其 Supplier Portal 上传\n' +
+          '• 邮寄纸质发票（极少，仅部分传统行业）\n\n' +
+          '─── 关键注意点 ─────────────────────────────────────────\n' +
+          '• 确认客户 AP 联系人邮箱（不能发给采购，采购不处理付款）\n' +
+          '• 发票编号唯一（Invoice #）：方便客户系统录入和核销\n' +
+          '• 保留发送记录（时间戳）：逾期追款时可证明"发票已送达"\n' +
+          '• 大客户通常要求在 ERP 中"认可"发票后才开始计账期——需确认客户从哪天开始算 Net 30',
+        fees: [],
+        accountingNote:
+          'No new journal entry — invoice delivery is an operational step.\nAR was already recorded when invoice was generated.',
+        accountingNoteCn:
+          '发票交付不产生新的会计分录——应收账款在开票时已入账。\n\n' +
+          '此步骤的财务意义：\n• 启动客户账期计时（账期从发票送达或认可日开始）\n• 留存发送凭据（用于后续催款和纠纷处理）\n• 触发 OMS 的 AR 账龄追踪模块开始计时',
+        commonIssues: [
+          '发票发送至错误邮箱（采购而非 AP）→ 客户 AP 没有收到，到期后才发现',
+          '大客户"发票认可日"比收到日晚 7~10 天 → 实际账期从认可日计，需在 OMS 中记录',
+          'EDI 810 格式错误 → 客户 ERP 拒收，发票未入对方系统，账期未启动',
+        ],
+      },
+      {
+        id: 'b2b-5', seq: 6,
+        title: 'AR Aging & Collections',
+        titleCn: 'AR 账龄管理（逾期追踪）',
+        actor: 'Finance / OMS', actorType: 'finance',
+        summary: '追踪每张发票到期状态，分级催款——DSO 是 B2B 应收健康度的核心指标',
+        whatHappens:
+          'AR 账龄管理是 B2B 应收的日常工作核心：\n\n' +
+          '─── 逾期判定公式 ───────────────────────────────────────\n' +
+          '  应收到期日 = 发票日 + 账期天数（如 +30）\n' +
+          '  逾期天数   = max(0, 今日 − 应收到期日)\n' +
+          '  逾期金额   = 未收余额（Outstanding Balance）\n\n' +
+          '─── 账龄分级与催款动作 ─────────────────────────────────\n' +
+          '  到期前 7 天    → 系统自动发付款提醒邮件\n' +
+          '  逾期 1–15 天   → 系统自动发逾期通知（附发票 PDF）\n' +
+          '  逾期 16–30 天  → 销售 / 客户经理电话跟进\n' +
+          '  逾期 31–60 天  → 财务介入，暂停新订单，可收取滞纳金（1.5%/月）\n' +
+          '  逾期 60 天以上 → 法务 / 催收，计提坏账准备\n\n' +
+          '─── DSO（Days Sales Outstanding）────────────────────────\n' +
+          '  DSO = (期末应收账款余额 ÷ 当期收入) × 统计天数\n' +
+          '  示例：应收余额 $120,000 ÷ 月收入 $280,000 × 30 天 = 12.9 天\n' +
+          '  DSO ≤ 账期天数 → 健康；DSO > 账期天数 → 存在系统性逾期',
+        fees: [],
+        accountingNote:
+          'If overdue > 60 days, consider Bad Debt Allowance:\nDr: Bad Debt Expense\nCr: Allowance for Doubtful Accounts (contra-AR)\n\nDo NOT write off AR until confirmed uncollectible.',
+        accountingNoteCn:
+          '逾期超 60 天时，按谨慎性原则计提坏账准备：\n借：坏账费用\n贷：坏账准备（AR 备抵科目）\n\n' +
+          '注意：计提坏账准备 ≠ 核销 AR。只有确认完全无法收回时，才做核销：\n借：坏账准备\n贷：应收账款\n\n' +
+          '坏账准备计提方法：\n• 账龄分析法（最常见）：逾期 0–30 天计提 2%，31–60 天 10%，60 天以上 50%\n• 余额百分比法：期末 AR 余额 × 历史坏账率',
+        standard: 'ASC 310 — Receivables measured at net realizable value. Allowance method required for expected credit losses.',
+        standardCn: 'ASC 310 + ASC 326（CECL）：应收账款按净可变现价值列报。美国 GAAP 要求采用"预期信用损失（CECL）"模型，在账款逾期前就需要估计并计提潜在坏账，而非等到实际发生后才确认。',
+        commonIssues: [
+          'DSO 持续高于账期 → 需检查是否存在系统性延迟付款客户，考虑调整账期或要求预付',
+          '催款邮件发给采购而非 AP → 客户 AP 不知情，继续延迟',
+          '未及时暂停逾期客户的新订单 → 坏账风险叠加增加',
+        ],
+        moduleLink: '/dashboard/receivables',
+        isKeyEvent: true,
+      },
+      {
+        id: 'b2b-6', seq: 7,
+        title: 'Payment Receipt & Application',
+        titleCn: '收款核销（Payment Application）',
+        actor: 'Finance / OMS', actorType: 'finance',
+        summary: '客户付款到账后，把这笔钱"对应"到具体发票——AR 余额清零',
+        whatHappens:
+          '客户付款到账（Wire / ACH / 支票）后，财务需做"收款核销（Payment Application）"：\n\n' +
+          '① 识别来款：银行流水中找到客户付款，确认金额和付款方\n' +
+          '② 核销匹配：将付款金额对应到具体发票号（Invoice #）\n' +
+          '   • 全额匹配：付款 = 发票金额 → 直接核销，AR 清零\n' +
+          '   • 部分付款：付款 < 发票金额 → AR 余额保留差额，继续追收\n' +
+          '   • 超额付款：付款 > 发票金额 → 差额计入预收款（客户信用）\n' +
+          '   • 扣款付款：客户自行扣除折扣 / 索赔 → 需确认是否批准\n\n' +
+          '─── 客户扣款（Deduction）处理 ──────────────────────────\n' +
+          '  大型零售商（Walmart、Amazon Vendor）经常自行扣除：\n' +
+          '  • 早付款折扣（如 2/10 已过期但客户仍扣）\n' +
+          '  • 物流索赔（货物损坏、短装）\n' +
+          '  • 合规罚款（标签错误、迟发货等）\n' +
+          '  处理：批准扣款则做收入调整；不批准则发 Debit Note 追收差额',
+        fees: [],
+        accountingNote:
+          'Dr: Cash / Bank  1000\nCr: Accounts Receivable  1200\n\nFor early payment discount taken:\nDr: Cash (net amount received)\nDr: Sales Discount  4100\nCr: Accounts Receivable (full invoice amount)',
+        accountingNoteCn:
+          '收款核销分录：\n借：银行存款  → 现金实际收到\n贷：应收账款  → AR 余额减少，对应发票核销\n\n' +
+          '如客户享有早付款折扣（2/10 Net 30，在 10 天内付款）：\n借：银行存款（实收金额，如 $9,800）\n借：销售折扣 4100（折扣金额，如 $200）\n贷：应收账款（发票全额，如 $10,000）\n\n' +
+          '销售折扣计入收入抵减科目，不影响 COGS。',
+        commonIssues: [
+          '客户付款没有注明发票号 → 来款识别困难，需人工对账（常见于支票付款）',
+          '一笔付款跨多张发票 → 需按金额逐一核销，系统需支持多对多匹配',
+          '客户未经批准自行扣款 → 需发 Deduction Dispute Letter，记录并追收',
+        ],
+        moduleLink: '/dashboard/receivables',
+      },
+      {
+        id: 'b2b-7', seq: 8,
+        title: 'GL Journal & AR Close',
+        titleCn: 'ERP 总账记账（AR 清零）',
+        actor: 'OMS → ERP (NetSuite/QB)', actorType: 'erp',
+        summary: '应收账款核销同步 ERP，AR Aging Report 更新，月结完成',
+        whatHappens:
+          'B2B O2C 最后一步：将应收账款核销结果同步至 ERP 总账，完成关账。\n\n' +
+          '① AR 科目更新：应收账款余额减少（已全额收款的发票清零）\n' +
+          '② 现金科目增加：银行存款增加实收金额\n' +
+          '③ AR Aging Report 刷新：该客户该发票从账龄报告中消失\n' +
+          '④ DSO 重新计算：收款完成后整体 DSO 改善\n\n' +
+          '如有坏账核销：\n' +
+          '• 应收账款余额减少\n' +
+          '• 坏账准备（备抵科目）同步减少\n' +
+          '• 不影响当期损益（坏账费用已在计提时确认）\n\n' +
+          '月末，OMS 将本期 B2B AR 汇总分录推送至 ERP 总账，完成月结。\n' +
+          '资产负债表 AR 科目 = 期末未收款发票总额 − 坏账准备 = 净可变现价值',
+        fees: [],
+        accountingNote:
+          'Monthly AR Summary to ERP:\nDr: Cash (collections)\nCr: AR (invoices collected)\n\nBad Debt Write-off (confirmed uncollectible):\nDr: Allowance for Doubtful Accounts\nCr: Accounts Receivable',
+        accountingNoteCn:
+          '月末 AR 汇总推送 ERP：\n• 期末应收账款余额（含所有未收发票）\n• 本期新增 AR（本月开具发票）\n• 本期核销 AR（本月收到付款）\n• 坏账准备余额变动\n\n' +
+          '资产负债表 AR 科目 = 期末未收款发票总额 − 坏账准备\n（净可变现价值，Net Realizable Value）',
+        standard: 'ASC 310 — Receivables. Net realizable value presentation on Balance Sheet.',
+        standardCn: 'ASC 310 应收账款准则：资产负债表上的应收账款应以"净可变现价值"列示 = 应收账款总额 − 坏账准备。坏账准备反映管理层对无法收回款项的最佳估计。',
+        commonIssues: [
+          'AR 余额与银行对账单不符 → 通常是核销操作未同步至 ERP',
+          '坏账准备计提不足 → 损益表利润虚高，监管要求充分披露信用风险',
+          '跨期收款：上月开票本月收款 → 收入在开票月确认，收款只影响现金流量表',
+        ],
+        moduleLink: '/dashboard/receivables',
         isKeyEvent: true,
       },
     ],
@@ -1172,6 +1640,11 @@ export const STEP_FINANCIALS: Record<string, FinancialLine[]> = {
     { label: '账单合计',                  labelEn: 'Invoice Total',              amount: '$5,715', type: 'subtotal' },
     { label: 'OMS 预估金额',              labelEn: 'OMS Estimate',               amount: '$5,418', type: 'inflow',  note: '系统按历史费率预估' },
     { label: '差异（需三方核验）',         labelEn: 'Variance → 3-Way Match',     amount: '+$297',  type: 'total',  note: '超预算 5.5%；进入费用对账流程' },
+    { label: '── 到期日计算 ──',          labelEn: 'Due Date Calculation',       amount: '',       type: 'note' },
+    { label: '账单日',                    labelEn: 'Invoice Date',               amount: 'Sep 01', type: 'neutral' },
+    { label: '付款条款',                  labelEn: 'Payment Terms',              amount: 'Net 30', type: 'neutral' },
+    { label: '到期日',                    labelEn: 'Due Date',                   amount: 'Oct 01', type: 'neutral', note: '= 账单日 Sep 01 + 30 天' },
+    { label: '今日距到期',                labelEn: 'Days Until Due',             amount: '3 天',   type: 'total',   note: '到期前 7 天触发预警；3 天内升级提醒' },
   ],
 
   // ── P2P Step 2: 三方核验 ──────────────────────────────────────────────────
@@ -1223,6 +1696,198 @@ export const STEP_FINANCIALS: Record<string, FinancialLine[]> = {
     { label: '贡献毛利 (43.0%)',     labelEn: 'Contribution Margin',    amount: '$121,022', type: 'total' },
     { label: '本月渠道利润最优',      labelEn: 'Best Channel',           amount: 'Amazon',  type: 'note',   note: 'Amazon $52,400 净结算 · 最高利润率渠道' },
   ],
+
+  // ── P2P Step 3: 成本分摊到订单 ────────────────────────────────────────────
+  'p2p-3': [
+    { label: '── 9月账单分摊基础数据 ──',  labelEn: 'Sep Allocation Base',      amount: '',        type: 'note' },
+    { label: '当月出库订单数',             labelEn: 'Orders Shipped',            amount: '1,600 单', type: 'neutral' },
+    { label: '当月出库总重量',             labelEn: 'Total Weight',              amount: '1,440 kg', type: 'neutral' },
+    { label: '当月订单总行数',             labelEn: 'Total Line Items',          amount: '4,280 行', type: 'neutral' },
+    { label: '── ① 拣货费（行数比例法）──', labelEn: 'Pick Fee – Line-Item Method', amount: '',     type: 'note' },
+    { label: '月度拣货费账单',             labelEn: 'Pick Fee Invoice',          amount: '$425',    type: 'outflow' },
+    { label: '本订单行数',                 labelEn: 'This Order Lines',          amount: '3 行',     type: 'neutral' },
+    { label: '公式',                       labelEn: 'Formula',                   amount: '$425 × (3÷4,280)', type: 'neutral' },
+    { label: '本订单拣货费分摊',           labelEn: 'Allocated Pick Fee',        amount: '$0.30',   type: 'subtotal' },
+    { label: '── ② 包装费（平均分摊法）──', labelEn: 'Pack Fee – Flat Method',   amount: '',        type: 'note' },
+    { label: '月度包装费账单',             labelEn: 'Pack Fee Invoice',          amount: '$2,400',  type: 'outflow' },
+    { label: '公式',                       labelEn: 'Formula',                   amount: '$2,400 ÷ 1,600', type: 'neutral' },
+    { label: '本订单包装费分摊',           labelEn: 'Allocated Pack Fee',        amount: '$1.50',   type: 'subtotal' },
+    { label: '── ③ 运费（重量比例法）──',  labelEn: 'Freight – Weight Method',   amount: '',        type: 'note' },
+    { label: '月度运费账单',               labelEn: 'Freight Invoice',           amount: '$18,620', type: 'outflow' },
+    { label: '本订单包裹重量',             labelEn: 'Order Weight',              amount: '0.9 kg',  type: 'neutral' },
+    { label: '公式',                       labelEn: 'Formula',                   amount: '$18,620 × (0.9÷1,440)', type: 'neutral' },
+    { label: '本订单运费分摊',             labelEn: 'Allocated Freight',         amount: '$11.64',  type: 'subtotal' },
+    { label: '── ④ 仓储费（体积×库龄法）──', labelEn: 'Storage – Vol×Age Method', amount: '',      type: 'note' },
+    { label: '月度仓储费账单',             labelEn: 'Storage Invoice',           amount: '$2,600',  type: 'outflow' },
+    { label: '全仓 SKU 体积×库龄合计',     labelEn: 'Total Vol·Days',            amount: '1,538 CF·天', type: 'neutral' },
+    { label: 'WE-PRO-BLK：0.5CF × 30天',  labelEn: 'SKU Vol·Days',             amount: '15 CF·天', type: 'neutral' },
+    { label: '公式',                       labelEn: 'Formula',                   amount: '$2,600 × (15÷1,538)', type: 'neutral' },
+    { label: '本订单仓储费分摊',           labelEn: 'Allocated Storage',         amount: '$25.36',  type: 'subtotal', note: '再按订单中该 SKU 件数分摊' },
+    { label: '── 本订单总分摊成本 ──',     labelEn: 'Total Allocated Cost',      amount: '',        type: 'note' },
+    { label: 'COGS 商品成本',              labelEn: 'COGS',                      amount: '$40.00',  type: 'outflow' },
+    { label: '拣货 + 包装 + 运费 + 仓储', labelEn: 'Fulfillment Allocated',     amount: '$38.80',  type: 'outflow', note: '$0.30 + $1.50 + $11.64 + $25.36' },
+    { label: '总成本',                     labelEn: 'Total Cost',                amount: '$78.80',  type: 'subtotal' },
+    { label: '订单收入',                   labelEn: 'Revenue',                   amount: '$85.00',  type: 'inflow' },
+    { label: '分摊后订单利润',             labelEn: 'Order Profit (Actual)',      amount: '$6.20',   type: 'total',   note: '7.3%；V30 简化示例利润更高，因运费成本按实计' },
+  ],
+
+  // ── P2P Step 4: 付款审批流程 ──────────────────────────────────────────────
+  'p2p-4': [
+    { label: '── 本次待审批账单 ──',   labelEn: 'Pending Approval',       amount: '',        type: 'note' },
+    { label: 'ShipBob US（$5,715）',   labelEn: 'ShipBob Invoice',        amount: '$5,715',  type: 'outflow', note: '账单日 Sep 01 · Net 30 → 到期日 Oct 01 · 剩余 3 天' },
+    { label: 'FedEx（$8,420）',        labelEn: 'FedEx Invoice',          amount: '$8,420',  type: 'outflow', note: '账单日 Sep 01 · Net 30 → 到期日 Oct 01 · 剩余 3 天' },
+    { label: 'UPS（$6,840）',          labelEn: 'UPS Invoice',            amount: '$6,840',  type: 'outflow', note: '账单日 Sep 01 · Net 30 → 到期日 Oct 01 · 剩余 3 天' },
+    { label: 'Royal Mail（$3,360）',   labelEn: 'Royal Mail Invoice',     amount: '$3,360',  type: 'outflow', note: '账单日 Sep 15 · Net 30 → 到期日 Oct 15 · 剩余 17 天' },
+    { label: '本次审批总额',           labelEn: 'Batch Total',            amount: '$24,335', type: 'subtotal' },
+    { label: '── 逾期判定公式 ──',     labelEn: 'Overdue Logic',          amount: '',        type: 'note' },
+    { label: '到期日',                 labelEn: 'Due Date',               amount: '账单日 + 付款天数', type: 'neutral', note: 'Net 30 = 账单日 + 30 天' },
+    { label: '逾期天数',              labelEn: 'Overdue Days',            amount: 'max(0, 今日 − 到期日)', type: 'neutral' },
+    { label: '逾期状态',              labelEn: 'Status',                  amount: 'balanceDue > 0 且 逾期天数 > 0', type: 'neutral' },
+    { label: '── 滞纳金示例 ──',       labelEn: 'Late Fee Example',       amount: '',        type: 'note' },
+    { label: 'FedEx 逾期 15 天',       labelEn: 'FedEx Overdue 15d',      amount: '$63.15',  type: 'outflow', note: '$8,420 × 1.5% ÷ 30 × 15 天' },
+    { label: '早付款折扣（2/10）',     labelEn: 'Early Pay Discount',     amount: '-$168.40',type: 'inflow',  note: '若在 10 天内付款：$8,420 × 2% = $168.40 折扣' },
+    { label: '审批时限 SLA',          labelEn: 'Approval SLA',            amount: '2 个工作日', type: 'total', note: '超时自动升级通知；逾期账单优先排队' },
+  ],
+
+  // ── R2R Step 1: 交易完整性检查 ────────────────────────────────────────────
+  'r2r-1': [
+    { label: '── 9月月末关账检查清单 ──', labelEn: 'Month-End Close Checklist', amount: '', type: 'note' },
+    { label: '已签收订单收入确认',   labelEn: 'Revenue Recognized',      amount: '3,847 单 ✓', type: 'inflow',  note: '全部已确认，无漏项' },
+    { label: '未签收订单（在途）',   labelEn: 'In-transit Orders',        amount: '142 单',    type: 'neutral', note: '收入暂不确认，待签收后触发' },
+    { label: '已确认 3PL 服务费用', labelEn: '3PL Expenses Recorded',    amount: '$12,840 ✓', type: 'outflow', note: '含计提估算' },
+    { label: '运费成本',            labelEn: 'Freight Cost',              amount: '$18,620 ✓', type: 'outflow', note: '含账单已到和计提部分' },
+    { label: '平台费（各渠道）',    labelEn: 'Platform Fees',             amount: '$14,348 ✓', type: 'outflow', note: '来自结算报告扣减明细' },
+    { label: '待核查差异',          labelEn: 'Open Variances',            amount: '$284.50',   type: 'total',   note: '4 笔差异未解决，需在锁期前处理' },
+  ],
+
+  // ── R2R Step 2: 渠道结算对账 ──────────────────────────────────────────────
+  'r2r-2': [
+    { label: '── 9月渠道结算对账汇总 ──', labelEn: 'Sep Settlement Reconciliation', amount: '', type: 'note' },
+    { label: 'Amazon US（已对账）',   labelEn: 'Amazon US',               amount: '$52,400',  type: 'inflow',  note: 'OMS $52,400 = 实际 $52,400 ✓' },
+    { label: 'Amazon US（上期）',     labelEn: 'Amazon US (Aug)',          amount: '$54,840',  type: 'inflow',  note: '已核销差异 $241.80 ✓' },
+    { label: 'Shopify（差异待查）',   labelEn: 'Shopify US',               amount: '$38,777',  type: 'inflow',  note: 'OMS $38,820 vs 实际 $38,777 · 差异 -$42.50 ⚠️' },
+    { label: 'Shopify（上期）',       labelEn: 'Shopify (prev)',           amount: '$36,501',  type: 'inflow',  note: '差异已核销 ✓' },
+    { label: 'TikTok UK（处理中）',   labelEn: 'TikTok UK',                amount: '⏳ $23,140', type: 'neutral', note: '预计 Sep 19 到账，尚未对账' },
+    { label: 'Walmart（处理中）',     labelEn: 'Walmart US',               amount: '⏳ $16,691', type: 'neutral', note: '预计 Sep 21 到账' },
+    { label: '未解差异合计',          labelEn: 'Total Open Variance',      amount: '-$42.50',  type: 'total',   note: 'Shopify 差异待核查，其余已匹配' },
+  ],
+
+  // ── R2R Step 3: 费用差异核查 ──────────────────────────────────────────────
+  'r2r-3': [
+    { label: '── 9月费用对账差异汇总 ──', labelEn: 'Sep Fee Reconciliation', amount: '', type: 'note' },
+    { label: 'ShipBob 仓储费（差异）', labelEn: 'ShipBob 3PL',             amount: '+$297',  type: 'outflow', note: 'OMS 预估 $5,418 vs 实际 $5,715；超预算 5.5%' },
+    { label: 'FedEx 运费（差异）',    labelEn: 'FedEx Freight',             amount: '+$220',  type: 'outflow', note: '燃油 $140 + 住宅附加 $80；更新费率表' },
+    { label: 'Amazon 平台费（匹配）', labelEn: 'Amazon Fees',               amount: '$0',     type: 'neutral', note: 'OMS $16,000 = 实际 $16,000 ✓' },
+    { label: 'UPS 运费（匹配）',      labelEn: 'UPS Freight',               amount: '$0',     type: 'neutral', note: '✓ 无差异' },
+    { label: 'Shopify 费率（差异）',  labelEn: 'TikTok Fee Rate',           amount: '+$66',   type: 'outflow', note: 'OMS 配置 5.0% vs 实际 5.5%；本期差异 $66' },
+    { label: '费用差异合计',          labelEn: 'Total Fee Variance',        amount: '+$583',  type: 'total',   note: '需更新 OMS 费率配置，防止下期继续偏差' },
+  ],
+
+  // ── R2R Step 5: ERP 期间锁定 ──────────────────────────────────────────────
+  'r2r-5': [
+    { label: '── 9月期末推送至 NetSuite ──', labelEn: 'Sep GL Push to NetSuite', amount: '', type: 'note' },
+    { label: '总收入分录',           labelEn: 'Revenue Entries',          amount: '$281,220', type: 'inflow',  note: '收入科目 4000 · 3,847 笔订单汇总' },
+    { label: 'COGS 分录',           labelEn: 'COGS Entries',              amount: '$112,000', type: 'outflow', note: 'COGS 科目 5000 · 库存结转' },
+    { label: '运营费用分录',         labelEn: 'Operating Expense Entries', amount: '$47,808',  type: 'outflow', note: '仓储/运费/平台费/支付费合计' },
+    { label: '试算平衡确认',         labelEn: 'Trial Balance Check',       amount: '✓ 借贷平衡', type: 'subtotal', note: 'Total Dr = Total Cr = $440,028' },
+    { label: '期间状态',             labelEn: 'Period Status',             amount: '🔒 已锁定', type: 'total',   note: '2026-09 期间锁定，禁止修改' },
+  ],
+
+  // ── P2P Step 0: 供应商档案配置 ────────────────────────────────────────────
+  'p2p-0': [
+    { label: '── 供应商档案字段清单 ──',    labelEn: 'Vendor Master Fields',    amount: '',         type: 'note' },
+    { label: '付款条款',                   labelEn: 'Payment Terms',           amount: 'Net 30',   type: 'neutral', note: '决定账单到期日：账单日 + 30 天' },
+    { label: '费率合同（拣货）',           labelEn: 'Pick Rate',               amount: '$0.25/件', type: 'neutral', note: '三方核验比价基准' },
+    { label: '费率合同（包装）',           labelEn: 'Pack Rate',               amount: '$1.50/单', type: 'neutral' },
+    { label: '费率合同（仓储）',           labelEn: 'Storage Rate',            amount: '$0.65/CF/月', type: 'neutral' },
+    { label: '燃油附加费（FedEx）',        labelEn: 'Fuel Surcharge',          amount: '17%（浮动）', type: 'neutral', note: '未配置 → 三方核验常见差异来源' },
+    { label: '住宅附加费（FedEx/UPS）',    labelEn: 'Residential Surcharge',   amount: '$4.90/件', type: 'neutral' },
+    { label: 'ACH Routing Number',        labelEn: 'Bank Routing',             amount: '已验证 ✓', type: 'neutral', note: '变更须双渠道验证，防欺诈' },
+    { label: '账单接收格式',              labelEn: 'Invoice Format',           amount: 'EDI 810',  type: 'neutral' },
+    { label: '费率合同有效期',            labelEn: 'Rate Card Expiry',         amount: 'Dec 31',   type: 'total',   note: '到期前 30 天触发续签提醒' },
+  ],
+
+  // ── B2B Step 0: B2B 客户档案配置 ──────────────────────────────────────────
+  'b2b-0': [
+    { label: '── B2B 客户档案字段清单 ──',  labelEn: 'Customer Master Fields',  amount: '',         type: 'note' },
+    { label: '授信额度',                   labelEn: 'Credit Limit',            amount: '$50,000',  type: 'inflow',  note: '信用审核的核心参数' },
+    { label: '付款条款',                   labelEn: 'Payment Terms',           amount: 'Net 45',   type: 'neutral', note: '发票到期日 = 发票日 + 45 天' },
+    { label: '信用评级',                   labelEn: 'Credit Rating',           amount: 'A 级',     type: 'neutral', note: '历史 DSO 稳定 42 天' },
+    { label: 'Tax ID / EIN',              labelEn: 'Tax ID',                   amount: '已验证 ✓', type: 'neutral', note: '发票抬头必须与法人名称完全一致' },
+    { label: 'Tax Exempt 状态',           labelEn: 'Tax Exempt',               amount: '是（含证书）', type: 'neutral', note: '免税证书有效期 Dec 2026' },
+    { label: 'AR 联系人邮箱',             labelEn: 'AR Contact (AP Dept)',     amount: 'ap@acme.com', type: 'neutral', note: '发票必须发至 AP 专用邮箱' },
+    { label: '开票方式',                  labelEn: 'Invoice Delivery',         amount: 'EDI 810',  type: 'neutral' },
+    { label: '账期起算规则',              labelEn: 'Terms Start',              amount: '发票认可日', type: 'neutral', note: '该客户从 ERP 认可日起算，通常晚 7–10 天' },
+    { label: '免税证书到期预警',          labelEn: 'Cert Expiry',              amount: 'Dec 2026', type: 'total',   note: '到期前 60 天触发续签提醒；逾期则恢复含税开票' },
+  ],
+
+  // ── B2B Step 2: 信用审核 ──────────────────────────────────────────────────
+  'b2b-2': [
+    { label: '── 本次信用审核（Acme Corp）──', labelEn: 'Credit Check – Acme Corp', amount: '',        type: 'note' },
+    { label: '本次 PO 金额',          labelEn: 'PO Amount',               amount: '$28,400', type: 'outflow' },
+    { label: '当前未付应收余额',      labelEn: 'Current Outstanding AR',  amount: '$12,600', type: 'outflow' },
+    { label: '合计敞口',              labelEn: 'Total Exposure',          amount: '$41,000', type: 'subtotal' },
+    { label: '客户授信额度',          labelEn: 'Credit Limit',            amount: '$50,000', type: 'inflow',  note: '上季度综合评级 A，额度 $50k' },
+    { label: '剩余可用额度',          labelEn: 'Available Credit',        amount: '$9,000',  type: 'total',   note: '≥ 0 → 信用审核通过 ✓' },
+    { label: '── 账期设定 ──',        labelEn: 'Terms Assigned',          amount: '',        type: 'note' },
+    { label: '付款条款',              labelEn: 'Payment Terms',           amount: 'Net 45',  type: 'neutral', note: '老客户，历史 DSO 稳定 42 天' },
+    { label: '预计发票日',            labelEn: 'Est. Invoice Date',       amount: 'Sep 10',  type: 'neutral' },
+    { label: '应收到期日',            labelEn: 'AR Due Date',             amount: 'Oct 25',  type: 'total',   note: '= Sep 10 + 45 天' },
+  ],
+
+  // ── B2B Step 3: 发货 + 开票 ────────────────────────────────────────────────
+  'b2b-3': [
+    { label: '── AR Invoice #INV-2026-0892 ──', labelEn: 'Invoice Details',  amount: '',        type: 'note' },
+    { label: 'WE-PRO-BLK × 50件',     labelEn: 'Wireless Earbuds × 50', amount: '$4,450',  type: 'inflow',  note: '单价 $89 × 50' },
+    { label: 'PC-CLR-IP15 × 100件',   labelEn: 'Phone Case × 100',      amount: '$2,900',  type: 'inflow',  note: '单价 $29 × 100' },
+    { label: 'UC-2M-WHT × 200件',     labelEn: 'USB-C Cable × 200',     amount: '$3,800',  type: 'inflow',  note: '单价 $19 × 200' },
+    { label: '发票小计',              labelEn: 'Invoice Subtotal',       amount: '$11,150', type: 'subtotal' },
+    { label: '销售税（B2B Tax Exempt）', labelEn: 'Sales Tax',          amount: '$0',      type: 'neutral', note: '客户提供 Resale Certificate，免税' },
+    { label: '发票总金额',            labelEn: 'Invoice Total',          amount: '$11,150', type: 'subtotal' },
+    { label: 'COGS 商品成本',          labelEn: 'COGS (to be recognized)', amount: '-$5,175', type: 'outflow', note: '出库时同步结转库存成本' },
+    { label: '── 账期 & 到期 ──',     labelEn: 'Terms & Due Date',       amount: '',        type: 'note' },
+    { label: '付款条款',              labelEn: 'Payment Terms',          amount: 'Net 45',  type: 'neutral' },
+    { label: '发票日',                labelEn: 'Invoice Date',           amount: 'Sep 10',  type: 'neutral' },
+    { label: '到期日',                labelEn: 'Due Date',               amount: 'Oct 25',  type: 'total',   note: '超出此日期且未付款 = 逾期' },
+  ],
+
+  // ── B2B Step 5: AR 账龄管理 ────────────────────────────────────────────────
+  'b2b-5': [
+    { label: '── 9月末 AR Aging 快照 ──', labelEn: 'AR Aging Snapshot', amount: '',          type: 'note' },
+    { label: '未逾期（Current）',      labelEn: 'Current',               amount: '$68,400',  type: 'inflow',  note: '在账期内，未到期' },
+    { label: '逾期 1–30 天',           labelEn: 'Past Due 1–30d',        amount: '$28,600',  type: 'outflow', note: '已发送第一次催款邮件' },
+    { label: '逾期 31–60 天',          labelEn: 'Past Due 31–60d',       amount: '$14,200',  type: 'outflow', note: '财务介入；暂停新订单' },
+    { label: '逾期 60 天以上',         labelEn: 'Past Due 60d+',         amount: '$9,000',   type: 'outflow', note: '法务介入；计提坏账准备' },
+    { label: 'AR 余额合计',            labelEn: 'Total AR Balance',       amount: '$120,200', type: 'subtotal' },
+    { label: '坏账准备（已计提）',     labelEn: 'Allowance for Doubtful', amount: '-$4,500',  type: 'outflow', note: '60d+ $9,000 × 50% 计提' },
+    { label: 'AR 净值（B/S 列报）',    labelEn: 'AR Net (Balance Sheet)', amount: '$115,700', type: 'subtotal' },
+    { label: '── DSO 计算 ──',         labelEn: 'DSO Calculation',        amount: '',         type: 'note' },
+    { label: '9月收入',               labelEn: 'Sep Revenue',            amount: '$281,220', type: 'neutral' },
+    { label: 'DSO',                   labelEn: 'Days Sales Outstanding',  amount: '12.8 天',  type: 'total',   note: '$120,200 ÷ $281,220 × 30 = 12.8 天；账期 45 天，DSO 健康 ✓' },
+  ],
+
+  // ── B2B Step 6: 收款核销 ──────────────────────────────────────────────────
+  'b2b-6': [
+    { label: '── Acme Corp 收款核销 ──', labelEn: 'Payment Application – Acme', amount: '',        type: 'note' },
+    { label: 'ACH 到账金额',           labelEn: 'ACH Receipt',            amount: '$10,933', type: 'inflow',  note: 'Sep 30 银行到账' },
+    { label: '发票 #INV-2026-0892',    labelEn: 'Invoice #0892',          amount: '$11,150', type: 'outflow', note: 'Net 45 · 到期日 Oct 25' },
+    { label: '── 客户扣款明细 ──',     labelEn: 'Deduction Breakdown',    amount: '',        type: 'note' },
+    { label: '早付款折扣（2/10）',     labelEn: 'Early Pay Discount 2%', amount: '-$223',   type: 'outflow', note: '发票日 Sep 10 + 10 天 = Sep 20 截止；今日 Sep 30 ⚠️ 折扣窗口已过' },
+    { label: '扣款决策',               labelEn: 'Dispute or Accept',      amount: '待确认',  type: 'neutral', note: '客户仍扣了折扣，需确认是否接受' },
+    { label: '若接受扣款，核销分录',   labelEn: 'Accept: Sales Discount', amount: '$223',    type: 'outflow', note: '计入销售折扣科目 4100' },
+    { label: 'AR 核销后余额',          labelEn: 'AR After Application',   amount: '$0',      type: 'total',   note: '发票 #0892 已全额核销（含折扣）✓' },
+  ],
+
+  // ── B2B Step 7: ERP 总账 ──────────────────────────────────────────────────
+  'b2b-7': [
+    { label: '── 9月 B2B AR 汇总 ──',  labelEn: 'Sep B2B AR Summary',     amount: '',         type: 'note' },
+    { label: '期初 AR 余额',           labelEn: 'Opening AR Balance',      amount: '$98,400',  type: 'inflow' },
+    { label: '本期新增 AR（开票）',    labelEn: 'New AR Invoiced',         amount: '+$142,600',type: 'inflow' },
+    { label: '本期核销 AR（收款）',    labelEn: 'AR Collected',            amount: '-$120,800',type: 'outflow' },
+    { label: '期末 AR 余额',           labelEn: 'Closing AR Balance',      amount: '$120,200', type: 'subtotal' },
+    { label: '坏账准备',               labelEn: 'Allowance',               amount: '-$4,500',  type: 'outflow', note: '60d+ 余额 $9,000 × 50%' },
+    { label: 'B/S 列报净值',           labelEn: 'Net AR on Balance Sheet', amount: '$115,700', type: 'total',   note: 'Net Realizable Value' },
+  ],
 };
 
 // ─── 步骤间箭头配置 ────────────────────────────────────────────────────────────
@@ -1236,7 +1901,7 @@ export type LaneArrowConfig = {
   rowSize: number;
 };
 
-export const LANE_ARROW_CONFIG: Record<'o2c' | 'p2p' | 'r2r', LaneArrowConfig> = {
+export const LANE_ARROW_CONFIG: Record<'o2c' | 'p2p' | 'r2r' | 'b2b', LaneArrowConfig> = {
   o2c: {
     rowSize: 5,
     rowBreakIndex: 4,
@@ -1253,14 +1918,15 @@ export const LANE_ARROW_CONFIG: Record<'o2c' | 'p2p' | 'r2r', LaneArrowConfig> =
     ],
   },
   p2p: {
-    rowSize: 3,
-    rowBreakIndex: 2,
+    rowSize: 4,
+    rowBreakIndex: 3,
     arrows: [
-      '账单录入',     // ①→②
-      '核验通过',     // ②→③
-      '分摊完成 ↓',  // ③→④ 换行
-      '审批通过',     // ④→⑤
-      '付款执行',     // ⑤→⑥
+      '档案就绪',     // ①→②
+      '账单录入',     // ②→③
+      '核验通过',     // ③→④
+      '分摊完成 ↓',  // ④→⑤ 换行
+      '审批通过',     // ⑤→⑥
+      '付款执行',     // ⑥→⑦
     ],
   },
   r2r: {
@@ -1272,6 +1938,19 @@ export const LANE_ARROW_CONFIG: Record<'o2c' | 'p2p' | 'r2r', LaneArrowConfig> =
       '费用核查 ↓',  // ③→④ 换行
       '计提完成',    // ④→⑤
       '期间锁定',    // ⑤→⑥
+    ],
+  },
+  b2b: {
+    rowSize: 4,
+    rowBreakIndex: 3,
+    arrows: [
+      '档案就绪',     // ①→②
+      '提交信审',     // ②→③
+      '授信通过',     // ③→④
+      '发票交付 ↓',  // ④→⑤ 换行
+      '到期提醒',     // ⑤→⑥
+      '收款触发',     // ⑥→⑦
+      '核销完成',     // ⑦→⑧
     ],
   },
 };

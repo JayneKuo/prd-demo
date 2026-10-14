@@ -230,6 +230,51 @@ export const channelArRows: ChannelArRow[] = [
     note: '线下收款，已开具发票，待客户电汇',
     expectedReceiptDate: '2026-09-30',
   },
+  // ── 已核销（历史周期差异已处理）──────────────────────────────
+  {
+    id: 'car_008',
+    settlementNo: 'STL-AMZ-20260715',
+    channel: 'Amazon',
+    merchant: 'US Amazon',
+    periodStart: '2026-07-01',
+    periodEnd: '2026-07-15',
+    orderCount: 612,
+    grossAmount: 47800.00,
+    totalDeduction: 11400.00,
+    expectedNet: 36400.00,
+    actualNet: 36158.20,
+    variance: -241.80,
+    currency: 'USD',
+    status: '已核销',
+    settledAt: '2026-07-17',
+    erpSync: 'synced',
+    erpSystem: 'NetSuite',
+    deductionBreakdown: { commission: 7268.64, advertisingFee: 1912.00, refunds: 1980.00, other: 239.36 },
+    note: '差异 $241.80 — Amazon FBA 仓储调整项，已与 Amazon 核实确认，Finance Admin 已核销（2026-07-25）',
+    expectedReceiptDate: '2026-07-17',
+  },
+  {
+    id: 'car_009',
+    settlementNo: 'STL-WMT-20260731',
+    channel: 'Walmart',
+    merchant: 'US Walmart',
+    periodStart: '2026-07-16',
+    periodEnd: '2026-07-31',
+    orderCount: 98,
+    grossAmount: 11240.00,
+    totalDeduction: 1124.00,
+    expectedNet: 10116.00,
+    actualNet: 10116.00,
+    variance: 0,
+    currency: 'USD',
+    status: '已核销',
+    settledAt: '2026-08-14',
+    erpSync: 'synced',
+    erpSystem: 'NetSuite',
+    deductionBreakdown: { commission: 898.40, refunds: 225.60 },
+    note: '7月下半月结算，已到账无差异，已录入 NetSuite 并锁定账期',
+    expectedReceiptDate: '2026-08-14',
+  },
 ];
 
 export const channelArStatusConfig: Record<ChannelArStatus, { cls: string; dot: string }> = {
@@ -306,11 +351,13 @@ export type ApRow = {
   vendor: string;
   /** 费用类型 */
   category: ApCategory;
+  /** 账单类型：发票/贷项通知单/预付款 */
+  billType?: 'invoice' | 'credit_note' | 'advance';
   /** 账单日期 */
   billDate: string;
   /** 到期日 */
   dueDate: string;
-  /** 账单金额（供应商实际账单） */
+  /** 账单金额（供应商实际账单；贷项通知单为负数） */
   billAmount: number;
   /** OMS 预估金额（按费率配置估算） */
   omsEstimate?: number;
@@ -320,14 +367,26 @@ export type ApRow = {
   paidAmount: number;
   /** 未付余额 */
   balanceDue: number;
-  /** 币种 */
+  /** 结算币种（最终记账币种，通常 USD） */
   currency: string;
+  /** 原始币种（如 GBP、EUR，非 USD 时才填） */
+  originalCurrency?: string;
+  /** 原始金额（原币金额，折算前） */
+  originalAmount?: number;
+  /** 汇率（原币 → USD，如 1.27 表示 1 GBP = 1.27 USD） */
+  exchangeRate?: number;
   /** 状态 */
   status: ApStatus;
   /** 逾期天数 */
   overdueDays: number;
   /** 付款条款（Net 30 等） */
   paymentTerms?: string;
+  /** 费用分摊方式 */
+  allocationMethod?: 'order' | 'weight' | 'volume' | 'quantity' | 'equal' | 'manual';
+  /** 是否已完成费用分摊 */
+  allocated?: boolean;
+  /** 已分摊到的订单数 */
+  allocatedOrderCount?: number;
   /** 备注 */
   note?: string;
 };
@@ -343,17 +402,17 @@ export type ApKpi = {
 // ─── AR Mock 数据 ─────────────────────────────────────────────────────────────
 
 export const arKpi: ArKpi = {
-  totalReceivable: 86420.00,
-  overdueAmount: 12840.00,
+  totalReceivable: 108320.00,   // 含逾期90天+ 15600+6300 = 21900 新增
+  overdueAmount: 34740.00,      // 12840 + 15600 + 6300
   currentAmount: 73580.00,
   collectedThisMonth: 114360.00,
   currency: 'USD',
   aging: [
-    { label: '未到期',       amount: 73580.00, cls: 'bg-emerald-500' },
-    { label: '1-30天',      amount: 6840.00,  cls: 'bg-amber-400' },
-    { label: '31-60天',     amount: 3200.00,  cls: 'bg-orange-400' },
-    { label: '61-90天',     amount: 2800.00,  cls: 'bg-red-400' },
-    { label: '90天+',       amount: 0,        cls: 'bg-red-600' },
+    { label: '未到期',    amount: 73580.00, cls: 'bg-emerald-500' },
+    { label: '1-30天',   amount: 6840.00,  cls: 'bg-amber-400' },
+    { label: '31-60天',  amount: 3200.00,  cls: 'bg-orange-400' },
+    { label: '61-90天',  amount: 2800.00,  cls: 'bg-red-400' },
+    { label: '90天+',    amount: 21900.00, cls: 'bg-red-600' },
   ],
 };
 
@@ -487,13 +546,102 @@ export const arRows: ArRow[] = [
     agingStatus: '未到期',
     overdueDays: 0,
   },
+  // ── 逾期90天+（高风险，催收阶段）──────────────────────────────
+  {
+    id: 'ar_009',
+    invoiceNo: 'INV-20260512-0031',
+    sourceOrderId: 'SO-2026-0512',
+    paymentTerms: 'Net 60',
+    customer: 'Sunset Retail Group',
+    channel: 'EDI',
+    invoiceDate: '2026-05-12',
+    dueDate: '2026-07-11',
+    invoiceAmount: 15600.00,
+    paidAmount: 0,
+    balanceDue: 15600.00,
+    currency: 'USD',
+    agingStatus: '逾期90天+',
+    overdueDays: 93,
+    note: '已发送 3 次催款函，对方未回应。律师函已于 2026-09-28 发出，等待法律程序推进。',
+  },
+  {
+    id: 'ar_010',
+    invoiceNo: 'INV-20260420-0017',
+    sourceOrderId: 'SO-2026-0388',
+    paymentTerms: 'Net 30',
+    customer: 'Global Trade Partners Ltd.',
+    channel: 'Direct',
+    invoiceDate: '2026-04-20',
+    dueDate: '2026-05-20',
+    invoiceAmount: 9800.00,
+    paidAmount: 3500.00,
+    balanceDue: 6300.00,
+    currency: 'USD',
+    agingStatus: '逾期90天+',
+    overdueDays: 145,
+    note: '曾部分付款 $3,500（2026-06-15），余额 $6,300 长期未结。已转催收机构跟进。',
+  },
+  // ── 已核销（坏账处理）─────────────────────────────────────────
+  {
+    id: 'ar_011',
+    invoiceNo: 'INV-20260310-0008',
+    sourceOrderId: 'SO-2026-0293',
+    paymentTerms: 'Net 30',
+    customer: 'BlueSky Commerce Ltd.',
+    channel: 'Direct',
+    invoiceDate: '2026-03-10',
+    dueDate: '2026-04-09',
+    invoiceAmount: 4200.00,
+    paidAmount: 0,
+    balanceDue: 0,
+    currency: 'USD',
+    agingStatus: '已核销',
+    overdueDays: 0,
+    note: '已核销 — 客户申请破产保护，坏账计入当期损益。核销日期：2026-08-01（Finance Admin 审批）',
+  },
+  // ── 预收款（客户预付定金）────────────────────────────────────
+  {
+    id: 'ar_012',
+    invoiceNo: 'DEPOSIT-20261001-0001',
+    sourceOrderId: 'PO-2026-1088',
+    paymentTerms: '即期',
+    customer: 'TechCorp Inc.',
+    channel: 'Direct',
+    invoiceDate: '2026-10-01',
+    dueDate: '2026-10-01',
+    invoiceAmount: 30000.00,
+    paidAmount: 30000.00,         // 客户预付全款
+    balanceDue: 0,
+    currency: 'USD',
+    agingStatus: '已收款',
+    overdueDays: 0,
+    note: '预收款 — Q4 大单定金，货物预计 11月发货。已开具预收款收据，发货后换开正式发票',
+  },
+  // ── 分期收款（Installment AR）────────────────────────────────
+  {
+    id: 'ar_013',
+    invoiceNo: 'INV-20260901-INST-003',
+    sourceOrderId: 'SO-2026-0765',
+    paymentTerms: 'Installment 3×',
+    customer: 'MidWest Distributors',
+    channel: 'EDI',
+    invoiceDate: '2026-09-01',
+    dueDate: '2026-11-30',
+    invoiceAmount: 36000.00,
+    paidAmount: 12000.00,         // 已收第1期（9月）
+    balanceDue: 24000.00,         // 剩余2期（10月+11月各$12,000）
+    currency: 'USD',
+    agingStatus: '未到期',
+    overdueDays: 0,
+    note: '分3期付款协议：$12,000/月 × 3期（9/10/11月）。已收 9月期 $12,000，剩余 2期',
+  },
 ];
 
 // ─── AP Mock 数据 ─────────────────────────────────────────────────────────────
 
 export const apKpi: ApKpi = {
-  totalPayable: 54280.00,
-  overdueAmount: 2840.00,
+  totalPayable: 57406.00,      // 54280 + 2840(DHL) + 286(PayPal) + 680(Klaviyo) - already-paid ones
+  overdueAmount: 3126.00,      // DHL $2840 + PayPal $286
   dueThisWeek: 18620.00,
   paidThisMonth: 38420.80,
   currency: 'USD',
@@ -697,6 +845,139 @@ export const apRows: ApRow[] = [
     status: '已付款',
     overdueDays: 0,
     paymentTerms: 'Net 30',
+  },
+  // ── 逾期（已超付款截止日）──────────────────────────────────────
+  {
+    id: 'ap_011',
+    billNo: 'DHL-INV-AUG2026-012',
+    vendor: 'DHL Express',
+    category: '运输费',
+    billDate: '2026-08-15',
+    dueDate: '2026-08-29',
+    billAmount: 2840.00,
+    omsEstimate: 2840.00,
+    variance: 0,
+    paidAmount: 0,
+    balanceDue: 2840.00,
+    currency: 'USD',
+    status: '逾期',
+    overdueDays: 14,
+    paymentTerms: 'Net 14',
+    note: '逾期 14 天 — 8月付款审批单据延误，需财务立即处理',
+  },
+  {
+    id: 'ap_012',
+    billNo: 'PAYPAL-SEP-2026',
+    vendor: 'PayPal',
+    category: '支付手续费',
+    billDate: '2026-09-01',
+    dueDate: '2026-09-15',
+    billAmount: 286.00,
+    omsEstimate: 280.00,
+    variance: 6.00,
+    paidAmount: 0,
+    balanceDue: 286.00,
+    currency: 'USD',
+    status: '逾期',
+    overdueDays: 7,
+    paymentTerms: 'Net 15',
+    note: '逾期 7 天 — 差异 $6 尚未确认，财务暂缓付款',
+  },
+  // ── 草稿待审批（本月新到）─────────────────────────────────────
+  {
+    id: 'ap_013',
+    billNo: 'KLAVIYO-OCT-2026',
+    vendor: 'Klaviyo（Email Marketing）',
+    category: '其他',
+    billDate: '2026-10-01',
+    dueDate: '2026-10-31',
+    billAmount: 680.00,
+    paidAmount: 0,
+    balanceDue: 680.00,
+    currency: 'USD',
+    status: '待审批',
+    overdueDays: 0,
+    paymentTerms: 'Net 30',
+    note: '10月营销邮件服务订阅费',
+  },
+  // ── 贷项通知单（Credit Note）——供应商退款减少应付金额 ────────
+  {
+    id: 'ap_014',
+    billNo: 'SB-CN-20260921',
+    vendor: 'ShipBob US (LAX)',
+    category: '仓储费',
+    billType: 'credit_note',
+    billDate: '2026-09-21',
+    dueDate: '2026-09-30',
+    billAmount: -320.00,           // 负数：供应商给的贷项（减少应付）
+    paidAmount: 0,
+    balanceDue: -320.00,           // 负余额表示供应商欠我们
+    currency: 'USD',
+    status: '待审批',
+    overdueDays: 0,
+    paymentTerms: 'Net 30',
+    note: '贷项通知单：9月账单超收存储费 $320，ShipBob 确认退款，可从下期账单抵扣',
+  },
+  // ── 多币种账单（GBP → USD）─────────────────────────────────────
+  {
+    id: 'ap_015',
+    billNo: 'SB-UK-INV-2026100001',
+    vendor: 'ShipBob UK (London)',
+    category: '仓储费',
+    billDate: '2026-10-01',
+    dueDate: '2026-10-31',
+    billAmount: 3940.00,           // USD 折算金额
+    originalCurrency: 'GBP',
+    originalAmount: 3100.00,       // 原始英镑金额
+    exchangeRate: 1.271,           // 2026-10-01 汇率 1 GBP = 1.271 USD
+    omsEstimate: 3810.00,          // OMS 按预估汇率 1.23 算
+    variance: 130.00,              // 汇率变动导致差异
+    paidAmount: 0,
+    balanceDue: 3940.00,
+    currency: 'USD',
+    status: '待审批',
+    overdueDays: 0,
+    paymentTerms: 'Net 30',
+    note: '差异 $130 由汇率波动引起（OMS 按 1.23 预估，实际结算 1.271）。需财务确认汇率基准',
+    allocationMethod: 'quantity',
+    allocated: false,
+  },
+  // ── 预付款/定金（Advance Payment）────────────────────────────
+  {
+    id: 'ap_016',
+    billNo: 'ADVANCE-XPO-Q4-2026',
+    vendor: 'XPO Logistics (EWR)',
+    category: '仓储费',
+    billType: 'advance',
+    billDate: '2026-09-25',
+    dueDate: '2026-09-25',        // 即期付款（签约时先付定金）
+    billAmount: 5000.00,           // Q4合约预付定金
+    paidAmount: 5000.00,           // 已付清定金
+    balanceDue: 0,
+    currency: 'USD',
+    status: '已付款',
+    overdueDays: 0,
+    paymentTerms: '即期',
+    note: 'Q4合约预付定金 $5,000，将在10–12月账单中逐月抵扣（约 $1,666/月）。合同编号 XPO-EWR-Q4-2026',
+  },
+  // ── 分期付款账单（Installment）────────────────────────────────
+  {
+    id: 'ap_017',
+    billNo: 'GOOGLE-ADS-Q3-2026',
+    vendor: 'Google Ads',
+    category: '其他',
+    billDate: '2026-07-01',
+    dueDate: '2026-12-31',
+    billAmount: 12000.00,          // Q3-Q4 广告预算总额
+    omsEstimate: 12000.00,
+    variance: 0,
+    paidAmount: 8000.00,           // 已付3期（7/8/9月各$2000）
+    balanceDue: 4000.00,           // 剩余10/11月两期
+    currency: 'USD',
+    status: '待付款',
+    overdueDays: 0,
+    paymentTerms: 'Net 30',
+    note: '广告框架合同分6期付款，每月 $2,000。已付 7/8/9 月共 $8,000，待付 10/11 月 $4,000',
   },
 ];
 

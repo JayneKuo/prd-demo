@@ -100,7 +100,9 @@ export const merchantNavigationGroups: NavGroup[] = [
       { title: { 'zh-CN': '财务概览', 'en-US': 'Finance Overview' }, href: '/dashboard/finance', capabilities: ['finance:read'], icon: 'layout-dashboard' },
       { title: { 'zh-CN': '应收账款', 'en-US': 'Accounts Receivable' }, href: '/dashboard/receivables', capabilities: ['finance:read'], icon: 'trending-up' },
       { title: { 'zh-CN': '应付账款', 'en-US': 'Accounts Payable' }, href: '/dashboard/payables', capabilities: ['finance:read'], icon: 'trending-down' },
+      { title: { 'zh-CN': '发票模版', 'en-US': 'Invoice Template' }, href: '/dashboard/finance/invoice-template', capabilities: ['finance:write'], icon: 'file-text' },
       { title: { 'zh-CN': '财务报表', 'en-US': 'Financial Reports' }, href: '/dashboard/reports/finance', capabilities: ['finance:read'], icon: 'bar-chart-2' },
+      { title: { 'zh-CN': '费用科目', 'en-US': 'Chart of Accounts' }, href: '/dashboard/settings/finance', capabilities: ['finance:write'], icon: 'book-open' },
     ]
   },
   {

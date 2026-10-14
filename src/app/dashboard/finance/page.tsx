@@ -773,12 +773,13 @@ function OtherAlertsSection({ alerts }: { alerts: FinanceAlert[] }) {
 // ─── Finance Flow Panel ───────────────────────────────────────────────────────
 // Tab 切换（O2C / P2P / R2R）+ 步骤网格 + 无滚动条 · US GAAP
 
-type LaneId = 'o2c' | 'p2p' | 'r2r';
+type LaneId = 'o2c' | 'p2p' | 'r2r' | 'b2b';
 
 const LANE_TABS: { id: LaneId; label: string; labelEn: string; steps: number }[] = [
   { id: 'o2c', label: '订单→收款',  labelEn: 'Order-to-Cash',    steps: 10 },
-  { id: 'p2p', label: '采购→付款',  labelEn: 'Procure-to-Pay',   steps: 6  },
+  { id: 'p2p', label: '采购→付款',  labelEn: 'Procure-to-Pay',   steps: 7  },
   { id: 'r2r', label: '记账→报告',  labelEn: 'Record-to-Report', steps: 6  },
+  { id: 'b2b', label: 'B2B 应收',   labelEn: 'B2B O2C',          steps: 8  },
 ];
 
 const LANE_COLORS: Record<FlowLane['colorScheme'], {
@@ -805,6 +806,13 @@ const LANE_COLORS: Record<FlowLane['colorScheme'], {
     border:    'border-emerald-400', hdrBg: 'bg-emerald-50', hdrText: 'text-emerald-800',
     seqBg:     'bg-emerald-500',    keyBorder: 'border-emerald-300', keyBg: 'bg-emerald-50/60',
     tag:       'bg-emerald-100 text-emerald-700',
+  },
+  amber: {
+    tab:       'text-amber-700 hover:bg-amber-50',
+    tabActive: 'bg-amber-600 text-white',
+    border:    'border-amber-400', hdrBg: 'bg-amber-50', hdrText: 'text-amber-800',
+    seqBg:     'bg-amber-500',    keyBorder: 'border-amber-300', keyBg: 'bg-amber-50/60',
+    tag:       'bg-amber-100 text-amber-700',
   },
 };
 

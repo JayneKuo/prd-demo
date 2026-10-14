@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   AlertTriangle, CheckCircle2, Clock, TrendingDown, TrendingUp,
   ChevronDown, ChevronRight, Search, Filter, X, Download,
-  RefreshCw, ExternalLink, ArrowRight, Bell, Zap,
+  RefreshCw, ExternalLink, ArrowRight, Bell, Zap, Plus,
 } from 'lucide-react';
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -440,6 +440,7 @@ function ActionQueue({ items }: { items: ActionItem[] }) {
 const CHANNEL_ORDER = ['Amazon', 'Shopify', 'TikTok Shop', 'Walmart'] as const;
 
 function ReconciliationView() {
+  const [batchRows, setBatchRows] = useState<ChannelArRow[]>(channelArRows);
   const [expandedBatch, setExpandedBatch] = useState<string | null>(null);
   const [activeChannel, setActiveChannel] = useState<string | null>(null);
   const [dimension, setDimension] = useState<'batch' | 'order' | 'sku'>('batch');
@@ -448,6 +449,31 @@ function ReconciliationView() {
   const [dateRange,     setDateRange]   = useState<string>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedOrderKey, setSelectedOrderKey] = useState<string | null>(null);
+  const [showManualSettlement, setShowManualSettlement] = useState(false);
+  const [confirmReceived, setConfirmReceived] = useState<ChannelArRow | null>(null);
+  const [confirmedAmount, setConfirmedAmount] = useState('');
+
+  function handleConfirmReceived(id: string, actualNet: number) {
+    setBatchRows(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const variance = +(actualNet - r.expectedNet).toFixed(2);
+      return {
+        ...r,
+        actualNet,
+        variance,
+        status: Math.abs(variance) < 0.01 ? '已到账' as ChannelArStatus : '差异' as ChannelArStatus,
+        settledAt: new Date().toISOString().slice(0, 10),
+        erpSync: 'pending' as const,
+      };
+    }));
+    setConfirmReceived(null);
+    setConfirmedAmount('');
+  }
+
+  function handleAddManualSettlement(row: ChannelArRow) {
+    setBatchRows(prev => [row, ...prev]);
+    setShowManualSettlement(false);
+  }
 
   // 日期范围预设（基于 mock 数据的实际时间范围）
   const DATE_PRESETS: { value: string; label: string; from: string; to: string }[] = [
@@ -464,12 +490,12 @@ function ReconciliationView() {
 
   // 渠道清算账户余额
   function getClearingBalance(channel: string): number {
-    return channelArRows
+    return batchRows
       .filter(r => r.channel === channel && r.actualNet === null)
       .reduce((s, r) => s + r.expectedNet, 0);
   }
 
-  const filteredBatch = useMemo(() => channelArRows.filter(r => {
+  const filteredBatch = useMemo(() => batchRows.filter(r => {
     const q = search.toLowerCase();
     if (q && !r.settlementNo.toLowerCase().includes(q) && !r.merchant.toLowerCase().includes(q)) return false;
     if (activeChannel && r.channel !== activeChannel) return false;
@@ -477,7 +503,7 @@ function ReconciliationView() {
     if (selectedPreset.from && r.periodStart < selectedPreset.from) return false;
     if (selectedPreset.to   && r.periodEnd   > selectedPreset.to)   return false;
     return true;
-  }), [search, activeChannel, statusFilter, selectedPreset]);
+  }), [search, activeChannel, statusFilter, selectedPreset, batchRows]);
 
   const filteredOrder = useMemo(() => allOrderRows.filter(r => {
     const q = search.toLowerCase();
@@ -503,9 +529,14 @@ function ReconciliationView() {
         <div className="mb-2 flex items-center gap-2">
           <h2 className="text-[13px] font-semibold text-[var(--foreground)]">渠道清算账户</h2>
           <span className="text-[11px] text-[var(--muted)]">— 余额趋近于零代表结算健康；点击卡片筛选下方明细</span>
+          <button
+            onClick={() => setShowManualSettlement(true)}
+            className="ml-auto flex h-7 items-center gap-1.5 rounded-lg bg-[var(--primary)] px-2.5 text-[11px] font-semibold text-white hover:opacity-90 shrink-0">
+            <Plus className="size-3" />手动录入结算
+          </button>
           {activeChannel && (
             <button onClick={() => setActiveChannel(null)}
-              className="ml-auto flex items-center gap-1 text-[11px] text-[var(--primary)] underline underline-offset-2">
+              className="flex items-center gap-1 text-[11px] text-[var(--primary)] underline underline-offset-2">
               <X className="size-3" />清除筛选
             </button>
           )}
@@ -513,7 +544,7 @@ function ReconciliationView() {
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {CHANNEL_ORDER.map(channel => {
-            const rows    = channelArRows.filter(r => r.channel === channel);
+            const rows    = batchRows.filter(r => r.channel === channel);
             if (rows.length === 0) return null;
 
             const clearing  = getClearingBalance(channel);
@@ -571,6 +602,13 @@ function ReconciliationView() {
                   <div className="mt-2 border-t border-[var(--border-subtle)] pt-2 text-[10px] text-[var(--muted)]">
                     本期已到账 {fmt(totalSettled)}
                     {latestSettled?.settledAt && ` · ${latestSettled.settledAt}`}
+                  </div>
+                )}
+
+                {/* 待确认到账的结算 */}
+                {rows.filter(r => r.actualNet === null && (r.status === '待到账' || r.status === '处理中')).length > 0 && (
+                  <div className="mt-2 text-[10px] font-medium text-blue-600 opacity-70">
+                    ↓ 在下方结算批次表格中点"确认到账"
                   </div>
                 )}
               </button>
@@ -646,13 +684,60 @@ function ReconciliationView() {
           </div>
         </div>
 
-        {dimension === 'batch' && <BatchDimensionTable rows={filteredBatch} onRowClick={setSelectedId} />}
+        {dimension === 'batch' && <BatchDimensionTable rows={filteredBatch} onRowClick={setSelectedId} onConfirmReceived={row => { setConfirmReceived(row); setConfirmedAmount(row.expectedNet.toFixed(2)); }} />}
         {dimension === 'order' && <OrderDimensionTable rows={filteredOrder} onRowClick={setSelectedOrderKey} />}
         {dimension === 'sku'   && <SkuDimensionTable rows={filteredSku} />}
 
-        <SettlementDetailDrawer row={channelArRows.find(r => r.id === selectedId) ?? null} onClose={() => setSelectedId(null)} />
+        <SettlementDetailDrawer row={batchRows.find(r => r.id === selectedId) ?? null} onClose={() => setSelectedId(null)} />
         <OrderDetailDrawer row={allOrderRows.find(r => r.key === selectedOrderKey) ?? null} onClose={() => setSelectedOrderKey(null)} />
       </div>
+
+      {/* 手动录入结算抽屉 */}
+      <ManualSettlementDrawer open={showManualSettlement} onClose={() => setShowManualSettlement(false)} onAdd={handleAddManualSettlement} />
+
+      {/* 确认到账弹窗 */}
+      {confirmReceived && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setConfirmReceived(null)} />
+          <div className="fixed left-1/2 top-1/2 z-50 w-[400px] max-w-[90vw] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl bg-[var(--surface)] shadow-2xl">
+            <div className="border-b border-[var(--border)] px-6 py-4">
+              <h2 className="text-[15px] font-bold text-[var(--foreground)]">确认回款到账</h2>
+              <p className="mt-0.5 text-[12px] text-[var(--muted)]">{confirmReceived.channel} · {confirmReceived.settlementNo}</p>
+            </div>
+            <div className="space-y-3 px-6 py-5">
+              <div className="rounded-lg bg-[var(--surface-subtle)] px-3 py-2.5 text-[12px]">
+                <div className="flex justify-between"><span className="text-[var(--muted)]">OMS 预期到账</span><span className="font-semibold">{fmtD(confirmReceived.expectedNet)}</span></div>
+              </div>
+              <div>
+                <label className="mb-1 block text-[12px] font-medium text-[var(--foreground)]">实际到账金额 *</label>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px] text-[var(--muted)]">$</span>
+                  <input
+                    type="number" value={confirmedAmount}
+                    onChange={e => setConfirmedAmount(e.target.value)}
+                    placeholder={confirmReceived.expectedNet.toFixed(2)}
+                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] py-1.5 pl-6 pr-2.5 text-[13px] font-semibold outline-none focus:border-[var(--primary)]"
+                  />
+                </div>
+                {confirmedAmount && Math.abs(parseFloat(confirmedAmount) - confirmReceived.expectedNet) > 0.01 && (
+                  <p className="mt-1 text-[11px] text-amber-600">
+                    与预期差异：{fmtD(parseFloat(confirmedAmount) - confirmReceived.expectedNet)}，将标记为"差异"状态
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-[var(--border)] px-6 py-4">
+              <button onClick={() => setConfirmReceived(null)} className="flex h-8 items-center rounded-lg border border-[var(--border)] px-3 text-[13px] hover:bg-[var(--surface-subtle)]">取消</button>
+              <button
+                disabled={!confirmedAmount || isNaN(parseFloat(confirmedAmount))}
+                onClick={() => handleConfirmReceived(confirmReceived.id, parseFloat(confirmedAmount))}
+                className="flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40">
+                确认到账
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -664,9 +749,39 @@ function ReconciliationView() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function AgingView({ dso }: { dso: number }) {
+  const [invoices, setInvoices] = useState<typeof arRows[0][]>(arRows);
   const [search, setSearch]           = useState('');
   const [agingFilter, setAgingFilter] = useState<string>('all');
   const [expandedCustomer, setExpandedCustomer] = useState<string | null>(null);
+  const [showNewInvoice, setShowNewInvoice] = useState(false);
+  const [paymentTarget, setPaymentTarget] = useState<typeof arRows[0] | null>(null);
+  const [payAmount, setPayAmount] = useState('');
+  // 分页
+  const AGING_PAGE_SIZE = 8;
+  const [agingPage, setAgingPage] = useState(1);
+  // 发票预览
+  const [invoicePreviewTarget, setInvoicePreviewTarget] = useState<typeof arRows[0] | null>(null);
+
+  function handleRecordPayment(id: string, amount: number) {
+    setInvoices(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const paid = r.paidAmount + amount;
+      const balance = Math.max(0, r.invoiceAmount - paid);
+      return {
+        ...r,
+        paidAmount: paid,
+        balanceDue: balance,
+        agingStatus: balance <= 0.005 ? '已收款' as typeof r.agingStatus : r.agingStatus,
+      };
+    }));
+    setPaymentTarget(null);
+    setPayAmount('');
+  }
+
+  function handleAddInvoice(inv: typeof arRows[0]) {
+    setInvoices(prev => [inv, ...prev]);
+    setShowNewInvoice(false);
+  }
 
   // 按客户聚合（标准 AR Aging Report 按客户分组）
   const customerMap = useMemo(() => {
@@ -676,7 +791,7 @@ function AgingView({ dso }: { dso: number }) {
       total: number; oldest: number;
       invoices: typeof arRows;
     }>();
-    arRows.forEach(row => {
+    invoices.forEach(row => {
       if (!map.has(row.customer)) {
         map.set(row.customer, { customer: row.customer, current: 0, d1_30: 0, d31_60: 0, d61_90: 0, d90plus: 0, total: 0, oldest: 0, invoices: [] });
       }
@@ -691,7 +806,7 @@ function AgingView({ dso }: { dso: number }) {
       if (row.overdueDays > c.oldest) c.oldest = row.overdueDays;
     });
     return Array.from(map.values()).filter(c => c.total > 0).sort((a, b) => b.oldest - a.oldest);
-  }, []);
+  }, [invoices]);
 
   const filtered = useMemo(() => customerMap.filter(c => {
     const q = search.toLowerCase();
@@ -718,6 +833,12 @@ function AgingView({ dso }: { dso: number }) {
     { key: 'd61_90',  label: '61–90天',  amount: totals.d61_90,  cls: 'bg-red-400' },
     { key: 'd90plus', label: '90天+',    amount: totals.d90plus, cls: 'bg-red-700' },
   ];
+
+  // 分页切片
+  const pagedFiltered = useMemo(
+    () => filtered.slice((agingPage - 1) * AGING_PAGE_SIZE, agingPage * AGING_PAGE_SIZE),
+    [filtered, agingPage],
+  );
 
   return (
     <div className="space-y-4">
@@ -789,10 +910,15 @@ function AgingView({ dso }: { dso: number }) {
           <div>
             <h2 className="text-[14px] font-semibold text-[var(--foreground)]">B2B 应收 · 客户账期管理</h2>
             <p className="mt-0.5 text-[11px] text-[var(--muted)]">
-              B2B 账期订单发货后由 OMS 自动生成应收记录，非手动录入
+              账期订单发货后自动生成应收记录；无系统订单可手动新建发票
             </p>
           </div>
           <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setShowNewInvoice(true)}
+              className="flex h-7 items-center gap-1 rounded-lg bg-[var(--primary)] px-2.5 text-[11px] font-semibold text-white hover:opacity-90 shrink-0">
+              <Plus className="size-3" />新建发票
+            </button>
             <div className="flex w-44 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5">
               <Search className="size-3.5 shrink-0 text-[var(--muted)]" />
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="客户名称"
@@ -829,7 +955,7 @@ function AgingView({ dso }: { dso: number }) {
               {filtered.length === 0 && (
                 <tr><td colSpan={9} className="py-10 text-center text-[13px] text-[var(--muted)]">无匹配客户</td></tr>
               )}
-              {filtered.map(c => {
+              {pagedFiltered.map(c => {
                 const isRisk    = c.d61_90 + c.d90plus > 0;
                 const hasOverdue = c.d1_30 + c.d31_60 + c.d61_90 + c.d90plus > 0;
                 const isExpanded = expandedCustomer === c.customer;
@@ -982,14 +1108,28 @@ function AgingView({ dso }: { dso: number }) {
                                       </span>
                                     </td>
                                     <td className="py-2">
-                                      {inv.balanceDue > 0 && inv.overdueDays > 0 && (
-                                        <button className={cn(
-                                          'flex h-6 items-center gap-1 rounded-md px-2 text-[11px] font-medium transition',
-                                          isRisk ? 'bg-red-600 text-white hover:bg-red-700' : 'border border-[var(--border)] hover:bg-[var(--surface-subtle)]'
-                                        )}>
-                                          <Bell className="size-3" />催款
+                                      <div className="flex items-center gap-1.5">
+                                        {inv.balanceDue > 0 && (
+                                          <button
+                                            onClick={() => { setPaymentTarget(inv); setPayAmount(inv.balanceDue.toFixed(2)); }}
+                                            className="flex h-6 items-center gap-1 rounded-md bg-emerald-600 px-2 text-[11px] font-medium text-white hover:opacity-90 transition">
+                                            录入收款
+                                          </button>
+                                        )}
+                                        <button
+                                          onClick={() => setInvoicePreviewTarget(inv)}
+                                          className="flex h-6 items-center gap-1 rounded-md border border-[var(--border)] px-2 text-[11px] hover:bg-[var(--surface-subtle)] transition">
+                                          生成发票
                                         </button>
-                                      )}
+                                        {inv.balanceDue > 0 && inv.overdueDays > 0 && (
+                                          <button className={cn(
+                                            'flex h-6 items-center gap-1 rounded-md px-2 text-[11px] font-medium transition',
+                                            isRisk ? 'bg-red-600 text-white hover:bg-red-700' : 'border border-[var(--border)] hover:bg-[var(--surface-subtle)]'
+                                          )}>
+                                            <Bell className="size-3" />催款
+                                          </button>
+                                        )}
+                                      </div>
                                     </td>
                                   </tr>
                                 );
@@ -1017,8 +1157,41 @@ function AgingView({ dso }: { dso: number }) {
               </tr>
             </tfoot>
           </table>
+          <ArPagination total={filtered.length} page={agingPage} pageSize={AGING_PAGE_SIZE} onChange={setAgingPage} />
         </div>
       </div>
+
+      {/* 录入收款弹窗 */}
+      {paymentTarget && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setPaymentTarget(null)} />
+          <div className="fixed left-1/2 top-1/2 z-50 w-[400px] max-w-[90vw] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl bg-[var(--surface)] shadow-2xl">
+            <div className="border-b border-[var(--border)] px-6 py-4">
+              <h2 className="text-[15px] font-bold text-[var(--foreground)]">录入收款</h2>
+              <p className="mt-0.5 text-[12px] text-[var(--muted)]">{paymentTarget.invoiceNo} · {paymentTarget.customer}</p>
+            </div>
+            <ArPaymentForm
+              balanceDue={paymentTarget.balanceDue}
+              payAmount={payAmount}
+              onAmountChange={setPayAmount}
+              onConfirm={(amount) => handleRecordPayment(paymentTarget.id, amount)}
+              onClose={() => setPaymentTarget(null)}
+            />
+          </div>
+        </>
+      )}
+
+      {/* 新建发票抽屉 */}
+      <NewInvoiceDrawer open={showNewInvoice} onClose={() => setShowNewInvoice(false)} onAdd={handleAddInvoice} />
+
+      {/* 发票预览弹窗 */}
+      {invoicePreviewTarget && (
+        <ArInvoicePreviewModal
+          invoice={invoicePreviewTarget}
+          onClose={() => setInvoicePreviewTarget(null)}
+          onMarkSent={() => setInvoicePreviewTarget(null)}
+        />
+      )}
     </div>
   );
 }
@@ -1046,10 +1219,15 @@ function KpiCard({ label, value, sub, warn, success, danger }: {
 
 // ─── 结算批次表 ───────────────────────────────────────────────────────────────
 
-function BatchDimensionTable({ rows, onRowClick }: {
+function BatchDimensionTable({ rows, onRowClick, onConfirmReceived }: {
   rows: ChannelArRow[];
   onRowClick: (id: string) => void;
+  onConfirmReceived: (row: ChannelArRow) => void;
 }) {
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(1);
+  const paged = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const total = {
     gross: rows.reduce((s, r) => s + r.grossAmount, 0),
     exp:   rows.reduce((s, r) => s + r.expectedNet, 0),
@@ -1081,7 +1259,7 @@ function BatchDimensionTable({ rows, onRowClick }: {
             {rows.length === 0 && (
               <tr><td colSpan={12} className="py-12 text-center text-[13px] text-[var(--muted)]">无匹配结算批次</td></tr>
             )}
-            {rows.map(row => {
+            {paged.map(row => {
               const sc  = channelArStatusConfig[row.status];
               const erc = erpSyncConfig[row.erpSync];
               const deductRate = row.grossAmount > 0 ? (row.totalDeduction / row.grossAmount * 100).toFixed(1) : '0';
@@ -1140,10 +1318,18 @@ function BatchDimensionTable({ rows, onRowClick }: {
                     {row.erpSystem && <div className="text-[10px] text-[var(--muted)]">{row.erpSystem}</div>}
                   </td>
                   <td className="whitespace-nowrap px-3 py-3">
-                    <button onClick={e => { e.stopPropagation(); onRowClick(row.id); }}
-                      className="h-6 rounded border border-[var(--border)] px-2 text-[11px] text-[var(--muted)] hover:bg-[var(--surface-subtle)]">
-                      查看
-                    </button>
+                    <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => onRowClick(row.id)}
+                        className="h-6 rounded border border-[var(--border)] px-2 text-[11px] text-[var(--muted)] hover:bg-[var(--surface-subtle)]">
+                        查看
+                      </button>
+                      {row.actualNet === null && (
+                        <button onClick={() => onConfirmReceived(row)}
+                          className="h-6 rounded border border-emerald-300 bg-emerald-50 px-2 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100">
+                          确认到账
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
@@ -1165,6 +1351,7 @@ function BatchDimensionTable({ rows, onRowClick }: {
           </div>
         ))}
       </div>
+      <ArPagination total={rows.length} page={page} pageSize={PAGE_SIZE} onChange={setPage} />
     </div>
   );
 }
@@ -1886,3 +2073,808 @@ function Num({ v, cls, bold }: { v: number; cls?: string; bold?: boolean }) {
 }
 
 // ─── SKU 维度表 ───────────────────────────────────────────────────────────────
+
+// ─── 手动录入结算 Drawer ──────────────────────────────────────────────────────
+
+const STANDARD_CHANNELS: ChannelSource[] = ['Amazon', 'Shopify', 'TikTok Shop', 'Walmart', '手工订单', 'EDI'];
+const CUSTOM_KEY = '__custom__';
+
+// 每个渠道的费用扣减字段配置
+type FeeField = {
+  key: string;
+  label: string;
+  hint: string;
+  typical?: string; // 典型费率说明
+};
+
+const CHANNEL_FEE_CONFIG: Record<ChannelSource, FeeField[]> = {
+  Amazon: [
+    { key: 'commission',     label: '引荐费（Referral Fee）',          hint: '按品类计费，服装 17%、3C 8%、日用 15% 等',    typical: '约 8–17%' },
+    { key: 'fulfillmentFee', label: 'FBA 配送费（Fulfillment Fee）',    hint: 'FBA Per-Unit + Weight-Based Fee，按件收取',   typical: '$3–15/件' },
+    { key: 'advertisingFee', label: '广告费扣减（Sponsored Ads）',      hint: '从结算周期内的广告消耗中扣除',                 typical: '视投放' },
+    { key: 'refunds',        label: '退款扣减（Refunds）',              hint: '已退款订单，含退货运费',                        typical: '' },
+    { key: 'otherDeduction', label: '其他杂项（FBA Storage / Adj.）',   hint: '长期仓储费、库存调整、账务调整等',              typical: '' },
+  ],
+  Shopify: [
+    { key: 'transactionFee', label: '支付手续费（Stripe Transaction）', hint: 'Stripe 费率约 2.9% + $0.30/笔，从打款中扣除', typical: '~2.9%' },
+    { key: 'refunds',        label: '退款扣减（Refunds）',              hint: '已退款的订单金额，含退货运费（如适用）',         typical: '' },
+    { key: 'otherDeduction', label: '其他（平台手续费等）',              hint: 'Shopify Payments 月费分摊、货币转换费等',       typical: '' },
+  ],
+  'TikTok Shop': [
+    { key: 'commission',     label: '平台佣金（Commission）',           hint: 'TikTok Shop 基础佣金，通常 5–8%',             typical: '5–8%' },
+    { key: 'advertisingFee', label: '联盟营销费（Affiliate Fee）',      hint: '达人带货佣金，从 GMV 中扣除',                  typical: '视合作' },
+    { key: 'otherDeduction', label: '运费补贴 / 优惠补贴（负数）',       hint: '平台补贴为负数（减少扣减），促销补贴正数',       typical: '' },
+    { key: 'refunds',        label: '退款扣减（Returns）',              hint: '退货退款',                                     typical: '' },
+  ],
+  Walmart: [
+    { key: 'commission',     label: '引荐费（Referral Fee）',           hint: 'Walmart Marketplace 佣金，约 6–20%',          typical: '6–20%' },
+    { key: 'fulfillmentFee', label: 'WFS 配送费（如使用）',             hint: 'Walmart Fulfillment Services，不使用则填 0', typical: '' },
+    { key: 'refunds',        label: '退款扣减',                         hint: '退款订单',                                     typical: '' },
+    { key: 'otherDeduction', label: '其他杂项',                         hint: '账务调整等',                                   typical: '' },
+  ],
+  '手工订单': [
+    { key: 'otherDeduction', label: '其他扣减（如有）',                  hint: '手工订单一般无平台扣减；如有银行手续费可填此处', typical: '' },
+    { key: 'refunds',        label: '退款（如有）',                     hint: '线下退款金额',                                  typical: '' },
+  ],
+  EDI: [
+    { key: 'commission',     label: '渠道服务费（如有）',               hint: 'EDI 合作方扣减的渠道服务费',                   typical: '' },
+    { key: 'refunds',        label: '退款扣减（如有）',                 hint: '退货退款',                                      typical: '' },
+    { key: 'otherDeduction', label: '其他杂项',                         hint: '对账差异、账务调整等',                          typical: '' },
+  ],
+};
+
+// 自定义渠道使用所有费用字段
+const CUSTOM_CHANNEL_FEES: FeeField[] = [
+  { key: 'commission',     label: '平台佣金 / 引荐费',  hint: '渠道扣减的佣金或引荐费，填从结算报告中的数字', typical: '' },
+  { key: 'fulfillmentFee', label: '配送费（如有）',       hint: '平台代履约配送费，不涉及则留空',               typical: '' },
+  { key: 'advertisingFee', label: '广告费扣减（如有）',   hint: '广告费从结算中直接扣除的部分',                 typical: '' },
+  { key: 'transactionFee', label: '支付 / 交易手续费',    hint: '支付网关或平台交易手续费',                    typical: '' },
+  { key: 'refunds',        label: '退款扣减（如有）',     hint: '退货退款从本期结算中扣除',                     typical: '' },
+  { key: 'otherDeduction', label: '其他杂项扣减',         hint: '账务调整、长期仓储费、其他平台收费等',          typical: '' },
+];
+
+// 渠道说明
+const CHANNEL_DESC: Record<ChannelSource, string> = {
+  Amazon:        '亚马逊卖家平台，T+7 或 T+14 结算，通过 Seller Central 导出 Settlement Report',
+  Shopify:       'Shopify Payments / Stripe 打款，T+1 到 T+3，通过 Shopify Admin 导出 Payout 报告',
+  'TikTok Shop': 'TikTok 电商，T+15 结算，通过 TikTok Seller Center 导出结算明细',
+  Walmart:       'Walmart Marketplace，T+14 结算，通过 Seller Center 导出报告',
+  '手工订单':    '线下/直接付款订单，客户银行电汇后手动录入到账',
+  EDI:           'EDI 合作零售商，按合同账期回款（Net 30/60 等）',
+};
+
+function ManualSettlementDrawer({ open, onClose, onAdd }: {
+  open: boolean;
+  onClose: () => void;
+  onAdd: (row: ChannelArRow) => void;
+}) {
+  const inputCls = 'w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5 text-[13px] text-[var(--foreground)] outline-none focus:border-[var(--primary)] focus:bg-[var(--surface)] transition-colors placeholder:text-[var(--muted-foreground)]';
+
+  const [channelPreset, setChannelPreset] = useState<ChannelSource | typeof CUSTOM_KEY>('Amazon');
+  const [channelCustom, setChannelCustom] = useState('');
+  const effectiveChannel = channelPreset === CUSTOM_KEY
+    ? (channelCustom.trim() || '自定义渠道')
+    : channelPreset;
+
+  const [form, setForm] = useState({
+    merchant: '',
+    periodStart: '',
+    periodEnd: '',
+    orderCount: '',
+    grossAmount: '',
+    // 各扣减字段（按渠道有不同含义）
+    commission: '',
+    fulfillmentFee: '',
+    advertisingFee: '',
+    transactionFee: '',
+    refunds: '',
+    otherDeduction: '',
+    actualNet: '',
+    currency: 'USD',
+    note: '',
+  });
+
+  // 切换渠道时清空费用字段
+  function handleChannelChange(val: ChannelSource | typeof CUSTOM_KEY) {
+    setChannelPreset(val);
+    setChannelCustom('');
+    setForm(p => ({
+      ...p,
+      commission: '', fulfillmentFee: '', advertisingFee: '',
+      transactionFee: '', refunds: '', otherDeduction: '',
+      actualNet: '',
+    }));
+  }
+
+  function set(k: keyof typeof form, v: string) { setForm(p => ({ ...p, [k]: v })); }
+
+  const feeFields = channelPreset === CUSTOM_KEY
+    ? CUSTOM_CHANNEL_FEES
+    : (CHANNEL_FEE_CONFIG[channelPreset as ChannelSource] ?? []);
+
+  const grossAmt = parseFloat(form.grossAmount) || 0;
+  const totalDeduction = feeFields.reduce((s, f) => s + (parseFloat(form[f.key as keyof typeof form] as string) || 0), 0);
+  const expectedNet = grossAmt - totalDeduction;
+  const actualNetVal = form.actualNet ? parseFloat(form.actualNet) : null;
+  const variance = actualNetVal !== null ? +(actualNetVal - expectedNet).toFixed(2) : null;
+
+  const isValid = effectiveChannel && form.periodStart && form.periodEnd && grossAmt > 0
+    && (channelPreset !== CUSTOM_KEY || channelCustom.trim().length > 0);
+
+  if (!open) return null;
+
+  return (
+    <>
+      <div className="fixed inset-0 z-30 bg-black/20" onClick={onClose} />
+      <div className="fixed right-0 top-0 z-40 flex h-full w-[540px] max-w-full flex-col overflow-hidden bg-[var(--surface)] shadow-2xl">
+        <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-6 py-4">
+          <div>
+            <h2 className="text-[15px] font-bold text-[var(--foreground)]">手动录入渠道结算</h2>
+            <p className="mt-0.5 text-[12px] text-[var(--muted)]">适用于平台未对接 API、需手动输入结算报告数据的情况</p>
+          </div>
+          <button onClick={onClose} className="flex size-8 items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[var(--surface-subtle)]">
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+
+          {/* ① 渠道选择 */}
+          <section>
+            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">① 渠道 & 结算周期</h3>
+            <div className="space-y-3">
+
+              {/* 渠道选择 — 下拉支持自定义 */}
+              <div>
+                <label className="mb-1 block text-[12px] font-medium">销售渠道 *</label>
+                <select
+                  value={channelPreset}
+                  onChange={e => handleChannelChange(e.target.value as ChannelSource | typeof CUSTOM_KEY)}
+                  className={inputCls}>
+                  <optgroup label="主流电商平台">
+                    {STANDARD_CHANNELS.map(ch => (
+                      <option key={ch} value={ch}>{ch}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="其他">
+                    <option value={CUSTOM_KEY}>自定义渠道（手动输入）</option>
+                  </optgroup>
+                </select>
+
+                {/* 自定义渠道输入框 */}
+                {channelPreset === CUSTOM_KEY && (
+                  <div className="mt-2">
+                    <input
+                      value={channelCustom}
+                      onChange={e => setChannelCustom(e.target.value)}
+                      placeholder="输入渠道名称，如：Lazada、Temu、独立站…"
+                      className={cn(inputCls, !channelCustom.trim() && 'border-amber-300 focus:border-amber-500')}
+                      autoFocus
+                    />
+                    <p className="mt-0.5 text-[10px] text-[var(--muted)]">自定义渠道将显示所有费用字段，请按实际账单填写</p>
+                  </div>
+                )}
+
+                {/* 渠道说明 */}
+                {channelPreset !== CUSTOM_KEY && (
+                  <p className="mt-1.5 text-[11px] text-[var(--muted)]">
+                    {CHANNEL_DESC[channelPreset as ChannelSource]}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="mb-1 block text-[12px] font-medium">店铺名称</label>
+                <input value={form.merchant} onChange={e => set('merchant', e.target.value)} placeholder={`如 ${effectiveChannel} US Store`} className={inputCls} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-[12px] font-medium">结算开始日 *</label>
+                  <input type="date" value={form.periodStart} onChange={e => set('periodStart', e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[12px] font-medium">结算结束日 *</label>
+                  <input type="date" value={form.periodEnd} onChange={e => set('periodEnd', e.target.value)} className={inputCls} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-[12px] font-medium">订单数量</label>
+                  <input type="number" value={form.orderCount} onChange={e => set('orderCount', e.target.value)} placeholder="0" className={inputCls} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[12px] font-medium">结算币种</label>
+                  <select value={form.currency} onChange={e => set('currency', e.target.value)} className={inputCls}>
+                    <option>USD</option><option>GBP</option><option>EUR</option><option>CNY</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* ② 销售金额 & 渠道专属扣减 */}
+          <section>
+            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">② 销售额 & 费用扣减</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-[12px] font-medium">渠道销售总额（GMV）*</label>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px] text-[var(--muted)]">$</span>
+                  <input type="number" value={form.grossAmount} onChange={e => set('grossAmount', e.target.value)} placeholder="0.00" className={cn(inputCls, 'pl-6')} />
+                </div>
+                <p className="mt-0.5 text-[10px] text-[var(--muted)]">结算报告中的 Total Sales / Gross Revenue</p>
+              </div>
+
+              {/* 渠道专属扣减字段 */}
+              {feeFields.length > 0 && (
+                <div>
+                  <div className="mb-2 flex items-center gap-1.5">
+                    <span className="text-[12px] font-medium text-[var(--foreground)]">{effectiveChannel} 费用扣减明细</span>
+                    <span className="text-[11px] text-[var(--muted)]">（从结算报告逐项填入）</span>
+                  </div>
+                  <div className="space-y-2.5">
+                    {feeFields.map(field => (
+                      <div key={field.key}>
+                        <div className="mb-0.5 flex items-baseline gap-2">
+                          <label className="text-[12px] font-medium">{field.label}</label>
+                          {field.typical && (
+                            <span className="text-[10px] text-amber-600">{field.typical}</span>
+                          )}
+                        </div>
+                        <div className="relative">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px] text-[var(--muted)]">$</span>
+                          <input
+                            type="number"
+                            value={form[field.key as keyof typeof form] as string}
+                            onChange={e => set(field.key as keyof typeof form, e.target.value)}
+                            placeholder="0.00"
+                            className={cn(inputCls, 'pl-6')}
+                          />
+                        </div>
+                        <p className="mt-0.5 text-[10px] text-[var(--muted)]">{field.hint}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 手工订单 / EDI 无扣减时的提示 */}
+              {(channelPreset === '手工订单' || channelPreset === 'EDI') && (
+                <div className="rounded-lg bg-emerald-50 px-3 py-2 text-[11px] text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                  💡 {channelPreset}通常无平台中间抽佣。扣减字段仅在有退款或特殊扣减时填写。
+                </div>
+              )}
+
+              {/* 实时计算结果 */}
+              {grossAmt > 0 && (
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] px-4 py-3 text-[12px] space-y-1.5">
+                  <div className="flex justify-between">
+                    <span className="text-[var(--muted)]">销售总额</span>
+                    <span className="font-medium">${grossAmt.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[var(--muted)]">扣减合计</span>
+                    <span className="font-semibold text-red-600">-${totalDeduction.toFixed(2)}</span>
+                  </div>
+                  {totalDeduction > 0 && grossAmt > 0 && (
+                    <div className="flex justify-between text-[10px]">
+                      <span className="text-[var(--muted)]">综合扣减率</span>
+                      <span className="text-[var(--muted)]">{(totalDeduction / grossAmt * 100).toFixed(1)}%</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t border-[var(--border-subtle)] pt-1.5">
+                    <span className="font-semibold">OMS 预期净额</span>
+                    <span className="text-[14px] font-bold text-[var(--foreground)]">${expectedNet.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* ③ 实际到账 */}
+          <section>
+            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">③ 实际到账（可选）</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-[12px] font-medium">银行实际到账金额</label>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px] text-[var(--muted)]">$</span>
+                  <input type="number" value={form.actualNet} onChange={e => set('actualNet', e.target.value)} placeholder="如已到账，填入实际金额" className={cn(inputCls, 'pl-6')} />
+                </div>
+                <p className="mt-0.5 text-[10px] text-[var(--muted)]">如尚未到账，留空即可；到账后再通过"确认到账"功能更新</p>
+                {variance !== null && Math.abs(variance) > 0.01 && (
+                  <div className="mt-1.5 rounded-lg bg-amber-50 px-2.5 py-2 text-[11px] text-amber-700">
+                    与预期差异：{variance > 0 ? '+' : ''}${variance.toFixed(2)} — 将标记为"差异"状态，需在对账中处理
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="mb-1 block text-[12px] font-medium">备注</label>
+                <textarea value={form.note} onChange={e => set('note', e.target.value)} rows={2} placeholder="如差异原因、汇率说明、特殊扣减等" className={cn(inputCls, 'resize-none')} />
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[var(--border)] px-6 py-4">
+          <button onClick={onClose} className="flex h-8 items-center rounded-lg border border-[var(--border)] px-3 text-[13px] hover:bg-[var(--surface-subtle)]">取消</button>
+          <button
+            disabled={!isValid}
+            onClick={() => {
+              const deductionBreakdown: ChannelArRow['deductionBreakdown'] = {
+                commission:    parseFloat(form.commission) || undefined,
+                fulfillmentFee: parseFloat(form.fulfillmentFee) || undefined,
+                advertisingFee: parseFloat(form.advertisingFee) || undefined,
+                transactionFee: parseFloat(form.transactionFee) || undefined,
+                refunds:        parseFloat(form.refunds) || undefined,
+                other:          parseFloat(form.otherDeduction) || undefined,
+              };
+              const newRow: ChannelArRow = {
+                id: `car_manual_${Date.now()}`,
+                settlementNo: `MANUAL-${effectiveChannel.toUpperCase().replace(/\s/g, '').slice(0, 10)}-${form.periodEnd.replace(/-/g, '')}`,
+                channel: effectiveChannel as ChannelSource,
+                merchant: form.merchant || effectiveChannel,
+                periodStart: form.periodStart,
+                periodEnd: form.periodEnd,
+                orderCount: parseInt(form.orderCount) || 0,
+                grossAmount: grossAmt,
+                totalDeduction,
+                expectedNet,
+                actualNet: actualNetVal,
+                variance,
+                currency: form.currency,
+                status: actualNetVal !== null
+                  ? (variance !== null && Math.abs(variance) < 0.01 ? '已到账' : '差异')
+                  : '待到账',
+                settledAt: actualNetVal !== null ? new Date().toISOString().slice(0, 10) : undefined,
+                erpSync: 'pending',
+                note: form.note || undefined,
+                deductionBreakdown,
+                expectedReceiptDate: form.periodEnd,
+              };
+              onAdd(newRow);
+            }}
+            className="flex h-8 items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40">
+            保存结算记录
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── 新建 B2B 发票 Drawer ─────────────────────────────────────────────────────
+
+function NewInvoiceDrawer({ open, onClose, onAdd }: {
+  open: boolean;
+  onClose: () => void;
+  onAdd: (inv: typeof arRows[0]) => void;
+}) {
+  const inputCls = 'w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5 text-[13px] text-[var(--foreground)] outline-none focus:border-[var(--primary)] focus:bg-[var(--surface)] transition-colors placeholder:text-[var(--muted-foreground)]';
+
+  const [form, setForm] = useState({
+    customer: '',
+    channel: 'Direct',
+    invoiceDate: new Date().toISOString().slice(0, 10),
+    paymentTerms: 'Net 30',
+    invoiceAmount: '',
+    currency: 'USD',
+    sourceOrderId: '',
+    note: '',
+  });
+
+  function set(k: keyof typeof form, v: string) { setForm(p => ({ ...p, [k]: v })); }
+
+  const amount = parseFloat(form.invoiceAmount) || 0;
+  const daysMap: Record<string, number> = { 'Net 15': 15, 'Net 30': 30, 'Net 45': 45, 'Net 60': 60, 'Net 90': 90 };
+  const days = daysMap[form.paymentTerms] ?? 30;
+  const dueDate = new Date(new Date(form.invoiceDate).getTime() + days * 86400000).toISOString().slice(0, 10);
+
+  const isValid = form.customer && amount > 0 && form.invoiceDate;
+
+  if (!open) return null;
+
+  return (
+    <>
+      <div className="fixed inset-0 z-30 bg-black/20" onClick={onClose} />
+      <div className="fixed right-0 top-0 z-40 flex h-full w-[440px] max-w-full flex-col overflow-hidden bg-[var(--surface)] shadow-2xl">
+        <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-6 py-4">
+          <div>
+            <h2 className="text-[15px] font-bold text-[var(--foreground)]">新建应收发票</h2>
+            <p className="mt-0.5 text-[12px] text-[var(--muted)]">手动创建 B2B 应收账单，不依赖系统订单</p>
+          </div>
+          <button onClick={onClose} className="flex size-8 items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[var(--surface-subtle)]">
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+          <div>
+            <label className="mb-1 block text-[12px] font-medium">客户名称 *</label>
+            <input value={form.customer} onChange={e => set('customer', e.target.value)} placeholder="如 TechCorp Inc." className={inputCls} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-[12px] font-medium">销售渠道</label>
+              <select value={form.channel} onChange={e => set('channel', e.target.value)} className={inputCls}>
+                <option>Direct</option><option>EDI</option><option>Shopify</option><option>Amazon</option><option>其他</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-[12px] font-medium">付款条款</label>
+              <select value={form.paymentTerms} onChange={e => set('paymentTerms', e.target.value)} className={inputCls}>
+                <option>Net 15</option><option>Net 30</option><option>Net 45</option><option>Net 60</option><option>Net 90</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-[12px] font-medium">开单日期 *</label>
+              <input type="date" value={form.invoiceDate} onChange={e => set('invoiceDate', e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <label className="mb-1 block text-[12px] font-medium">到期日（自动计算）</label>
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5 text-[13px] text-[var(--muted)]">{dueDate}</div>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-[12px] font-medium">应收金额 *</label>
+            <div className="relative">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px] text-[var(--muted)]">$</span>
+              <input type="number" value={form.invoiceAmount} onChange={e => set('invoiceAmount', e.target.value)} placeholder="0.00" className={cn(inputCls, 'pl-6')} />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-[12px] font-medium">关联订单号（可选）</label>
+            <input value={form.sourceOrderId} onChange={e => set('sourceOrderId', e.target.value)} placeholder="如 SO-2026-0001" className={cn(inputCls, 'font-mono')} />
+          </div>
+          <div>
+            <label className="mb-1 block text-[12px] font-medium">备注</label>
+            <textarea value={form.note} onChange={e => set('note', e.target.value)} rows={2} className={cn(inputCls, 'resize-none')} />
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[var(--border)] px-6 py-4">
+          <button onClick={onClose} className="flex h-8 items-center rounded-lg border border-[var(--border)] px-3 text-[13px] hover:bg-[var(--surface-subtle)]">取消</button>
+          <button
+            disabled={!isValid}
+            onClick={() => {
+              const today = new Date().toISOString().slice(0, 10);
+              const newInv = {
+                id: `ar_manual_${Date.now()}`,
+                invoiceNo: `INV-MAN-${today.replace(/-/g, '')}-${Math.floor(Math.random() * 9000) + 1000}`,
+                sourceOrderId: form.sourceOrderId || undefined,
+                paymentTerms: form.paymentTerms,
+                customer: form.customer,
+                channel: form.channel,
+                invoiceDate: form.invoiceDate,
+                dueDate,
+                invoiceAmount: amount,
+                paidAmount: 0,
+                balanceDue: amount,
+                currency: form.currency,
+                agingStatus: '未到期' as const,
+                overdueDays: 0,
+                note: form.note || undefined,
+              };
+              onAdd(newInv);
+            }}
+            className="flex h-8 items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40">
+            创建发票
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── 通用分页组件（AR 模块）─────────────────────────────────────────────────
+
+function ArPagination({ total, page, pageSize, onChange }: {
+  total: number; page: number; pageSize: number; onChange: (p: number) => void;
+}) {
+  const totalPages = Math.ceil(total / pageSize);
+  if (totalPages <= 1) return null;
+
+  const pages: (number | '...')[] = [];
+  if (totalPages <= 7) {
+    for (let i = 1; i <= totalPages; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    if (page > 3) pages.push('...');
+    for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) pages.push(i);
+    if (page < totalPages - 2) pages.push('...');
+    pages.push(totalPages);
+  }
+
+  const btnCls = 'flex h-7 min-w-[28px] items-center justify-center rounded-md border text-[12px] transition-colors';
+
+  return (
+    <div className="flex items-center justify-between border-t border-[var(--border)] px-5 py-3 text-[12px]">
+      <span className="text-[var(--muted)]">共 {total} 条 · 第 {page}/{totalPages} 页</span>
+      <div className="flex items-center gap-1">
+        <button
+          disabled={page === 1}
+          onClick={() => onChange(page - 1)}
+          className={cn(btnCls, 'border-[var(--border)] px-2.5 text-[var(--muted)] hover:bg-[var(--surface-subtle)] disabled:cursor-not-allowed disabled:opacity-40')}>
+          ‹
+        </button>
+        {pages.map((p, i) =>
+          p === '...'
+            ? <span key={`e-${i}`} className="px-1 text-[var(--muted)]">…</span>
+            : <button key={p} onClick={() => onChange(p as number)}
+                className={cn(btnCls, p === page
+                  ? 'border-[var(--primary)] bg-[var(--primary)] text-white'
+                  : 'border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--surface-subtle)]')}>
+                {p}
+              </button>
+        )}
+        <button
+          disabled={page === totalPages}
+          onClick={() => onChange(page + 1)}
+          className={cn(btnCls, 'border-[var(--border)] px-2.5 text-[var(--muted)] hover:bg-[var(--surface-subtle)] disabled:cursor-not-allowed disabled:opacity-40')}>
+          ›
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── AR 收款表单（独立组件，含凭证上传）────────────────────────────────────
+
+function ArPaymentForm({ balanceDue, payAmount, onAmountChange, onConfirm, onClose }: {
+  balanceDue: number;
+  payAmount: string;
+  onAmountChange: (v: string) => void;
+  onConfirm: (amount: number) => void;
+  onClose: () => void;
+}) {
+  const [receiptDate, setReceiptDate] = useState(new Date().toISOString().slice(0, 10));
+  const [payMethod, setPayMethod] = useState('银行转账');
+  const [ref, setRef] = useState('');
+  const [attachmentName, setAttachmentName] = useState<string | null>(null);
+
+  const parsed = parseFloat(payAmount);
+  const attachmentRequired = parsed > 5000;
+  const isValid = !isNaN(parsed) && parsed > 0
+    && (!attachmentRequired || attachmentName !== null);
+
+  return (
+    <>
+      <div className="space-y-3 px-6 py-5">
+        <div className="rounded-lg bg-[var(--surface-subtle)] px-3 py-2 text-[12px]">
+          <div className="flex justify-between"><span className="text-[var(--muted)]">未收余额</span><span className="font-semibold">{fmtD(balanceDue)}</span></div>
+        </div>
+        <div>
+          <label className="mb-1 block text-[12px] font-medium">本次收款金额 *</label>
+          <div className="relative">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px] text-[var(--muted)]">$</span>
+            <input type="number" value={payAmount} onChange={e => onAmountChange(e.target.value)}
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] py-1.5 pl-6 pr-2.5 text-[13px] font-semibold outline-none focus:border-[var(--primary)]" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-[12px] font-medium">到账日期</label>
+            <input type="date" value={receiptDate} onChange={e => setReceiptDate(e.target.value)}
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--primary)]" />
+          </div>
+          <div>
+            <label className="mb-1 block text-[12px] font-medium">收款方式</label>
+            <select value={payMethod} onChange={e => setPayMethod(e.target.value)}
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--primary)]">
+              <option>银行转账</option><option>支票</option><option>信用卡</option><option>PayPal</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-[12px] font-medium">银行流水号（可选）</label>
+          <input value={ref} onChange={e => setRef(e.target.value)} placeholder="参考号/流水号"
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5 font-mono text-[12px] outline-none focus:border-[var(--primary)]" />
+        </div>
+
+        {/* 收款凭证上传 */}
+        <div>
+          <label className="mb-1 flex items-center gap-1.5 text-[12px] font-medium">
+            收款凭证
+            {attachmentRequired
+              ? <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">必填（金额 &gt;$5,000）</span>
+              : <span className="rounded-full bg-[var(--surface-subtle)] px-1.5 py-0.5 text-[10px] text-[var(--muted)]">建议上传</span>
+            }
+          </label>
+          {attachmentName ? (
+            <div className="flex items-center justify-between rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2">
+              <div className="flex items-center gap-2 text-[12px] text-emerald-700">
+                <span className="font-medium">{attachmentName}</span>
+              </div>
+              <button onClick={() => setAttachmentName(null)} className="text-[var(--muted)] hover:text-[var(--danger)]">
+                <X className="size-3.5" />
+              </button>
+            </div>
+          ) : (
+            <label className={cn(
+              'flex cursor-pointer items-center gap-2.5 rounded-lg border-2 border-dashed px-3 py-2.5 transition-colors',
+              attachmentRequired ? 'border-red-300 bg-red-50 hover:border-red-400' : 'border-[var(--border)] hover:border-[var(--primary)]',
+            )}>
+              <div className="size-4 shrink-0 text-[var(--muted)]">↑</div>
+              <div>
+                <div className={cn('text-[12px] font-medium', attachmentRequired ? 'text-red-600' : 'text-[var(--foreground)]')}>
+                  {attachmentRequired ? '请上传银行到账凭证（必填）' : '上传到账凭证（推荐）'}
+                </div>
+                <div className="text-[10px] text-[var(--muted)]">支持 PDF、PNG、JPG，最大 10MB</div>
+              </div>
+              <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden"
+                onChange={e => { if (e.target.files?.[0]) setAttachmentName(e.target.files[0].name); }} />
+            </label>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center justify-end gap-2 border-t border-[var(--border)] px-6 py-4">
+        <button onClick={onClose} className="flex h-8 items-center rounded-lg border border-[var(--border)] px-3 text-[13px] hover:bg-[var(--surface-subtle)]">取消</button>
+        <button
+          disabled={!isValid}
+          onClick={() => isValid && onConfirm(parsed)}
+          className="flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40">
+          确认收款
+        </button>
+      </div>
+    </>
+  );
+}
+
+// ─── AR 发票预览弹窗 ──────────────────────────────────────────────────────────
+
+function ArInvoicePreviewModal({ invoice, onClose, onMarkSent }: {
+  invoice: typeof arRows[0];
+  onClose: () => void;
+  onMarkSent: () => void;
+}) {
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/50" onClick={onClose} />
+      <div className="fixed left-1/2 top-1/2 z-50 h-[88vh] w-[620px] max-w-[95vw] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl bg-[var(--surface)] shadow-2xl flex flex-col">
+
+        {/* 操作栏 */}
+        <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-5 py-3">
+          <div>
+            <span className="text-[14px] font-semibold text-[var(--foreground)]">发票预览</span>
+            <span className="ml-2 text-[12px] text-[var(--muted)]">{invoice.invoiceNo}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button className="flex h-7 items-center gap-1 rounded-lg border border-[var(--border)] px-2.5 text-[12px] hover:bg-[var(--surface-subtle)]">
+              下载 PDF（模拟）
+            </button>
+            <button
+              onClick={onMarkSent}
+              className="flex h-7 items-center gap-1 rounded-lg bg-[var(--primary)] px-2.5 text-[12px] font-semibold text-white hover:opacity-90">
+              ✓ 标记已发送
+            </button>
+            <button onClick={onClose} className="flex size-7 items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[var(--surface-subtle)]">
+              <X className="size-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* 发票内容 */}
+        <div className="flex-1 overflow-y-auto bg-gray-100 p-6">
+          <div className="mx-auto max-w-[520px] bg-white shadow-lg" style={{ fontFamily: 'system-ui, sans-serif' }}>
+
+            {/* 标题栏 */}
+            <div style={{ backgroundColor: '#1d4ed8', color: '#fff', padding: '24px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '18px', fontWeight: 700 }}>Your Company Inc.</div>
+              <div style={{ fontSize: '26px', fontWeight: 800, opacity: 0.9 }}>INVOICE</div>
+            </div>
+
+            {/* 发送方/收件方 + 元信息 */}
+            <div style={{ padding: '20px 28px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, borderBottom: '2px solid #bfdbfe' }}>
+              <div>
+                <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', color: '#888', letterSpacing: 1, marginBottom: 6 }}>FROM</div>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#111' }}>Your Company Inc.</div>
+                <div style={{ fontSize: '11px', color: '#555', lineHeight: 1.7, marginTop: 2 }}>
+                  123 Commerce Street<br />New York, NY 10001<br />finance@yourcompany.com
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', color: '#888', letterSpacing: 1, marginBottom: 6 }}>BILL TO</div>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#111' }}>{invoice.customer}</div>
+                <div style={{ fontSize: '11px', color: '#555', lineHeight: 1.7, marginTop: 2 }}>
+                  [Customer Address]<br />[City, Country]
+                </div>
+                <div style={{ marginTop: 12 }}>
+                  {[
+                    { l: 'Invoice No.', v: invoice.invoiceNo },
+                    { l: 'Issue Date',  v: invoice.invoiceDate },
+                    { l: 'Due Date',    v: invoice.dueDate },
+                    { l: 'Terms',       v: invoice.paymentTerms ?? 'Net 30' },
+                  ].map(r => (
+                    <div key={r.l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginBottom: 3 }}>
+                      <span style={{ color: '#888' }}>{r.l}</span>
+                      <span style={{ fontWeight: 600 }}>{r.v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 明细 */}
+            <div style={{ padding: '20px 28px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#1d4ed8', color: '#fff' }}>
+                    <th style={{ padding: '7px 10px', textAlign: 'left' }}>Description</th>
+                    <th style={{ padding: '7px 10px', textAlign: 'right' }}>Qty</th>
+                    <th style={{ padding: '7px 10px', textAlign: 'right' }}>Unit Price</th>
+                    <th style={{ padding: '7px 10px', textAlign: 'right' }}>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style={{ borderBottom: '1px solid #bfdbfe' }}>
+                    <td style={{ padding: '9px 10px', color: '#333' }}>
+                      Goods / Services per Order {invoice.sourceOrderId ?? '—'}<br />
+                      <span style={{ fontSize: '10px', color: '#888' }}>Per agreement dated {invoice.invoiceDate}</span>
+                    </td>
+                    <td style={{ padding: '9px 10px', textAlign: 'right', color: '#555' }}>1</td>
+                    <td style={{ padding: '9px 10px', textAlign: 'right', color: '#555' }}>
+                      {invoice.invoiceAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+                    </td>
+                    <td style={{ padding: '9px 10px', textAlign: 'right', fontWeight: 600 }}>
+                      {invoice.invoiceAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+                <div style={{ minWidth: 180 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '5px 0', borderBottom: '1px solid #bfdbfe', color: '#555' }}>
+                    <span>Subtotal</span>
+                    <span>{invoice.invoiceAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '5px 0', borderBottom: '1px solid #bfdbfe', color: '#555' }}>
+                    <span>Tax</span><span>—</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 10px', backgroundColor: '#1d4ed8', color: '#fff', borderRadius: 4, marginTop: 3, fontSize: '13px', fontWeight: 700 }}>
+                    <span>TOTAL DUE</span>
+                    <span>{invoice.invoiceAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
+                  </div>
+                  {invoice.paidAmount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', backgroundColor: '#d1fae5', color: '#065f46', borderRadius: 4, marginTop: 3, fontSize: '12px', fontWeight: 600 }}>
+                      <span>Payments Received</span>
+                      <span>-{invoice.paidAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
+                    </div>
+                  )}
+                  {invoice.balanceDue > 0 && invoice.paidAmount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', backgroundColor: '#fef3c7', color: '#92400e', borderRadius: 4, marginTop: 3, fontSize: '12px', fontWeight: 700 }}>
+                      <span>Balance Due</span>
+                      <span>{invoice.balanceDue.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 付款说明 */}
+            <div style={{ padding: '16px 28px', backgroundColor: '#eff6ff', borderTop: '2px solid #bfdbfe' }}>
+              <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', color: '#888', letterSpacing: 1, marginBottom: 6 }}>Payment Instructions</div>
+              <div style={{ fontSize: '11px', color: '#555', lineHeight: 1.7 }}>
+                请在到期日前通过银行转账完成付款。<br />
+                Bank: [Your Bank Name] · Account: [Account No.] · Routing: [Routing No.]
+              </div>
+              <div style={{ marginTop: 6, fontSize: '10px', color: '#888' }}>逾期30天未付款，将按未付金额的 1.5%/月 收取滞纳金。</div>
+            </div>
+
+            {/* 底部 */}
+            <div style={{ padding: '12px 28px', borderTop: '1px solid #bfdbfe', fontSize: '10px', color: '#aaa', textAlign: 'center' }}>
+              感谢您的合作。如有疑问，请联系 finance@yourcompany.com
+            </div>
+          </div>
+        </div>
+
+        {/* 提示 */}
+        <div className="shrink-0 border-t border-[var(--border)] bg-amber-50 px-5 py-2.5 text-[11px] text-amber-700">
+          💡 请在"财务设置 → 发票模版"中完善公司信息、银行账户等，生成的发票将自动使用这些信息
+        </div>
+      </div>
+    </>
+  );
+}
