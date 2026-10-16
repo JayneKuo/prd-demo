@@ -257,8 +257,8 @@ export default function ReceivablesPage() {
 
   // ── 动态筛选选项 — 全部从数据中提取，不硬编码 ─────────────────────────
   const reconChannelOptions = useMemo(() => Array.from(new Set(batchRows.map(r => r.channel))).sort(), [batchRows]);
-  const arChannelOptions    = useMemo(() => Array.from(new Set(arInvoices.map(r => r.channel))).filter(Boolean).sort(), [arInvoices]);
-  const arTermsOptions      = useMemo(() => Array.from(new Set(arInvoices.map(r => r.paymentTerms).filter(Boolean))).sort(), [arInvoices]);
+  const arChannelOptions    = useMemo(() => Array.from(new Set(arInvoices.map(r => r.channel).filter((c): c is string => !!c))).sort(), [arInvoices]);
+  const arTermsOptions      = useMemo(() => Array.from(new Set(arInvoices.map(r => r.paymentTerms).filter((t): t is string => !!t))).sort(), [arInvoices]);
 
   // ── 派生 KPI ──────────────────────────────────────────────────────────────
   const b2bPending  = arRows.filter(r => r.balanceDue > 0).reduce((s, r) => s + r.balanceDue, 0);

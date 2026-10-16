@@ -153,6 +153,8 @@ type FormState = {
   // 输出字段
   syncStatus: boolean;
   unavailToZero: boolean;
+  noLedgerAsZero: boolean;
+  ignoreShipTimeLimit: boolean;
   includeZero: boolean;
   includePreorder: boolean;
   syncRetailerSkuName: boolean;
@@ -199,6 +201,8 @@ const DEFAULT_FORM: FormState = {
   ratio: '80',
   syncStatus: true,
   unavailToZero: true,
+  noLedgerAsZero: false,
+  ignoreShipTimeLimit: false,
   includeZero: true,
   includePreorder: false,
   syncRetailerSkuName: false,
@@ -1361,15 +1365,19 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
             <div>
               <div className="mb-3 text-[13px] font-medium text-[var(--foreground)]">输出字段</div>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                <ToggleRow label="同步商品状态" hint="在库存数量之外，一并输出可用 / 不可用状态。"
+                <ToggleRow label="同步 SKU 状态" hint="随库存数量一并输出 SKU 可用 / 不可用状态。"
                   checked={form.syncStatus} onChange={(v) => set('syncStatus', v)} />
-                <ToggleRow label="不可用 SKU 输出为 0" hint="已不可用的 SKU 统一按零库存输出。"
+                <ToggleRow label="不可用 SKU 置零" hint="SKU 状态不可用时，同步库存强制输出为 0。"
                   checked={form.unavailToZero} onChange={(v) => set('unavailToZero', v)} />
+                <ToggleRow label="可用 SKU 无流水时置零" hint="SKU 状态可用，但无任何库存流水记录时，同步库存强制输出为 0。"
+                  checked={form.noLedgerAsZero} onChange={(v) => set('noLedgerAsZero', v)} />
+                <ToggleRow label="忽略已发货时间限制" hint="启用后，WMS 将返回库存记录，无论发货时间窗口如何。"
+                  checked={form.ignoreShipTimeLimit} onChange={(v) => set('ignoreShipTimeLimit', v)} />
                 <ToggleRow label="同步零库存 SKU" hint="库存为 0 的 SKU 仍然输出，不跳过。"
                   checked={form.includeZero} onChange={(v) => set('includeZero', v)} />
-                <ToggleRow label="同步 Retailer SKU Name" hint="附带 Retailer 侧的 SKU 名称。"
+                <ToggleRow label="同步 Retailer SKU 名称" hint="随库存报文附带 Retailer 侧的 SKU 名称。"
                   checked={form.syncRetailerSkuName} onChange={(v) => set('syncRetailerSkuName', v)} />
-                <ToggleRow label="包含 Barcode" hint="输出 UPC、EAN 等条码字段。"
+                <ToggleRow label="包含条码" hint="输出 UPC、EAN 等条码字段。"
                   checked={form.includeBarcode} onChange={(v) => set('includeBarcode', v)} />
               </div>
             </div>
