@@ -74,6 +74,30 @@ const statusMap: Record<string, { label: string; variant: StatusVariant }> = {
   'exception': { label: 'Exception', variant: 'danger' },
   'cancelled': { label: 'Cancelled', variant: 'neutral' },
 
+  // AR / AP status (Finance module)
+  '待审批':     { label: '待审批',     variant: 'warning' },
+  '已审批':     { label: '已审批',     variant: 'info' },
+  '待付款':     { label: '待付款',     variant: 'info' },
+  '已付款':     { label: '已付款',     variant: 'success' },
+  '逾期':       { label: '逾期',       variant: 'danger' },
+  '有争议':     { label: '有争议',     variant: 'danger' },
+  // Channel AR status
+  '待到账':     { label: '待到账',     variant: 'info' },
+  '已到账':     { label: '已到账',     variant: 'success' },
+  '差异':       { label: '差异',       variant: 'warning' },
+  '已核销':     { label: '已核销',     variant: 'neutral' },
+  // AR Aging status
+  '未到期':     { label: '未到期',     variant: 'success' },
+  '逾期1-30天':  { label: '逾期1-30天',  variant: 'warning' },
+  '逾期31-60天': { label: '逾期31-60天', variant: 'warning' },
+  '逾期61-90天': { label: '逾期61-90天', variant: 'danger' },
+  '逾期90天+':   { label: '逾期90天+',   variant: 'danger' },
+  '已收款':     { label: '已收款',     variant: 'neutral' },
+  // ERP sync status
+  '已同步':     { label: '已同步',     variant: 'success' },
+  '待同步':     { label: '待同步',     variant: 'warning' },
+  '同步失败':   { label: '同步失败',   variant: 'danger' },
+
   // Product status
   '草稿': { label: '草稿', variant: 'neutral' },
   '已发布': { label: '已发布', variant: 'success' },

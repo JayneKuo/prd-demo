@@ -1827,6 +1827,64 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   ))}
                 </div>
               )}
+
+              {/* ── 资金路径 & 预计结算（对应文档 §7.6 / §12.2）── */}
+              {(() => {
+                const gw = detail.paymentGateway?.toLowerCase() ?? '';
+                const ch = detail.channel?.toLowerCase() ?? '';
+                let path = { label: '路径待确认', cls: 'bg-slate-50 text-slate-500 ring-slate-200', progress: 'ROUTE_UNKNOWN' };
+                let hint = '';
+                let estimatedNet: number | null = null;
+
+                if (gw.includes('shopify_payments') || gw.includes('stripe')) {
+                  path = { label: 'Shopify Payments', cls: 'bg-green-50 text-green-700 ring-green-200', progress: 'PAYOUT_SCHEDULED' };
+                  hint = '通过 Shopify Payments (Stripe) 打款 → 生成 Payout → 银行';
+                  const total = parseFloat(detail.totalPrice?.replace(/[^0-9.]/g, '') ?? '0');
+                  estimatedNet = total - (total * 0.029 + 0.30);
+                } else if (ch.includes('amazon') || gw.includes('amazon')) {
+                  path = { label: 'Amazon Seller Central', cls: 'bg-orange-50 text-orange-700 ring-orange-200', progress: 'EXTERNAL_DATA_REQUIRED' };
+                  hint = '外部结算：Amazon Settlement Report 待导入，OMS 无法自动获取净额';
+                } else if (gw.includes('manual') || detail.transactions?.some(t => t.kind === 'authorization' || t.method?.includes('人工'))) {
+                  path = { label: '人工付款', cls: 'bg-amber-50 text-amber-700 ring-amber-200', progress: 'MANUAL_EVIDENCE_REQUIRED' };
+                  hint = '人工标记付款，需上传银行凭证完成核销';
+                } else if (gw) {
+                  path = { label: gw, cls: 'bg-slate-50 text-slate-600 ring-slate-200', progress: 'ROUTE_UNKNOWN' };
+                  hint = `第三方网关，结算路径待确认（gateway: ${gw}）`;
+                }
+
+                return (
+                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-3">
+                    <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+                      资金路径 &amp; 预计结算
+                    </div>
+                    <div className="space-y-1.5 text-[11px]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[var(--muted)]">结算路径</span>
+                        <span className={cn('rounded px-1.5 py-0.5 font-medium ring-1 ring-inset', path.cls)}>{path.label}</span>
+                      </div>
+                      {estimatedNet !== null && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[var(--muted)]">预计结算净额</span>
+                          <span className="font-semibold text-emerald-700">≈ ${estimatedNet.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <span className="text-[var(--muted)]">资金进度</span>
+                        <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset',
+                          path.progress === 'PAYOUT_SCHEDULED' ? 'bg-amber-50 text-amber-700 ring-amber-200' :
+                          path.progress === 'EXTERNAL_DATA_REQUIRED' ? 'bg-orange-50 text-orange-700 ring-orange-200' :
+                          path.progress === 'MANUAL_EVIDENCE_REQUIRED' ? 'bg-orange-50 text-orange-700 ring-orange-200' :
+                          'bg-slate-50 text-slate-500 ring-slate-200')}>
+                          {path.progress === 'PAYOUT_SCHEDULED' ? '已安排打款' :
+                           path.progress === 'EXTERNAL_DATA_REQUIRED' ? '外部数据待补' :
+                           path.progress === 'MANUAL_EVIDENCE_REQUIRED' ? '凭证待补' : '路径待确认'}
+                        </span>
+                      </div>
+                      {hint && <p className="text-[10px] text-[var(--muted)] leading-4">{hint}</p>}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </section>
 

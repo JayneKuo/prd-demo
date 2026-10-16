@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import React from 'react';
-import { Download, Plus, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Info, X, Upload } from 'lucide-react';
+import { Columns3, Download, Plus, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, X, Upload, Clock, Search, MoreHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   apKpi, apRows, apStatusConfig,
   type ApRow, type ApStatus, type ApCategory,
 } from '@/lib/mock-data/ar-ap';
+import { StatusBadge } from '@/components/admin/status-badge';
 
 // ─── utils ────────────────────────────────────────────────────────────────────
 
@@ -48,17 +49,46 @@ export default function PayablesPage() {
   const [showBillEntry, setShowBillEntry] = useState(false);
   const [paymentTarget, setPaymentTarget] = useState<{ id: string; balance: number; vendor: string } | null>(null);
   const [allocationTarget, setAllocationTarget] = useState<ApRow | null>(null);
-
-  // 分页
-  const PAGE_SIZE = 10;
+  const [toastMsg, setToastMsg] = useState('');
+  // 筛选 & 分页
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [jumpPage, setJumpPage] = useState('1');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [vendorFilter, setVendorFilter] = useState('');
+  const [dueFilter, setDueFilter] = useState('');   // '' | 'overdue' | 'this-week' | 'this-month'
+  const [allocationFilter, setAllocationFilter] = useState(''); // '' | 'allocated' | 'unallocated'
+  const [billTypeFilter, setBillTypeFilter] = useState(''); // '' | 'invoice' | 'credit_note' | 'advance'
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const PAGE_SIZE = pageSize;
+
+  // Toast 辅助
+  const showToast = useCallback((msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(''), 2600);
+  }, []);
+
+  // DPO 计算：未付余额 / (本月已付 + 未付) × 30
+  const dpo = apKpi.paidThisMonth > 0
+    ? Math.round((apKpi.totalPayable / (apKpi.paidThisMonth + apKpi.totalPayable)) * 30)
+    : 0;
 
   // ── 行内操作处理 ──────────────────────────────────────────────────────────
-  function handleRowAction(id: string, action: 'approve' | 'pay' | 'dispute' | 'resolve') {
+  function handleRowAction(id: string, action: 'approve' | 'schedule' | 'pay' | 'dispute' | 'resolve') {
     if (action === 'approve') {
+      // 审批通过 → 已审批（等待安排付款，不直接变待付款）
+      setRows(prev => prev.map(r =>
+        r.id === id ? { ...r, status: '已审批' as ApStatus } : r,
+      ));
+      showToast('✓ 审批通过');
+    } else if (action === 'schedule') {
+      // 安排付款 → 待付款
       setRows(prev => prev.map(r =>
         r.id === id ? { ...r, status: '待付款' as ApStatus } : r,
       ));
+      showToast('已安排付款，等待执行');
     } else if (action === 'pay') {
       const row = rows.find(r => r.id === id);
       if (row) setPaymentTarget({ id, balance: row.balanceDue, vendor: row.vendor });
@@ -66,10 +96,12 @@ export default function PayablesPage() {
       setRows(prev => prev.map(r =>
         r.id === id ? { ...r, status: '有争议' as ApStatus } : r,
       ));
+      showToast('已标记为争议，等待处理');
     } else if (action === 'resolve') {
       setRows(prev => prev.map(r =>
-        r.id === id ? { ...r, status: '待付款' as ApStatus, note: (r.note ?? '') + '（争议已解决）' } : r,
+        r.id === id ? { ...r, status: '待付款' as ApStatus, note: (r.note ?? '') + '（争议已解决 · ' + new Date().toLocaleDateString('zh-CN') + '）' } : r,
       ));
+      showToast('争议已解决，恢复待付款');
     }
   }
 
@@ -81,6 +113,7 @@ export default function PayablesPage() {
       return { ...r, paidAmount: paid, balanceDue: balance, status: balance <= 0.005 ? '已付款' as ApStatus : r.status };
     }));
     setPaymentTarget(null);
+    showToast('✓ 付款已确认');
   }
 
   function handleAddBill(bill: ApRow) {
@@ -95,11 +128,6 @@ export default function PayablesPage() {
     return r.category === activeTab;
   }), [activeTab, rows]);
 
-  // 分页切片（切换 tab 时重置页码）
-  const pagedFiltered = useMemo(() => {
-    return filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  }, [filtered, page]);
-
   const counts: Record<TabKey, number> = useMemo(() => ({
     all:      rows.length,
     '仓储费': rows.filter(r => r.category === '仓储费').length,
@@ -110,17 +138,44 @@ export default function PayablesPage() {
     '有争议': rows.filter(r => r.status === '有争议').length,
   }), [rows]);
 
-  // 差异汇总
-  const totalVariance = rows.reduce((s, r) => s + (r.variance ?? 0), 0);
-  const varianceCount = rows.filter(r => (r.variance ?? 0) !== 0).length;
+  // 搜索 + 日期过滤（叠加到 Tab 过滤之上）
+  // 供应商列表（用于下拉）
+  const vendorOptions = useMemo(() => Array.from(new Set(rows.map(r => r.vendor))).sort(), [rows]);
 
-  // 费用类型分布
-  const totalBill = rows.reduce((s, r) => s + r.billAmount, 0);
-  const categoryTotals = useMemo(() => {
-    const map: Partial<Record<ApCategory, number>> = {};
-    rows.forEach(r => { map[r.category] = (map[r.category] ?? 0) + r.billAmount; });
-    return map;
-  }, [rows]);
+  // 到期日参考（基于模拟当前日期）
+  const AP_TODAY = '2026-10-15';
+  const AP_NEXT_WEEK  = '2026-10-22';
+  const AP_NEXT_MONTH = '2026-11-15';
+
+  const filteredWithSearch = useMemo(() => filtered.filter(r => {
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      if (!r.billNo.toLowerCase().includes(q) && !r.vendor.toLowerCase().includes(q)) return false;
+    }
+    if (statusFilter && r.status !== statusFilter) return false;
+    if (vendorFilter && r.vendor !== vendorFilter) return false;
+    if (billTypeFilter && r.billType !== billTypeFilter) return false;
+    if (allocationFilter === 'allocated'   && !r.allocated) return false;
+    if (allocationFilter === 'unallocated' &&  r.allocated) return false;
+    if (dueFilter === 'overdue')     { if (!(r.dueDate < AP_TODAY && r.status !== '已付款')) return false; }
+    if (dueFilter === 'this-week')   { if (!(r.dueDate >= AP_TODAY && r.dueDate <= AP_NEXT_WEEK && r.status !== '已付款')) return false; }
+    if (dueFilter === 'this-month')  { if (!(r.dueDate >= AP_TODAY && r.dueDate <= AP_NEXT_MONTH && r.status !== '已付款')) return false; }
+    if (startDate && r.billDate < startDate) return false;
+    if (endDate   && r.billDate > endDate)   return false;
+    return true;
+  }), [filtered, searchQuery, statusFilter, vendorFilter, billTypeFilter, allocationFilter, dueFilter, startDate, endDate]);
+
+  // AP 状态选项 — 从实际数据中提取
+  const apStatusOptions = useMemo(() => Array.from(new Set(rows.map(r => r.status))).sort(), [rows]);
+  // AP 账单类型选项
+  const apBillTypeOptions = useMemo(() => Array.from(new Set(rows.map(r => r.billType).filter(Boolean))).sort(), [rows]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredWithSearch.length / pageSize));
+
+  // 分页切片（切换 tab / 筛选时重置页码用 effect）
+  const pagedFiltered = useMemo(() => {
+    return filteredWithSearch.slice((page - 1) * pageSize, page * pageSize);
+  }, [filteredWithSearch, page, pageSize]);
 
   return (
     <div className="mx-auto max-w-[1440px] pt-5 lg:pt-6">
@@ -130,11 +185,19 @@ export default function PayablesPage() {
         <div>
           <h1 className="text-[22px] font-semibold tracking-tight text-[var(--foreground)]">应付账款</h1>
           <p className="mt-0.5 text-[13px] text-[var(--muted)]">
-            3PL仓储 · 承运商运费 · 平台服务费 · 广告费 — OMS预估 vs 实际账单对比
+            仓储 · 运费 · 平台费 · 广告费 · OMS预估 vs 实际账单
+            <span className="mx-2 opacity-30">·</span>
+            总应付 {fmt(apKpi.totalPayable)}
+            {apKpi.overdueAmount > 0 && <span className="ml-2 font-medium text-red-500">逾期 {fmt(apKpi.overdueAmount)}</span>}
+            <span className="mx-2 opacity-30">·</span>
+            <span className={dpo > 45 ? 'text-amber-600' : ''}>DPO {dpo} 天</span>
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <button className="flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[13px] font-medium text-[var(--foreground)] hover:bg-[var(--surface-hover)]">
+          <button
+            className="flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[13px] font-medium text-[var(--foreground)] hover:bg-[var(--surface-hover)]"
+            onClick={() => showToast('导出功能开发中，敬请期待')}
+          >
             <Download className="size-3.5" />导出
           </button>
           <button
@@ -145,82 +208,116 @@ export default function PayablesPage() {
         </div>
       </div>
 
-      {/* ── KPI ── */}
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <KpiCard label="总应付"  value={fmt(apKpi.totalPayable)}  sub="未付余额合计" />
-        <KpiCard label="逾期应付" value={fmt(apKpi.overdueAmount)} sub="需立即处理" warn />
-        <KpiCard label="本周到期" value={fmt(apKpi.dueThisWeek)}  sub="即将到期" caution />
-        <KpiCard label="本月已付" value={fmt(apKpi.paidThisMonth)} sub="当月支出" success />
-        <KpiCard
-          label="待审批"
-          value={`${rows.filter(r => r.status === '待审批').length} 笔`}
-          sub="待 Finance 审批"
-          caution={rows.filter(r => r.status === '待审批').length > 0}
-        />
-        <KpiCard
-          label="费用差异"
-          value={`${varianceCount} 笔`}
-          sub={`超预估 ${fmt(totalVariance)}`}
-          warn={varianceCount > 0}
-        />
-      </div>
-
-      {/* ── 费用类型分布条 ── */}
-      <div className="mb-5 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4 shadow-[var(--shadow-soft)]">
-        <div className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold text-[var(--muted-foreground)]">
-          <Info className="size-3.5" />费用类型分布
-          <span className="ml-1 text-[var(--muted)]">（按账单金额）</span>
-        </div>
-        <div className="flex h-3 w-full overflow-hidden rounded-full">
-          {(Object.entries(categoryTotals) as [ApCategory, number][]).map(([cat, amt]) => (
-            <div key={cat} className={cn('h-full', categoryConfig[cat]?.barCls ?? 'bg-gray-400')}
-              style={{ width: totalBill > 0 ? `${(amt / totalBill) * 100}%` : '0' }} />
-          ))}
-        </div>
-        <div className="mt-3 flex flex-wrap gap-5">
-          {(Object.entries(categoryTotals) as [ApCategory, number][]).map(([cat, amt]) => (
-            <div key={cat} className="flex items-center gap-2 text-[12px]">
-              <span className={cn('size-2.5 rounded-sm', categoryConfig[cat]?.barCls ?? 'bg-gray-400')} />
-              <span className="text-[var(--muted)]">{categoryConfig[cat]?.label ?? cat}</span>
-              <span className="font-semibold text-[var(--foreground)]">{fmt(amt)}</span>
-              <span className="text-[var(--muted)]">{((amt / totalBill) * 100).toFixed(0)}%</span>
-            </div>
-          ))}
-        </div>
-        {/* 平台费说明：避免与结算扣减双重计费 */}
-        <p className="mt-3 text-[11px] text-[var(--muted)]">
-          ⚠️ <span className="font-semibold text-amber-600">平台订阅费</span>仅含独立账单（Amazon Pro 月费、Shopify 月费等）；
-          佣金/FBA 配送费等已在应收结算扣除，不应重复录入此处。
-        </p>
-      </div>
-
       {/* ── 主表格 ── */}
       <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)]">
-        {/* Tabs */}
+        {/* Tabs + 筛选 — sticky */}
         <div className="sticky -top-5 lg:-top-6 z-20 rounded-t-xl bg-[var(--surface)]">
-          <div className="flex items-center gap-0 border-b border-[var(--border)] px-5 overflow-x-auto">
-            {tabs.map(tab => {
-              const count = counts[tab.key];
-              const isActive = tab.key === activeTab;
-              return (
-                <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                  className={cn(
-                    'relative mr-4 shrink-0 pb-3 pt-2.5 text-[13px] font-medium transition-colors whitespace-nowrap',
-                    isActive ? 'text-[var(--primary)]' : 'text-[var(--muted)] hover:text-[var(--foreground)]',
-                  )}>
-                  {tab.label}
-                  {count > 0 && (
-                    <span className={cn('ml-1.5 text-[11px]',
-                      tab.key === '有差异' || tab.key === '有争议' ? 'text-[var(--danger)]' :
-                      'text-[var(--muted-foreground)]',
+          {/* Tab 行 */}
+          <div className="flex items-center justify-between border-b border-[var(--border)] px-5 pt-1">
+            <div className="flex items-center overflow-x-auto">
+              {tabs.map(tab => {
+                const count = counts[tab.key];
+                const isActive = tab.key === activeTab;
+                return (
+                  <button key={tab.key} onClick={() => { setActiveTab(tab.key); setPage(1); setJumpPage('1'); }}
+                    className={cn(
+                      'relative mr-5 shrink-0 pb-3 pt-2.5 text-[13px] font-medium transition-colors whitespace-nowrap',
+                      isActive ? 'text-[var(--primary)]' : 'text-[var(--muted)] hover:text-[var(--foreground)]',
                     )}>
-                      {count}
-                    </span>
-                  )}
-                  {isActive && <div className="absolute inset-x-0 bottom-0 h-[2px] rounded-full bg-[var(--primary)]" />}
+                    {tab.label}
+                    {count > 0 && (
+                      <span className={cn('ml-1.5 text-[11px]',
+                        tab.key === '有差异' || tab.key === '有争议' ? 'text-[var(--danger)]' : 'text-[var(--muted-foreground)]',
+                      )}>
+                        {count}
+                      </span>
+                    )}
+                    {isActive && <div className="absolute inset-x-0 bottom-0 h-[2px] rounded-full bg-[var(--primary)]" />}
+                  </button>
+                );
+              })}
+            </div>
+            <button className="flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 text-[12px] font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-subtle)]">
+              <Columns3 className="size-3.5" />
+              列设置
+            </button>
+          </div>
+
+          {/* 筛选 pill 行 */}
+          <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-2.5">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* 复合搜索框 */}
+              <div className="flex h-8 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-subtle)] pl-2.5 pr-1">
+                <Search className="size-3.5 shrink-0 text-[var(--muted)]" />
+                <input
+                  value={searchQuery}
+                  onChange={e => { setSearchQuery(e.target.value); setPage(1); setJumpPage('1'); }}
+                  placeholder="账单号 / 供应商..."
+                  className="w-[160px] bg-transparent text-[12px] text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} className="flex size-5 items-center justify-center rounded-full hover:bg-[var(--surface-hover)]">
+                    <X className="size-3 text-[var(--muted)]" />
+                  </button>
+                )}
+              </div>
+              {/* 供应商 */}
+              <select value={vendorFilter} onChange={e => { setVendorFilter(e.target.value); setPage(1); }}
+                className={cn('h-8 rounded-full border px-3 text-[12px] font-medium outline-none transition-colors',
+                  vendorFilter ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-subtle)]')}>
+                <option value="">供应商</option>
+                {vendorOptions.map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+              {/* 到期状态 */}
+              <select value={dueFilter} onChange={e => { setDueFilter(e.target.value); setPage(1); }}
+                className={cn('h-8 rounded-full border px-3 text-[12px] font-medium outline-none transition-colors',
+                  dueFilter ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-subtle)]')}>
+                <option value="">到期状态</option>
+                <option value="overdue">已逾期</option>
+                <option value="this-week">本周到期</option>
+                <option value="this-month">本月内到期</option>
+              </select>
+              {/* 审批/付款状态 */}
+              <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); setJumpPage('1'); }}
+                className={cn('h-8 rounded-full border px-3 text-[12px] font-medium outline-none transition-colors',
+                  statusFilter ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-subtle)]')}>
+                <option value="">全部状态</option>
+                {apStatusOptions.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+              {/* 账单类型 */}
+              <select value={billTypeFilter} onChange={e => { setBillTypeFilter(e.target.value); setPage(1); }}
+                className={cn('h-8 rounded-full border px-3 text-[12px] font-medium outline-none transition-colors',
+                  billTypeFilter ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-subtle)]')}>
+                <option value="">账单类型</option>
+                {apBillTypeOptions.map(t => {
+                  const BILL_LABELS: Record<string, string> = { invoice: '发票（Invoice）', credit_note: '贷项通知单（Credit Note）', advance: '预付款（Advance）' };
+                  return <option key={t} value={t}>{BILL_LABELS[t] ?? t}</option>;
+                })}
+              </select>
+              {/* 费用分摊 */}
+              <select value={allocationFilter} onChange={e => { setAllocationFilter(e.target.value); setPage(1); }}
+                className={cn('h-8 rounded-full border px-3 text-[12px] font-medium outline-none transition-colors',
+                  allocationFilter ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-subtle)]')}>
+                <option value="">费用分摊</option>
+                <option value="allocated">已分摊到订单</option>
+                <option value="unallocated">未分摊</option>
+              </select>
+              {/* 账单日期范围 */}
+              <div className={cn('flex h-8 items-center gap-1 rounded-full border px-2.5 text-[12px]',
+                (startDate || endDate) ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)]')}>
+                <input type="date" value={startDate} onChange={e => { setStartDate(e.target.value); setPage(1); }} className="w-[100px] bg-transparent text-[12px] outline-none" />
+                <span className="text-[var(--muted)]">—</span>
+                <input type="date" value={endDate} onChange={e => { setEndDate(e.target.value); setPage(1); }} className="w-[100px] bg-transparent text-[12px] outline-none" />
+              </div>
+              {(searchQuery || statusFilter || vendorFilter || dueFilter || allocationFilter || billTypeFilter || startDate || endDate) && (
+                <button
+                  onClick={() => { setSearchQuery(''); setStatusFilter(''); setVendorFilter(''); setDueFilter(''); setAllocationFilter(''); setBillTypeFilter(''); setStartDate(''); setEndDate(''); setPage(1); setJumpPage('1'); }}
+                  className="h-8 rounded-full px-3 text-[12px] font-medium text-[var(--muted)] transition-colors hover:bg-[var(--surface-subtle)] hover:text-[var(--foreground)]">
+                  清除筛选
                 </button>
-              );
-            })}
+              )}
+            </div>
+            <span className="shrink-0 text-[12px] text-[var(--muted)]">{filteredWithSearch.length} 条</span>
           </div>
         </div>
 
@@ -239,7 +336,7 @@ export default function PayablesPage() {
                 <th className="whitespace-nowrap px-3 py-2.5 text-right">已付</th>
                 <th className="whitespace-nowrap px-3 py-2.5 text-right">未付余额</th>
                 <th className="whitespace-nowrap px-3 py-2.5">状态</th>
-                <th className="w-8 px-3 py-2.5" />
+                <th className="w-10 px-3 py-2.5" />
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border-subtle)]">
@@ -267,15 +364,15 @@ export default function PayablesPage() {
         {/* 底部汇总 + 分页 */}
         <div className="grid grid-cols-3 gap-px border-t border-[var(--border)] bg-[var(--border-subtle)] text-[12px]">
           {[
-            { label: 'OMS预估合计', value: fmt(filtered.reduce((s, r) => s + (r.omsEstimate ?? r.billAmount), 0)), cls: 'text-[var(--foreground)]' },
-            { label: '实际账单合计', value: fmt(filtered.reduce((s, r) => s + r.billAmount, 0)), cls: 'font-semibold text-[var(--foreground)]' },
+            { label: 'OMS预估合计', value: fmt(filteredWithSearch.reduce((s, r) => s + (r.omsEstimate ?? r.billAmount), 0)), cls: 'text-[var(--foreground)]' },
+            { label: '实际账单合计', value: fmt(filteredWithSearch.reduce((s, r) => s + r.billAmount, 0)), cls: 'font-semibold text-[var(--foreground)]' },
             {
               label: '差异合计',
               value: (() => {
-                const v = filtered.reduce((s, r) => s + (r.variance ?? 0), 0);
+                const v = filteredWithSearch.reduce((s, r) => s + (r.variance ?? 0), 0);
                 return v === 0 ? '— 无差异' : fmt(v);
               })(),
-              cls: filtered.reduce((s, r) => s + (r.variance ?? 0), 0) > 0 ? 'font-semibold text-[var(--danger)]' : 'text-[var(--muted)]',
+              cls: filteredWithSearch.reduce((s, r) => s + (r.variance ?? 0), 0) > 0 ? 'font-semibold text-[var(--danger)]' : 'text-[var(--muted)]',
             },
           ].map(({ label, value, cls }) => (
             <div key={label} className="bg-[var(--surface-subtle)] px-5 py-3">
@@ -284,7 +381,32 @@ export default function PayablesPage() {
             </div>
           ))}
         </div>
-        <TablePagination total={filtered.length} page={page} pageSize={PAGE_SIZE} onChange={setPage} />
+
+        {/* 分页 — sticky footer */}
+        <div className="sticky -bottom-5 lg:-bottom-6 z-20 flex items-center justify-between rounded-b-xl border-t border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 pb-[calc(0.625rem+20px)] lg:pb-[calc(0.625rem+24px)] text-[13px] text-[var(--muted)]">
+          <span>共 {filteredWithSearch.length} 条</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-[12px]">每页</span>
+              <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); setJumpPage('1'); }} className="rounded border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[12px] text-[var(--foreground)]">
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+              <span className="text-[12px]">条</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} className="flex size-7 items-center justify-center rounded-md border border-[var(--border)] text-[12px] transition hover:bg-[var(--surface-hover)] disabled:opacity-40 disabled:cursor-not-allowed">‹</button>
+              <span className="px-1 text-[12px] text-[var(--foreground)]">{page} / {totalPages}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="flex size-7 items-center justify-center rounded-md border border-[var(--border)] text-[12px] transition hover:bg-[var(--surface-hover)] disabled:opacity-40 disabled:cursor-not-allowed">›</button>
+              <div className="ml-2 flex items-center gap-1">
+                <span className="text-[12px]">跳至</span>
+                <input type="number" min={1} max={totalPages} value={jumpPage} onChange={e => setJumpPage(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { const p = Math.max(1, Math.min(totalPages, Number(jumpPage))); setPage(p); setJumpPage(String(p)); } }} className="w-12 rounded border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-center text-[12px] outline-none focus:ring-1 focus:ring-[var(--focus-ring)]" />
+                <span className="text-[12px]">页</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* 录入账单抽屉 */}
@@ -311,8 +433,16 @@ export default function PayablesPage() {
                 : r,
             ));
             setAllocationTarget(null);
+            showToast(`✓ 费用已按「${method}」分摊至 ${count} 笔订单`);
           }}
         />
+      )}
+
+      {/* Toast 提示 */}
+      {toastMsg && (
+        <div className="fixed bottom-6 left-1/2 z-[200] -translate-x-1/2 rounded-xl bg-[var(--foreground)] px-4 py-2.5 text-[13px] font-medium text-[var(--background)] shadow-xl">
+          {toastMsg}
+        </div>
       )}
     </div>
   );
@@ -320,7 +450,7 @@ export default function PayablesPage() {
 
 function ApTableRow({ row, expanded, onToggle, onAction, onAllocate }: {
   row: ApRow; expanded: boolean; onToggle: () => void;
-  onAction: (id: string, action: 'approve' | 'pay' | 'dispute' | 'resolve') => void;
+  onAction: (id: string, action: 'approve' | 'schedule' | 'pay' | 'dispute' | 'resolve') => void;
   onAllocate: () => void;
 }) {
   const sc    = apStatusConfig[row.status];
@@ -330,10 +460,10 @@ function ApTableRow({ row, expanded, onToggle, onAction, onAllocate }: {
   const isOverdue = row.overdueDays > 0;
 
   const actionMap: Record<ApStatus, { label: string; cls: string } | null> = {
-    '待审批': { label: '审批', cls: 'bg-amber-50 text-amber-700 hover:bg-amber-100' },
-    '已审批': { label: '付款', cls: 'bg-[var(--primary)] text-white hover:opacity-90' },
-    '待付款': { label: '付款', cls: 'bg-[var(--primary)] text-white hover:opacity-90' },
-    '有争议': { label: '处理', cls: 'bg-red-50 text-[var(--danger)] hover:bg-red-100' },
+    '待审批': { label: '审批通过', cls: 'bg-amber-50 text-amber-700 hover:bg-amber-100' },
+    '已审批': { label: '安排付款', cls: 'bg-blue-50 text-blue-700 hover:bg-blue-100' },
+    '待付款': { label: '确认付款', cls: 'bg-[var(--primary)] text-white hover:opacity-90' },
+    '有争议': { label: '解决争议', cls: 'bg-red-50 text-[var(--danger)] hover:bg-red-100' },
     '逾期':   { label: '立即付款', cls: 'bg-red-50 text-[var(--danger)] hover:bg-red-100' },
     '已付款': null,
   };
@@ -343,7 +473,7 @@ function ApTableRow({ row, expanded, onToggle, onAction, onAllocate }: {
     <>
       <tr
         className={cn(
-          'cursor-pointer transition-colors hover:bg-[var(--surface-subtle)]',
+          'group cursor-pointer transition-colors hover:bg-[var(--surface-subtle)]',
           expanded && 'bg-[var(--surface-subtle)]',
           row.status === '有争议' && 'bg-red-50/30',
         )}
@@ -417,16 +547,14 @@ function ApTableRow({ row, expanded, onToggle, onAction, onAllocate }: {
         </td>
         {/* 状态 */}
         <td className="whitespace-nowrap px-3 py-3">
-          <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset', sc.cls)}>
-            <span className={cn('size-1.5 rounded-full', sc.dot)} />
-            {row.status}
-          </span>
+          <StatusBadge status={row.status} />
           {action && (
             <div className="mt-1.5">
               <button className={cn('h-6 rounded-md px-2 text-[11px] font-medium transition', action.cls)}
                 onClick={e => {
                   e.stopPropagation();
                   if (row.status === '待审批') onAction(row.id, 'approve');
+                  else if (row.status === '已审批') onAction(row.id, 'schedule');
                   else if (row.status === '有争议') onAction(row.id, 'resolve');
                   else onAction(row.id, 'pay');
                 }}>
@@ -436,10 +564,15 @@ function ApTableRow({ row, expanded, onToggle, onAction, onAllocate }: {
           )}
         </td>
         {/* 展开 */}
-        <td className="px-3 py-3">
-          <span className="flex size-6 items-center justify-center rounded-md text-[var(--muted)] hover:bg-[var(--surface-hover)]">
-            {expanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-          </span>
+        <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-end gap-1">
+            <button className="inline-flex size-7 items-center justify-center rounded-md opacity-0 transition hover:bg-[var(--surface-hover)] group-hover:opacity-100">
+              <MoreHorizontal className="size-4 text-[var(--muted)]" />
+            </button>
+            <span className="flex size-6 items-center justify-center rounded-md text-[var(--muted)] hover:bg-[var(--surface-hover)]">
+              {expanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+            </span>
+          </div>
         </td>
       </tr>
 
@@ -458,7 +591,7 @@ function ApTableRow({ row, expanded, onToggle, onAction, onAllocate }: {
 
 function ApRowDetail({ row, onAction, onAllocate }: {
   row: ApRow;
-  onAction: (id: string, action: 'approve' | 'pay' | 'dispute' | 'resolve') => void;
+  onAction: (id: string, action: 'approve' | 'schedule' | 'pay' | 'dispute' | 'resolve') => void;
   onAllocate: () => void;
 }) {
   const hasVariance = (row.variance ?? 0) !== 0;
@@ -537,8 +670,13 @@ function ApRowDetail({ row, onAction, onAllocate }: {
 
           <div className="mt-3 flex flex-wrap gap-2">
             {row.status === '待审批' && (
-              <button onClick={() => onAction(row.id, 'approve')} className="flex h-7 items-center gap-1 rounded-lg bg-[var(--primary)] px-2.5 text-[12px] font-medium text-white hover:opacity-90">
+              <button onClick={() => onAction(row.id, 'approve')} className="flex h-7 items-center gap-1 rounded-lg bg-amber-500 px-2.5 text-[12px] font-medium text-white hover:opacity-90">
                 ✓ 审批通过
+              </button>
+            )}
+            {row.status === '已审批' && (
+              <button onClick={() => onAction(row.id, 'schedule')} className="flex h-7 items-center gap-1 rounded-lg bg-blue-600 px-2.5 text-[12px] font-medium text-white hover:opacity-90">
+                安排付款
               </button>
             )}
             {(row.status === '已审批' || row.status === '待付款' || row.status === '逾期') && (
@@ -1128,13 +1266,14 @@ function PaymentConfirmModal({
   const [amount, setAmount] = useState(target.balance.toFixed(2));
   const [payDate, setPayDate] = useState(new Date().toISOString().slice(0, 10));
   const [payMethod, setPayMethod] = useState('银行转账');
+  const [payAccount, setPayAccount] = useState('公司主账户 · Chase ****4821');
   const [ref, setRef] = useState('');
   const [attachmentName, setAttachmentName] = useState<string | null>(null);
 
   const parsed = parseFloat(amount);
   const attachmentRequired = parsed > 5000;
   const isValid = !isNaN(parsed) && parsed > 0 && parsed <= target.balance + 0.01
-    && (!attachmentRequired || attachmentName !== null);
+    && !!ref && (!attachmentRequired || attachmentName !== null);
 
   return (
     <>
@@ -1177,10 +1316,21 @@ function PaymentConfirmModal({
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-[12px] font-medium text-[var(--foreground)]">付款参考号</label>
+            <label className="mb-1 block text-[12px] font-medium text-[var(--foreground)]">付款账户 *</label>
+            <select value={payAccount} onChange={e => setPayAccount(e.target.value)}
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5 text-[12px] outline-none focus:border-[var(--primary)]">
+              <option>公司主账户 · Chase ****4821</option>
+              <option>USD 结算账户 · Citibank ****9034</option>
+              <option>EUR 账户 · HSBC ****7156</option>
+              <option>支票账户 · Wells Fargo ****2290</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[12px] font-medium text-[var(--foreground)]">银行流水号 / 参考号 *</label>
             <input value={ref} onChange={e => setRef(e.target.value)}
-              placeholder="银行流水号或支票号（可选）"
+              placeholder="如：TXN-20261001-8823"
               className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5 font-mono text-[12px] outline-none focus:border-[var(--primary)]" />
+            {!ref && parsed > 0 && <p className="mt-1 text-[11px] text-red-500">流水号为必填项</p>}
           </div>
 
           {/* 付款凭证上传 */}

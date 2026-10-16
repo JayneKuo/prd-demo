@@ -7,6 +7,39 @@ export type ChannelArStatus = '处理中' | '待到账' | '已到账' | '差异'
 export type ChannelSource = 'Amazon' | 'Shopify' | 'TikTok Shop' | 'Walmart' | '手工订单' | 'EDI';
 export type ErpSyncStatus = 'synced' | 'pending' | 'error' | 'na';
 
+/** 资金进度（文档 12.2） — 追踪每笔资金从成功扣款到银行到账的全程状态 */
+export type FundProgress =
+  | 'ROUTE_UNKNOWN'            // 资金路径待确认
+  | 'WAITING_LEDGER'           // 资金明细待同步
+  | 'UNASSIGNED'               // 待分配打款批次
+  | 'PAYOUT_SCHEDULED'         // 已安排打款
+  | 'PAYOUT_IN_TRANSIT'        // 打款处理中（来自机构 IN_TRANSIT）
+  | 'PROVIDER_PAID'            // 机构报告已入账
+  | 'ACTION_REQUIRED'          // 需要处理（冻结/限制等）
+  | 'PAYOUT_FAILED'            // 打款失败
+  | 'PAYOUT_CANCELED'          // 打款取消
+  | 'EXTERNAL_DATA_REQUIRED'   // 外部结算数据待补（Amazon/Walmart等）
+  | 'MANUAL_EVIDENCE_REQUIRED' // 人工收款凭证待补
+  | 'NOT_APPLICABLE';          // 不适用机构打款
+
+/** 结算核对状态（文档 12.3） — OMS预算 vs 平台实际金额是否一致 */
+export type SettlementCheckStatus =
+  | 'DATA_INCOMPLETE'  // 明细或分类不完整
+  | 'TO_CHECK'         // 待核对
+  | 'MATCHED'          // 金额一致
+  | 'DIFFERENCE'       // 有未解释差额
+  | 'RESOLVED'         // 差异已批准处理
+  | 'NOT_APPLICABLE';  // 不适用
+
+/** 银行核销状态（文档 12.4） — 机构打款 vs 实际银行凭证是否对上 */
+export type BankMatchStatus =
+  | 'NO_EVIDENCE'    // 未取得银行凭证
+  | 'TO_MATCH'       // 有候选凭证待确认
+  | 'PARTIAL'        // 部分核销
+  | 'MATCHED'        // 已核销
+  | 'DIFFERENCE'     // 已确认到账差异
+  | 'NOT_APPLICABLE'; // 不适用
+
 /** 扣减明细：各平台费用逐项拆分，辅助核账 */
 export type DeductionBreakdown = {
   /** 平台引荐费/佣金（Amazon referral fee、TikTok commission、Walmart commission） */
@@ -30,6 +63,8 @@ export type ChannelArRow = {
   channel: ChannelSource;
   /** 店铺名称 */
   merchant: string;
+  /** 实际结算主体（文档 14: 资金路径映射，可能与 channel 不同）*/
+  settlementOwner?: string;
   /** 结算周期 */
   periodStart: string;
   periodEnd: string;
@@ -37,6 +72,10 @@ export type ChannelArRow = {
   orderCount: number;
   /** OMS 侧原始销售额 */
   grossAmount: number;
+  /** 收款本金（销售额中实际收款部分，不含退款） */
+  chargePrincipal?: number;
+  /** 退款本金（独立追踪，用于公式 8.8） */
+  refundPrincipal?: number;
   /** 平台佣金 + FBA 费 + 广告等扣减合计 */
   totalDeduction: number;
   /** OMS 预计到账净额 */
@@ -45,9 +84,11 @@ export type ChannelArRow = {
   actualNet: number | null;
   /** 差异 = actualNet - expectedNet */
   variance: number | null;
+  /** 银行凭证核销金额（实际银行到账后确认的金额）*/
+  bankMatchedAmount?: number | null;
   /** 币种 */
   currency: string;
-  /** 结算状态 */
+  /** 结算核对状态（文档 12.3） */
   status: ChannelArStatus;
   /** 实际到账日 */
   settledAt?: string;
@@ -61,6 +102,20 @@ export type ChannelArRow = {
   deductionBreakdown?: DeductionBreakdown;
   /** 预计到账日（依平台 T+N 结算周期推算） */
   expectedReceiptDate?: string;
+  /** 资金进度（文档 12.2） */
+  fundProgress?: FundProgress;
+  /** 结算核对状态（文档 12.3，与 status 重合但更细） */
+  settlementCheckStatus?: SettlementCheckStatus;
+  /** 银行核销状态（文档 12.4） */
+  bankMatchStatus?: BankMatchStatus;
+  /** 预测置信度 */
+  predictionConfidence?: 'HIGH' | 'LOW' | 'INSUFFICIENT';
+  /** 预计发起打款日（内部预测）*/
+  estimatedPayoutDate?: string;
+  /** 预计银行到账开始日 */
+  estimatedArrivalFrom?: string;
+  /** 预计银行到账结束日 */
+  estimatedArrivalTo?: string;
 };
 
 export type ChannelArKpi = {
@@ -89,104 +144,154 @@ export const channelArRows: ChannelArRow[] = [
     settlementNo: 'STL-AMZ-20260914',
     channel: 'Amazon',
     merchant: 'US Amazon',
+    settlementOwner: 'Amazon Seller Central',
     periodStart: '2026-09-01',
     periodEnd: '2026-09-14',
     orderCount: 842,
     grossAmount: 68400.00,
-    totalDeduction: 16000.00,   // 佣金 $10,396.80 + 退款 $3,200 + 广告 $2,240 + 其他 $163.20
+    chargePrincipal: 71600.00,
+    refundPrincipal: 3200.00,
+    totalDeduction: 16000.00,
     expectedNet: 52400.00,
     actualNet: 52400.00,
+    bankMatchedAmount: 52400.00,
     variance: 0,
     currency: 'USD',
     status: '已到账',
     settledAt: '2026-09-16',
     erpSync: 'synced',
     erpSystem: 'NetSuite',
+    fundProgress: 'PROVIDER_PAID',
+    settlementCheckStatus: 'MATCHED',
+    bankMatchStatus: 'MATCHED',
+    predictionConfidence: 'HIGH',
     deductionBreakdown: { commission: 10396.80, advertisingFee: 2240.00, refunds: 3200.00, other: 163.20 },
     expectedReceiptDate: '2026-09-16',
+    estimatedArrivalFrom: '2026-09-16',
+    estimatedArrivalTo: '2026-09-17',
   },
   {
     id: 'car_002',
     settlementNo: 'STL-SHP-20260914',
     channel: 'Shopify',
     merchant: 'US Store',
+    settlementOwner: 'Shopify Payments (Stripe)',
     periodStart: '2026-09-08',
     periodEnd: '2026-09-14',
     orderCount: 386,
     grossAmount: 41200.00,
-    totalDeduction: 2380.00,    // Stripe 交易费 $1,194.80 + 退款 $1,185.20
+    chargePrincipal: 42385.20,
+    refundPrincipal: 1185.20,
+    totalDeduction: 2380.00,
     expectedNet: 38820.00,
     actualNet: 38777.50,
+    bankMatchedAmount: null,
     variance: -42.50,
     currency: 'USD',
     status: '差异',
     settledAt: '2026-09-16',
     erpSync: 'synced',
     erpSystem: 'NetSuite',
+    fundProgress: 'PROVIDER_PAID',
+    settlementCheckStatus: 'DIFFERENCE',
+    bankMatchStatus: 'TO_MATCH',
+    predictionConfidence: 'HIGH',
     note: '实际到账 $38,777.50，与OMS预计差 $42.50，疑似1笔退款时序不同步，已提交核查',
     deductionBreakdown: { transactionFee: 1194.80, refunds: 1185.20 },
     expectedReceiptDate: '2026-09-16',
+    estimatedArrivalFrom: '2026-09-16',
+    estimatedArrivalTo: '2026-09-17',
   },
   {
     id: 'car_003',
     settlementNo: 'STL-TTK-20260914',
     channel: 'TikTok Shop',
     merchant: 'UK TikTok Shop',
+    settlementOwner: 'TikTok Commerce',
     periodStart: '2026-09-08',
     periodEnd: '2026-09-14',
     orderCount: 298,
     grossAmount: 25320.00,
-    totalDeduction: 2180.40,    // 佣金 $1,266 + 退款 $680 + 广告 $234.40
+    chargePrincipal: 26000.00,
+    refundPrincipal: 680.00,
+    totalDeduction: 2180.40,
     expectedNet: 23139.60,
     actualNet: null,
+    bankMatchedAmount: null,
     variance: null,
     currency: 'USD',
     status: '处理中',
     erpSync: 'pending',
     erpSystem: 'NetSuite',
+    fundProgress: 'PAYOUT_SCHEDULED',
+    settlementCheckStatus: 'DATA_INCOMPLETE',
+    bankMatchStatus: 'NO_EVIDENCE',
+    predictionConfidence: 'LOW',
     note: 'TikTok Shop 结算处理中，预计 2026-09-19 到账',
     deductionBreakdown: { commission: 1266.00, advertisingFee: 234.40, refunds: 680.00 },
     expectedReceiptDate: '2026-09-19',
+    estimatedPayoutDate: '2026-09-18',
+    estimatedArrivalFrom: '2026-09-19',
+    estimatedArrivalTo: '2026-09-21',
   },
   {
     id: 'car_004',
     settlementNo: 'STL-WMT-20260914',
     channel: 'Walmart',
     merchant: 'US Walmart',
+    settlementOwner: 'Walmart Marketplace',
     periodStart: '2026-09-01',
     periodEnd: '2026-09-14',
     orderCount: 156,
     grossAmount: 18600.00,
-    totalDeduction: 1908.00,    // Walmart 佣金 $1,488 + 退款 $420
+    chargePrincipal: 19020.00,
+    refundPrincipal: 420.00,
+    totalDeduction: 1908.00,
     expectedNet: 16692.00,
     actualNet: null,
+    bankMatchedAmount: null,
     variance: null,
     currency: 'USD',
     status: '待到账',
     erpSync: 'pending',
     erpSystem: 'NetSuite',
+    fundProgress: 'PAYOUT_IN_TRANSIT',
+    settlementCheckStatus: 'TO_CHECK',
+    bankMatchStatus: 'NO_EVIDENCE',
+    predictionConfidence: 'LOW',
     note: '等待 Walmart Seller Center 结算确认',
     deductionBreakdown: { commission: 1488.00, refunds: 420.00 },
     expectedReceiptDate: '2026-09-28',
+    estimatedPayoutDate: '2026-09-27',
+    estimatedArrivalFrom: '2026-09-28',
+    estimatedArrivalTo: '2026-09-30',
   },
   {
     id: 'car_005',
     settlementNo: 'STL-AMZ-20260831',
     channel: 'Amazon',
     merchant: 'US Amazon',
+    settlementOwner: 'Amazon Seller Central',
     periodStart: '2026-08-16',
     periodEnd: '2026-08-31',
     orderCount: 924,
     grossAmount: 72180.00,
-    totalDeduction: 17340.00,   // 佣金 $10,971.36 + 退款 $2,640 + 广告 $3,480 + 其他 $248.64
+    chargePrincipal: 74820.00,
+    refundPrincipal: 2640.00,
+    totalDeduction: 17340.00,
     expectedNet: 54840.00,
     actualNet: 54840.00,
+    bankMatchedAmount: 54840.00,
     variance: 0,
     currency: 'USD',
     status: '已到账',
     settledAt: '2026-09-02',
     erpSync: 'synced',
     erpSystem: 'NetSuite',
+    fundProgress: 'PROVIDER_PAID',
+    settlementCheckStatus: 'MATCHED',
+    bankMatchStatus: 'MATCHED',
+    predictionConfidence: 'HIGH',
     deductionBreakdown: { commission: 10971.36, advertisingFee: 3480.00, refunds: 2640.00, other: 248.64 },
     expectedReceiptDate: '2026-09-02',
   },
@@ -195,19 +300,27 @@ export const channelArRows: ChannelArRow[] = [
     settlementNo: 'STL-SHP-20260907',
     channel: 'Shopify',
     merchant: 'US Store',
+    settlementOwner: 'Shopify Payments (Stripe)',
     periodStart: '2026-09-01',
     periodEnd: '2026-09-07',
     orderCount: 342,
     grossAmount: 38600.00,
-    totalDeduction: 2099.40,    // Stripe 交易费 $1,119.40 + 退款 $980
+    chargePrincipal: 39580.00,
+    refundPrincipal: 980.00,
+    totalDeduction: 2099.40,
     expectedNet: 36500.60,
     actualNet: 36500.60,
+    bankMatchedAmount: 36500.60,
     variance: 0,
     currency: 'USD',
     status: '已到账',
     settledAt: '2026-09-09',
     erpSync: 'synced',
     erpSystem: 'NetSuite',
+    fundProgress: 'PROVIDER_PAID',
+    settlementCheckStatus: 'MATCHED',
+    bankMatchStatus: 'MATCHED',
+    predictionConfidence: 'HIGH',
     deductionBreakdown: { transactionFee: 1119.40, refunds: 980.00 },
     expectedReceiptDate: '2026-09-09',
   },
@@ -216,39 +329,54 @@ export const channelArRows: ChannelArRow[] = [
     settlementNo: 'MANUAL-SEP-001',
     channel: '手工订单',
     merchant: '-',
+    settlementOwner: '人工付款（待确认）',
     periodStart: '2026-09-01',
     periodEnd: '2026-09-14',
     orderCount: 12,
     grossAmount: 8620.00,
+    chargePrincipal: 8620.00,
+    refundPrincipal: 0,
     totalDeduction: 0,
     expectedNet: 8620.00,
     actualNet: null,
+    bankMatchedAmount: null,
     variance: null,
     currency: 'USD',
     status: '待到账',
     erpSync: 'na',
+    fundProgress: 'MANUAL_EVIDENCE_REQUIRED',
+    settlementCheckStatus: 'NOT_APPLICABLE',
+    bankMatchStatus: 'NO_EVIDENCE',
+    predictionConfidence: 'INSUFFICIENT',
     note: '线下收款，已开具发票，待客户电汇',
     expectedReceiptDate: '2026-09-30',
   },
-  // ── 已核销（历史周期差异已处理）──────────────────────────────
   {
     id: 'car_008',
     settlementNo: 'STL-AMZ-20260715',
     channel: 'Amazon',
     merchant: 'US Amazon',
+    settlementOwner: 'Amazon Seller Central',
     periodStart: '2026-07-01',
     periodEnd: '2026-07-15',
     orderCount: 612,
     grossAmount: 47800.00,
+    chargePrincipal: 49780.00,
+    refundPrincipal: 1980.00,
     totalDeduction: 11400.00,
     expectedNet: 36400.00,
     actualNet: 36158.20,
+    bankMatchedAmount: 36158.20,
     variance: -241.80,
     currency: 'USD',
     status: '已核销',
     settledAt: '2026-07-17',
     erpSync: 'synced',
     erpSystem: 'NetSuite',
+    fundProgress: 'PROVIDER_PAID',
+    settlementCheckStatus: 'RESOLVED',
+    bankMatchStatus: 'MATCHED',
+    predictionConfidence: 'HIGH',
     deductionBreakdown: { commission: 7268.64, advertisingFee: 1912.00, refunds: 1980.00, other: 239.36 },
     note: '差异 $241.80 — Amazon FBA 仓储调整项，已与 Amazon 核实确认，Finance Admin 已核销（2026-07-25）',
     expectedReceiptDate: '2026-07-17',
@@ -258,19 +386,27 @@ export const channelArRows: ChannelArRow[] = [
     settlementNo: 'STL-WMT-20260731',
     channel: 'Walmart',
     merchant: 'US Walmart',
+    settlementOwner: 'Walmart Marketplace',
     periodStart: '2026-07-16',
     periodEnd: '2026-07-31',
     orderCount: 98,
     grossAmount: 11240.00,
+    chargePrincipal: 11465.60,
+    refundPrincipal: 225.60,
     totalDeduction: 1124.00,
     expectedNet: 10116.00,
     actualNet: 10116.00,
+    bankMatchedAmount: 10116.00,
     variance: 0,
     currency: 'USD',
     status: '已核销',
     settledAt: '2026-08-14',
     erpSync: 'synced',
     erpSystem: 'NetSuite',
+    fundProgress: 'PROVIDER_PAID',
+    settlementCheckStatus: 'RESOLVED',
+    bankMatchStatus: 'MATCHED',
+    predictionConfidence: 'HIGH',
     deductionBreakdown: { commission: 898.40, refunds: 225.60 },
     note: '7月下半月结算，已到账无差异，已录入 NetSuite 并锁定账期',
     expectedReceiptDate: '2026-08-14',
@@ -290,6 +426,39 @@ export const erpSyncConfig: Record<ErpSyncStatus, { label: string; cls: string }
   pending: { label: '待同步',   cls: 'text-amber-600' },
   error:   { label: '同步失败', cls: 'text-[var(--danger)]' },
   na:      { label: '—',        cls: 'text-[var(--muted)]' },
+};
+
+export const fundProgressConfig: Record<FundProgress, { label: string; cls: string; dot: string }> = {
+  ROUTE_UNKNOWN:            { label: '路径待确认',   cls: 'bg-slate-50 text-slate-500 ring-slate-200',     dot: 'bg-slate-400' },
+  WAITING_LEDGER:           { label: '明细待同步',   cls: 'bg-blue-50 text-blue-700 ring-blue-200',        dot: 'bg-blue-500' },
+  UNASSIGNED:               { label: '待分配批次',   cls: 'bg-blue-50 text-blue-600 ring-blue-200',        dot: 'bg-blue-400' },
+  PAYOUT_SCHEDULED:         { label: '已安排打款',   cls: 'bg-amber-50 text-amber-700 ring-amber-200',     dot: 'bg-amber-400' },
+  PAYOUT_IN_TRANSIT:        { label: '打款处理中',   cls: 'bg-blue-50 text-blue-700 ring-blue-200',        dot: 'bg-blue-500' },
+  PROVIDER_PAID:            { label: '机构已入账',   cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200', dot: 'bg-emerald-500' },
+  ACTION_REQUIRED:          { label: '需处理',       cls: 'bg-red-50 text-red-700 ring-red-200',           dot: 'bg-red-500' },
+  PAYOUT_FAILED:            { label: '打款失败',     cls: 'bg-red-50 text-red-700 ring-red-200',           dot: 'bg-red-500' },
+  PAYOUT_CANCELED:          { label: '打款取消',     cls: 'bg-slate-50 text-slate-500 ring-slate-200',     dot: 'bg-slate-400' },
+  EXTERNAL_DATA_REQUIRED:   { label: '外部待补',     cls: 'bg-orange-50 text-orange-700 ring-orange-200',  dot: 'bg-orange-500' },
+  MANUAL_EVIDENCE_REQUIRED: { label: '凭证待补',     cls: 'bg-orange-50 text-orange-700 ring-orange-200',  dot: 'bg-orange-400' },
+  NOT_APPLICABLE:           { label: '不适用',       cls: 'bg-slate-50 text-slate-400 ring-slate-200',     dot: 'bg-slate-300' },
+};
+
+export const settlementCheckConfig: Record<SettlementCheckStatus, { label: string; cls: string; dot: string }> = {
+  DATA_INCOMPLETE: { label: '数据不全', cls: 'bg-slate-50 text-slate-500 ring-slate-200',       dot: 'bg-slate-400' },
+  TO_CHECK:        { label: '待核对',   cls: 'bg-amber-50 text-amber-700 ring-amber-200',       dot: 'bg-amber-400' },
+  MATCHED:         { label: '已匹配',   cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200', dot: 'bg-emerald-500' },
+  DIFFERENCE:      { label: '有差异',   cls: 'bg-red-50 text-red-700 ring-red-200',             dot: 'bg-red-500' },
+  RESOLVED:        { label: '差异已处理',cls:'bg-emerald-50 text-emerald-600 ring-emerald-200', dot: 'bg-emerald-400' },
+  NOT_APPLICABLE:  { label: '不适用',   cls: 'bg-slate-50 text-slate-400 ring-slate-200',       dot: 'bg-slate-300' },
+};
+
+export const bankMatchConfig: Record<BankMatchStatus, { label: string; cls: string; dot: string }> = {
+  NO_EVIDENCE:    { label: '未取凭证', cls: 'bg-slate-50 text-slate-500 ring-slate-200',       dot: 'bg-slate-400' },
+  TO_MATCH:       { label: '待核销',   cls: 'bg-amber-50 text-amber-700 ring-amber-200',       dot: 'bg-amber-400' },
+  PARTIAL:        { label: '部分核销', cls: 'bg-blue-50 text-blue-700 ring-blue-200',          dot: 'bg-blue-500' },
+  MATCHED:        { label: '已核销',   cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200', dot: 'bg-emerald-500' },
+  DIFFERENCE:     { label: '核销差异', cls: 'bg-red-50 text-red-700 ring-red-200',             dot: 'bg-red-500' },
+  NOT_APPLICABLE: { label: '不适用',   cls: 'bg-slate-50 text-slate-400 ring-slate-200',       dot: 'bg-slate-300' },
 };
 
 // ─── 应收账款（AR）────────────────────────────────────────────────────────────

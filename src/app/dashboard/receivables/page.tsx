@@ -3,14 +3,15 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import {
-  AlertTriangle, CheckCircle2, Clock, TrendingDown, TrendingUp,
-  ChevronDown, ChevronRight, Search, Filter, X, Download,
-  RefreshCw, ExternalLink, ArrowRight, Bell, Zap, Plus,
+  AlertTriangle, ChevronDown, ChevronRight, Search, X, Download,
+  RefreshCw, ExternalLink, ArrowRight, Bell, Zap, Plus, MoreHorizontal, Columns3,
 } from 'lucide-react';
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { StatusBadge } from '@/components/admin/status-badge';
 import {
   channelArRows, channelArKpi, channelArStatusConfig, erpSyncConfig,
+  fundProgressConfig, settlementCheckConfig, bankMatchConfig,
   arRows, arKpi, agingStatusConfig,
   stores, platformSettlementBatches, amountTypeConfig,
   shopifyPayoutBatches, tiktokSettlementBatches,
@@ -65,7 +66,11 @@ const PROTO_TODAY = new Date().toISOString().slice(0, 10);
 // ─── 订单 / SKU 类型 ──────────────────────────────────────────────────────────
 
 type OrderViewRow = {
-  key: string; channel: ChannelSource; storeCode: string;
+  key: string;
+  channel: ChannelSource;         // 结算渠道 — 谁打款（Amazon / Shopify / TikTok Shop）
+  sourceChannel?: string;         // 来源渠道 — 订单从哪里进来（可与结算渠道不同）
+  paymentGateway?: string;        // 支付处理方 — 谁收钱（Stripe / Amazon Pay / TikTok Pay）
+  storeCode: string;
   orderId: string; productName?: string; msku?: string;
   quantity: number; income: number; platformFee: number;
   refund: number; net: number; date: string; batchPeriod: string; isRefund: boolean;
@@ -91,6 +96,8 @@ function buildOrderViewRows(): OrderViewRow[] {
     orders.forEach(o => {
       rows.push({
         key: `${batch.settlementId}-${o.orderId}`, channel: 'Amazon', storeCode: 'US-AMZ',
+        // Amazon 结算：来源和结算都是 Amazon；支付由 Amazon Pay / Marketplace 处理
+        paymentGateway: 'Amazon Pay',
         orderId: o.orderId, productName: o.productName, msku: o.msku, quantity: o.quantity,
         income: o.isRefund ? 0 : Math.max(o.principal + o.promotion, 0),
         platformFee: o.fbaFee + o.commission, refund: o.isRefund ? o.net : 0,
@@ -104,6 +111,7 @@ function buildOrderViewRows(): OrderViewRow[] {
     batch.lines.forEach(l => {
       rows.push({
         key: `${batch.settlementId}-${l.orderId}`, channel: 'TikTok Shop', storeCode: l.storeCode,
+        paymentGateway: 'TikTok Pay',
         orderId: l.orderId, productName: l.productName, msku: l.msku ?? l.sku, quantity: l.quantity,
         income: l.deliveryIncome > 0 ? l.deliveryIncome + l.creditAmount + l.shippingOpsAmount : 0,
         platformFee: l.commission < 0 ? l.commission : 0, refund: l.deliveryIncome < 0 ? l.deliveryIncome : 0,
@@ -116,6 +124,8 @@ function buildOrderViewRows(): OrderViewRow[] {
     batch.lines.filter(l => (l.type === 'charge' || l.type === 'refund') && l.orderId).forEach(l => {
       rows.push({
         key: `${batch.payoutId}-${l.orderId}-${l.type}`, channel: 'Shopify', storeCode: 'US-SHP',
+        // Shopify Payments = Stripe 在幕后收款，Shopify Payout 打款
+        paymentGateway: 'Stripe (via Shopify Payments)',
         orderId: l.orderId!, productName: undefined, msku: undefined, quantity: 1,
         income: l.type === 'charge' ? l.grossSales : 0, platformFee: l.feeAmount,
         refund: l.type === 'refund' ? l.returnAmount : 0, net: l.netAmount,
@@ -124,6 +134,37 @@ function buildOrderViewRows(): OrderViewRow[] {
       });
     });
   });
+
+  // ── 跨渠道演示数据：Buy with Prime / Multi-Channel Fulfillment ──────────────
+  // 场景一：订单在 Shopify 独立站下单 → Amazon Pay 收款 → Amazon Seller Central 结算
+  // 场景二：TikTok Shop 下单 → Amazon MCF 履约 → 在 Amazon 结算
+  rows.push(
+    {
+      key: 'bwp-001', channel: 'Amazon', storeCode: 'US-AMZ',
+      sourceChannel: 'Shopify DTC',
+      paymentGateway: 'Amazon Pay (Buy with Prime)',
+      orderId: 'BWP-112-9283741', productName: 'Sleep Mask Pro · 2-Pack', msku: 'SKU-SMP-2PK',
+      quantity: 2, income: 59.98, platformFee: -7.20, refund: 0, net: 52.78,
+      date: '2026-09-18', batchPeriod: '2026-09-01~2026-09-30', isRefund: false,
+    },
+    {
+      key: 'bwp-002', channel: 'Amazon', storeCode: 'US-AMZ',
+      sourceChannel: 'Shopify DTC',
+      paymentGateway: 'Amazon Pay (Buy with Prime)',
+      orderId: 'BWP-112-8847362', productName: 'Pillow Spray · 100ml', msku: 'SKU-PS-100',
+      quantity: 1, income: 29.99, platformFee: -3.60, refund: 0, net: 26.39,
+      date: '2026-09-22', batchPeriod: '2026-09-01~2026-09-30', isRefund: false,
+    },
+    {
+      key: 'mcf-001', channel: 'Amazon', storeCode: 'US-AMZ',
+      sourceChannel: 'TikTok Shop',
+      paymentGateway: 'Amazon MCF',
+      orderId: 'MCF-114-7736521', productName: 'Eye Mask Bundle × 3', msku: 'SKU-EMB-3',
+      quantity: 3, income: 89.97, platformFee: -12.60, refund: 0, net: 77.37,
+      date: '2026-09-25', batchPeriod: '2026-09-01~2026-09-30', isRefund: false,
+    },
+  );
+
   return rows.sort((a, b) => b.date.localeCompare(a.date));
 }
 
@@ -163,132 +204,347 @@ function FeeCell({ v, cls }: { v?: number; cls?: string }) {
 // 主页面
 // ═══════════════════════════════════════════════════════════════════════════════
 
-type MainTab = 'reconciliation' | 'aging';
+type MainTab = 'reconciliation' | 'aging' | 'b2b';
+
+// ─── 日期范围预设 ─────────────────────────────────────────────────────────────
+const DATE_PRESETS_PAGE = [
+  { value: 'all',        label: '全部时间',  from: '',           to: '' },
+  { value: 'this-month', label: '本月',      from: '2026-09-01', to: '2026-09-30' },
+  { value: 'last-month', label: '上月',      from: '2026-08-01', to: '2026-08-31' },
+  { value: '90d',        label: '近 3 个月', from: '2026-07-01', to: '2026-09-30' },
+];
 
 export default function ReceivablesPage() {
   const [tab, setTab] = useState<MainTab>('reconciliation');
+  const [batchRows, setBatchRows] = useState<ChannelArRow[]>(channelArRows);
+  const [arInvoices, setArInvoices] = useState<typeof arRows[0][]>(arRows);
+  const [showEntry, setShowEntry] = useState(false);
+  const [toastMsg, setToastMsg] = useState('');
 
-  // 派生指标
+  // ── 统一筛选状态（提升到页面级，对齐订单页架构）──────────────────────────
+  const [search, setSearch]             = useState('');
+  const [dimension, setDimension]       = useState<'batch' | 'order' | 'sku'>('batch');
+  const [statusFilter, setStatusFilter] = useState<ChannelArStatus | 'all'>('all');
+  const [channelFilter, setChannelFilter] = useState<string | null>(null);
+  const [dateRange, setDateRange]       = useState('all');
+  const [agingFilter, setAgingFilter]   = useState<'all' | 'current' | 'overdue' | 'critical'>('all');
+  const [b2bFilter, setB2bFilter]       = useState<'all' | 'overdue' | 'current' | 'collected'>('all');
+  const [arChannelFilter, setArChannelFilter] = useState('');
+  // 结算对账 tab 追加筛选
+  const [erpFilter, setErpFilter]       = useState<'all' | 'pending' | 'synced'>('all');
+  // 账龄管理 tab 追加筛选
+  const [agingTermsFilter, setAgingTermsFilter] = useState(''); // 'Net 30' | 'Net 60' etc.
+  const [agingMinBalance, setAgingMinBalance]   = useState(''); // '' | '1000' | '10000' | '50000'
+  // B2B 应收 tab 追加筛选
+  const [b2bInvoiceType, setB2bInvoiceType] = useState(''); // '' | 'invoice' | 'credit_note' | 'proforma'
+  const [b2bDueFilter, setB2bDueFilter]     = useState(''); // '' | 'overdue' | '7d' | '30d'
+
+  const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 2600); };
+
+  function clearFilters() {
+    setSearch(''); setStatusFilter('all'); setChannelFilter(null);
+    setDateRange('all'); setAgingFilter('all'); setB2bFilter('all'); setArChannelFilter('');
+    setErpFilter('all'); setAgingTermsFilter(''); setAgingMinBalance('');
+    setB2bInvoiceType(''); setB2bDueFilter('');
+  }
+  const hasFilter = search || statusFilter !== 'all' || channelFilter || dateRange !== 'all'
+    || agingFilter !== 'all' || b2bFilter !== 'all' || arChannelFilter !== ''
+    || erpFilter !== 'all' || agingTermsFilter !== '' || agingMinBalance !== ''
+    || b2bInvoiceType !== '' || b2bDueFilter !== '';
+
+  // Tab 切换时清空筛选
+  function switchTab(t: MainTab) { setTab(t); clearFilters(); }
+
+  // ── 动态筛选选项 — 全部从数据中提取，不硬编码 ─────────────────────────
+  const reconChannelOptions = useMemo(() => Array.from(new Set(batchRows.map(r => r.channel))).sort(), [batchRows]);
+  const arChannelOptions    = useMemo(() => Array.from(new Set(arInvoices.map(r => r.channel))).filter(Boolean).sort(), [arInvoices]);
+  const arTermsOptions      = useMemo(() => Array.from(new Set(arInvoices.map(r => r.paymentTerms).filter(Boolean))).sort(), [arInvoices]);
+
+  // ── 派生 KPI ──────────────────────────────────────────────────────────────
   const b2bPending  = arRows.filter(r => r.balanceDue > 0).reduce((s, r) => s + r.balanceDue, 0);
   const b2bOverdue  = arRows.filter(r => r.overdueDays > 0 && r.balanceDue > 0).reduce((s, r) => s + r.balanceDue, 0);
-  const varTotal    = Math.abs(channelArRows.reduce((s, r) => s + (r.variance ?? 0), 0));
-  const totalAR     = channelArKpi.channelPending + channelArKpi.channelReceived + b2bPending;
+  const liveChannelPending  = batchRows.filter(r => r.actualNet === null).reduce((s, r) => s + r.expectedNet, 0);
+  const liveChannelReceived = batchRows.filter(r => r.actualNet !== null).reduce((s, r) => s + (r.actualNet ?? 0), 0);
+  const liveVariances       = batchRows.filter(r => r.variance !== null && r.variance !== 0);
+  const varTotal            = liveVariances.reduce((s, r) => s + Math.abs(r.variance ?? 0), 0);
+  const monthlyGross        = batchRows.reduce((s, r) => s + r.grossAmount, 0);
+  const totalPending        = liveChannelPending + b2bPending;
+  const dso                 = monthlyGross > 0 ? Math.round((totalPending / monthlyGross) * 30) : 0;
 
-  // DSO 估算（基于本月已发货金额和已回款，简化版）
-  // DSO = 待回款 / 日均销售额；用 30 天周期估算
-  const monthlyGross = channelArRows.reduce((s, r) => s + r.grossAmount, 0);
-  const totalPending = channelArRows.filter(r => r.actualNet === null).reduce((s, r) => s + r.expectedNet, 0) + b2bPending;
-  const dso = monthlyGross > 0 ? Math.round((totalPending / monthlyGross) * 30) : 0;
+  // ── 各 tab 结果数 ──────────────────────────────────────────────────────────
+  const reconcCount = useMemo(() => batchRows.filter(r => {
+    if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+    if (channelFilter && r.channel !== channelFilter) return false;
+    if (search && !r.settlementNo.toLowerCase().includes(search.toLowerCase()) && !r.merchant.toLowerCase().includes(search.toLowerCase())) return false;
+    const preset = DATE_PRESETS_PAGE.find(p => p.value === dateRange)!;
+    if (preset.from && r.periodStart < preset.from) return false;
+    if (preset.to   && r.periodEnd   > preset.to)   return false;
+    return true;
+  }).length, [batchRows, statusFilter, channelFilter, search, dateRange]);
 
-  // 本周预计到账
-  const dueThisWeek = channelArRows.filter(r =>
-    r.actualNet === null && r.expectedReceiptDate && r.expectedReceiptDate <= '2026-10-06'
-  ).reduce((s, r) => s + r.expectedNet, 0);
-
-  // 已到账率
-  const receivedRatio = totalAR > 0
-    ? Math.round((channelArKpi.channelReceived / (channelArKpi.channelPending + channelArKpi.channelReceived)) * 100)
-    : 0;
-
-  // Action items
-  const actions = buildActionItems();
-  const urgentCount = actions.filter(a => a.urgency === 'high').length;
+  const b2bCount = useMemo(() => arRows.filter(r => {
+    const q = search.toLowerCase();
+    if (q && !r.customer.toLowerCase().includes(q) && !r.invoiceNo.toLowerCase().includes(q)) return false;
+    if (b2bFilter === 'overdue')   return r.overdueDays > 0 && r.balanceDue > 0;
+    if (b2bFilter === 'current')   return r.overdueDays === 0 && r.balanceDue > 0;
+    if (b2bFilter === 'collected') return r.balanceDue === 0;
+    return true;
+  }).length, [search, b2bFilter]);
 
   return (
     <div className="mx-auto max-w-[1440px] space-y-5 pt-5 lg:pt-6">
 
       {/* ── 页头 ── */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-[22px] font-semibold tracking-tight text-[var(--foreground)]">应收账款</h1>
           <p className="mt-0.5 text-[13px] text-[var(--muted)]">
-            结算对账 · 账龄管理 · 催款跟踪
+            结算对账 · 账龄管理 · B2B 客户应收
+            <span className="mx-2 opacity-30">·</span>
+            待回款 {fmt(liveChannelPending)}
+            <span className="mx-2 opacity-30">·</span>
+            <span className={dso > 45 ? 'text-red-500' : dso > 30 ? 'text-amber-600' : ''}>DSO {dso} 天</span>
+            {liveVariances.length > 0 && <span className="ml-2 font-medium text-red-500">{liveVariances.length} 笔差异</span>}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <button className="flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] font-medium hover:bg-[var(--surface-subtle)]">
-            <RefreshCw className="size-3.5" />同步数据
+          <button onClick={() => showToast('正在同步数据...')} className="flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[13px] font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-hover)]">
+            <RefreshCw className="size-3.5" />
+            同步
           </button>
-          <button className="flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] font-medium hover:bg-[var(--surface-subtle)]">
-            <Download className="size-3.5" />导出
+          <button onClick={() => showToast('导出功能开发中')} className="flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[13px] font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-hover)]">
+            <Download className="size-3.5" />
+            导出
+          </button>
+          <button
+            onClick={() => setShowEntry(true)}
+            className="flex h-8 items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3 text-[13px] font-semibold text-white shadow-[var(--shadow-soft)] transition hover:opacity-90">
+            <Plus className="size-3.5" />
+            {tab === 'reconciliation' ? '录入结算' : '录入发票'}
           </button>
         </div>
       </div>
 
-      {/* ── KPI Strip ── */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        {/* DSO - 最重要的 AR 指标 */}
-        <div className={cn('rounded-xl border p-4 shadow-[var(--shadow-soft)]',
-          dso > 45 ? 'border-red-200 bg-red-50' : dso > 30 ? 'border-amber-200 bg-amber-50' : 'border-[var(--border)] bg-[var(--surface)]')}>
-          <div className="text-[11px] text-[var(--muted)]">DSO 回款天数</div>
-          <div className={cn('mt-1 text-[22px] font-bold tracking-tight',
-            dso > 45 ? 'text-red-700' : dso > 30 ? 'text-amber-700' : 'text-[var(--foreground)]')}>
-            {dso} 天
+      {/* ════════════════════════════════════════════════════════════════════
+          主卡片 — orders 规范：sticky Tab+Filter top，table，sticky footer
+          ════════════════════════════════════════════════════════════════════ */}
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)]">
+
+        {/* ── Sticky 头部：Tab + 筛选 pill 行 ── */}
+        <div className="sticky -top-5 lg:-top-6 z-20 rounded-t-xl bg-[var(--surface)] pt-5 lg:pt-6">
+
+          {/* Tab 行 */}
+          <div className="flex items-center justify-between border-b border-[var(--border)] px-5 pt-1">
+            <div className="flex items-center gap-6">
+              {([
+                { key: 'reconciliation', label: '结算对账',    count: batchRows.length,                              danger: liveVariances.length > 0 ? `${liveVariances.length} 笔差异` : undefined },
+                { key: 'aging',         label: '账龄管理',    count: arRows.filter(r => r.balanceDue > 0).length,    danger: b2bOverdue > 0 ? `逾期 ${fmt(b2bOverdue)}` : undefined },
+                { key: 'b2b',           label: 'B2B 客户应收', count: arRows.filter(r => r.balanceDue > 0).length,   danger: b2bOverdue > 0 ? `逾期 ${fmt(b2bOverdue)}` : undefined },
+              ] as const).map(({ key, label, count, danger }) => {
+                const isActive = tab === key;
+                return (
+                  <button key={key} onClick={() => switchTab(key as MainTab)}
+                    className={cn(
+                      'relative pb-3 pt-2.5 text-[13px] font-medium transition-colors whitespace-nowrap',
+                      isActive ? 'text-[var(--primary)]' : 'text-[var(--muted)] hover:text-[var(--foreground)]',
+                    )}>
+                    {label}
+                    <span className="ml-1.5 text-[11px] text-[var(--muted-foreground)]">{count}</span>
+                    {danger && (
+                      <span className="ml-1.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">{danger}</span>
+                    )}
+                    {isActive && <div className="absolute inset-x-0 bottom-0 h-[2px] rounded-full bg-[var(--primary)]" />}
+                  </button>
+                );
+              })}
+            </div>
+            <button className="flex h-8 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 text-[12px] font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-subtle)]">
+              <Columns3 className="size-3.5" />
+              列设置
+            </button>
           </div>
-          <div className="mt-1.5 flex items-center gap-1 text-[11px] text-[var(--muted)]">
-            {dso <= 30 ? <TrendingDown className="size-3 text-emerald-500" /> : <TrendingUp className="size-3 text-red-500" />}
-            <span>{dso <= 30 ? '健康' : dso <= 45 ? '偏高' : '需关注'} · 行业基准 30d</span>
+
+          {/* 筛选 pill 行 — 随 Tab 切换 */}
+          <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-2.5">
+            <div className="flex flex-wrap items-center gap-2">
+
+              {/* 结算对账：视图切换 + 搜索 + 状态 + ERP同步 + 渠道 + 日期 */}
+              {tab === 'reconciliation' && (<>
+                <div className="flex h-8 items-center rounded-full border border-[var(--border)] bg-[var(--surface)] p-0.5">
+                  {(['batch', 'order', 'sku'] as const).map(d => (
+                    <button key={d} onClick={() => setDimension(d)}
+                      className={cn('rounded-full px-3 py-1 text-[12px] font-medium transition-colors',
+                        dimension === d ? 'bg-[var(--primary)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--foreground)]')}>
+                      {{ batch: '结算批次', order: '订单', sku: 'SKU' }[d]}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex h-8 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-subtle)] pl-2.5 pr-1">
+                  <Search className="size-3.5 shrink-0 text-[var(--muted)]" />
+                  <input value={search} onChange={e => setSearch(e.target.value)}
+                    placeholder={dimension === 'order' ? '订单号 / MSKU' : dimension === 'sku' ? 'SKU / 商品' : '结算单号 / 店铺'}
+                    className="w-[150px] bg-transparent text-[12px] outline-none placeholder:text-[var(--muted)]" />
+                  {search && <button onClick={() => setSearch('')} className="flex size-5 items-center justify-center rounded-full hover:bg-[var(--surface-hover)]"><X className="size-3 text-[var(--muted)]" /></button>}
+                </div>
+                {dimension === 'batch' && (<>
+                  <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as ChannelArStatus | 'all')}
+                    className={cn('h-8 rounded-full border px-3 text-[12px] font-medium outline-none transition-colors',
+                      statusFilter !== 'all' ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-subtle)]')}>
+                    <option value="all">全部状态</option>
+                    <option value="处理中">处理中</option>
+                    <option value="待到账">待到账</option>
+                    <option value="已到账">已到账</option>
+                    <option value="差异">差异 ⚠</option>
+                  </select>
+                  <select value={erpFilter} onChange={e => setErpFilter(e.target.value as typeof erpFilter)}
+                    className={cn('h-8 rounded-full border px-3 text-[12px] font-medium outline-none transition-colors',
+                      erpFilter !== 'all' ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-subtle)]')}>
+                    <option value="all">ERP 同步</option>
+                    <option value="pending">待同步至 ERP</option>
+                    <option value="synced">已同步</option>
+                  </select>
+                </>)}
+                <select value={channelFilter ?? ''} onChange={e => setChannelFilter(e.target.value || null)}
+                  className={cn('h-8 rounded-full border px-3 text-[12px] font-medium outline-none transition-colors',
+                    channelFilter ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-subtle)]')}>
+                  <option value="">渠道</option>
+                  {reconChannelOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <select value={dateRange} onChange={e => setDateRange(e.target.value)}
+                  className={cn('h-8 rounded-full border px-3 text-[12px] font-medium outline-none transition-colors',
+                    dateRange !== 'all' ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-subtle)]')}>
+                  {DATE_PRESETS_PAGE.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </select>
+              </>)}
+
+              {/* 账龄管理：搜索 + 渠道 + 账期 + 最小余额 + 账龄pill */}
+              {tab === 'aging' && (<>
+                <div className="flex h-8 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-subtle)] pl-2.5 pr-1">
+                  <Search className="size-3.5 shrink-0 text-[var(--muted)]" />
+                  <input value={search} onChange={e => setSearch(e.target.value)} placeholder="客户名称"
+                    className="w-[140px] bg-transparent text-[12px] outline-none placeholder:text-[var(--muted)]" />
+                  {search && <button onClick={() => setSearch('')} className="flex size-5 items-center justify-center rounded-full hover:bg-[var(--surface-hover)]"><X className="size-3 text-[var(--muted)]" /></button>}
+                </div>
+                <select value={arChannelFilter} onChange={e => setArChannelFilter(e.target.value)}
+                  className={cn('h-8 rounded-full border px-3 text-[12px] font-medium outline-none transition-colors',
+                    arChannelFilter ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-subtle)]')}>
+                  <option value="">渠道</option>
+                  {arChannelOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <select value={agingTermsFilter} onChange={e => setAgingTermsFilter(e.target.value)}
+                  className={cn('h-8 rounded-full border px-3 text-[12px] font-medium outline-none transition-colors',
+                    agingTermsFilter ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-subtle)]')}>
+                  <option value="">账期</option>
+                  {arTermsOptions.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <select value={agingMinBalance} onChange={e => setAgingMinBalance(e.target.value)}
+                  className={cn('h-8 rounded-full border px-3 text-[12px] font-medium outline-none transition-colors',
+                    agingMinBalance ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-subtle)]')}>
+                  <option value="">余额范围</option>
+                  <option value="1000">≥ $1,000</option>
+                  <option value="10000">≥ $10,000</option>
+                  <option value="50000">≥ $50,000</option>
+                </select>
+                {(['all', 'current', 'overdue', 'critical'] as const).map(f => (
+                  <button key={f} onClick={() => setAgingFilter(f)}
+                    className={cn('h-8 rounded-full border px-3 text-[12px] font-medium transition-colors',
+                      agingFilter === f ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-subtle)]')}>
+                    {{ all: '全部', current: '未到期', overdue: '有逾期', critical: '61天+ 高风险' }[f]}
+                  </button>
+                ))}
+              </>)}
+
+              {/* B2B：搜索 + 渠道 + 发票类型 + 到期状态 + 状态pill */}
+              {tab === 'b2b' && (<>
+                <div className="flex h-8 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-subtle)] pl-2.5 pr-1">
+                  <Search className="size-3.5 shrink-0 text-[var(--muted)]" />
+                  <input value={search} onChange={e => setSearch(e.target.value)} placeholder="客户 / 发票号"
+                    className="w-[150px] bg-transparent text-[12px] outline-none placeholder:text-[var(--muted)]" />
+                  {search && <button onClick={() => setSearch('')} className="flex size-5 items-center justify-center rounded-full hover:bg-[var(--surface-hover)]"><X className="size-3 text-[var(--muted)]" /></button>}
+                </div>
+                <select value={arChannelFilter} onChange={e => setArChannelFilter(e.target.value)}
+                  className={cn('h-8 rounded-full border px-3 text-[12px] font-medium outline-none transition-colors',
+                    arChannelFilter ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-subtle)]')}>
+                  <option value="">渠道</option>
+                  {arChannelOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <select value={b2bInvoiceType} onChange={e => setB2bInvoiceType(e.target.value)}
+                  className={cn('h-8 rounded-full border px-3 text-[12px] font-medium outline-none transition-colors',
+                    b2bInvoiceType ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-subtle)]')}>
+                  <option value="">发票类型</option>
+                  <option value="invoice">正式发票</option>
+                  <option value="credit_note">贷项通知单</option>
+                  <option value="proforma">形式发票</option>
+                </select>
+                <select value={b2bDueFilter} onChange={e => setB2bDueFilter(e.target.value)}
+                  className={cn('h-8 rounded-full border px-3 text-[12px] font-medium outline-none transition-colors',
+                    b2bDueFilter ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-subtle)]')}>
+                  <option value="">到期状态</option>
+                  <option value="overdue">已逾期</option>
+                  <option value="7d">7天内到期</option>
+                  <option value="30d">30天内到期</option>
+                  <option value="ok">正常未到期</option>
+                </select>
+                {(['all', 'overdue', 'current', 'collected'] as const).map(f => (
+                  <button key={f} onClick={() => setB2bFilter(f)}
+                    className={cn('h-8 rounded-full border px-3 text-[12px] font-medium transition-colors',
+                      b2bFilter === f ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-subtle)]')}>
+                    {{ all: '全部', overdue: '逾期', current: '未到期', collected: '已结清' }[f]}
+                  </button>
+                ))}
+              </>)}
+
+              {hasFilter && (
+                <button onClick={clearFilters}
+                  className="h-8 rounded-full px-3 text-[12px] font-medium text-[var(--muted)] transition-colors hover:bg-[var(--surface-subtle)] hover:text-[var(--foreground)]">
+                  清除筛选
+                </button>
+              )}
+            </div>
+            <span className="shrink-0 text-[12px] text-[var(--muted)]">
+              {tab === 'reconciliation' ? `${reconcCount} 条` : tab === 'b2b' ? `${b2bCount} 条` : `${arRows.filter(r => r.balanceDue > 0).length} 家`}
+            </span>
           </div>
         </div>
-        <KpiCard label="渠道待回款"   value={fmt(channelArKpi.channelPending)} sub="TikTok · Walmart" warn />
-        <KpiCard label="本月已到账"   value={fmt(channelArKpi.channelReceived)} sub={`到账率 ${receivedRatio}%`} success />
-        <KpiCard label="本周预计到账" value={fmt(dueThisWeek)} sub="基于结算周期预测" />
-        <KpiCard label="结算差异"     value={`${channelArKpi.varianceCount} 笔`} sub={`合计 ${fmtD(varTotal)}`} danger={varTotal > 0} />
+
+        {/* ── 内容区 ── */}
+        {tab === 'reconciliation' && (
+          <ReconciliationView
+            batchRows={batchRows} setBatchRows={setBatchRows} onToast={showToast}
+            search={search} dimension={dimension} setDimension={setDimension}
+            statusFilter={statusFilter} channelFilter={channelFilter} dateRange={dateRange}
+            erpFilter={erpFilter}
+          />
+        )}
+        {tab === 'aging' && <AgingView dso={dso} search={search} agingFilter={agingFilter} channelFilter={arChannelFilter} paymentTermsFilter={agingTermsFilter} minBalance={agingMinBalance} invoices={arInvoices} setInvoices={setArInvoices} />}
+        {tab === 'b2b'   && <B2bView onToast={showToast} search={search} filter={b2bFilter} channelFilter={arChannelFilter} invoiceTypeFilter={b2bInvoiceType} dueFilter={b2bDueFilter} invoices={arInvoices} setInvoices={setArInvoices} />}
       </div>
 
-      {/* ── 待处理操作队列（Action Queue）── */}
-      {actions.length > 0 && <ActionQueue items={actions} />}
-
-      {/* ── Tab 导航 ── */}
-      <div className="flex items-end border-b border-[var(--border)]">
-        <TabBtn
-          active={tab === 'reconciliation'}
-          onClick={() => setTab('reconciliation')}
-          label="结算对账"
-          sub={`${channelArRows.length} 个批次 · ${stores.length} 家店铺`}
-          badge={varTotal > 0 ? `${channelArKpi.varianceCount} 笔差异` : undefined}
+      {/* ── 录入抽屉（页面级统一入口）── */}
+      {showEntry && tab === 'reconciliation' && (
+        <ManualSettlementDrawer
+          open={showEntry}
+          onClose={() => setShowEntry(false)}
+          onAdd={(row) => { setBatchRows(prev => [row, ...prev]); setShowEntry(false); showToast('✓ 手动结算已录入'); }}
         />
-        <TabBtn
-          active={tab === 'aging'}
-          onClick={() => setTab('aging')}
-          label="账龄管理"
-          sub={`${arRows.filter(r => r.balanceDue > 0).length} 张未结发票 · DSO ${dso}d`}
-          badge={b2bOverdue > 0 ? `逾期 ${fmt(b2bOverdue)}` : undefined}
-          badgeDanger
+      )}
+      {showEntry && tab !== 'reconciliation' && (
+        <NewInvoiceDrawer
+          open={showEntry}
+          onClose={() => setShowEntry(false)}
+          onAdd={(inv) => { setArInvoices(prev => [inv, ...prev]); setShowEntry(false); showToast('✓ 应收发票已创建'); }}
         />
-      </div>
+      )}
 
-      {/* ── 内容区 ── */}
-      {tab === 'reconciliation' && <ReconciliationView />}
-      {tab === 'aging'          && <AgingView dso={dso} />}
+      {toastMsg && (
+        <div className="fixed bottom-6 left-1/2 z-[200] -translate-x-1/2 rounded-xl bg-[var(--foreground)] px-4 py-2.5 text-[13px] font-medium text-[var(--background)] shadow-xl">
+          {toastMsg}
+        </div>
+      )}
     </div>
   );
 }
 
-function TabBtn({ active, onClick, label, sub, badge, badgeDanger }: {
-  active: boolean; onClick: () => void; label: string; sub: string;
-  badge?: string; badgeDanger?: boolean;
-}) {
-  return (
-    <button onClick={onClick}
-      className={cn(
-        'relative flex flex-col items-start px-5 py-3 text-left transition-colors',
-        'after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:rounded-full after:transition-colors',
-        active ? 'after:bg-[var(--primary)] text-[var(--primary)]' : 'after:bg-transparent text-[var(--muted)] hover:text-[var(--foreground)]',
-      )}>
-      <div className="flex items-center gap-2">
-        <span className="text-[13px] font-semibold">{label}</span>
-        {badge && (
-          <span className={cn('rounded-full px-1.5 py-0.5 text-[10px] font-bold',
-            badgeDanger ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700')}>
-            {badge}
-          </span>
-        )}
-      </div>
-      <span className="mt-0.5 text-[11px] opacity-70">{sub}</span>
-    </button>
-  );
-}
 
 // ─── Action Queue 数据构建 ─────────────────────────────────────────────────────
 
@@ -303,11 +559,11 @@ type ActionItem = {
   ctaHref: string;
 };
 
-function buildActionItems(): ActionItem[] {
+function buildActionItems(batchRows: ChannelArRow[]): ActionItem[] {
   const items: ActionItem[] = [];
 
   // 结算差异
-  channelArRows.filter(r => r.variance !== null && r.variance !== 0).forEach(r => {
+  batchRows.filter(r => r.variance !== null && r.variance !== 0 && r.status === '差异').forEach(r => {
     items.push({
       id: `diff-${r.id}`,
       urgency: 'high',
@@ -431,6 +687,29 @@ function ActionQueue({ items }: { items: ActionItem[] }) {
   );
 }
 
+// ─── 结算对账筛选 pill 行（嵌入卡片 sticky 头部）────────────────────────────
+
+function ReconciliationFilterBar({ visible, batchRows }: { visible: boolean; batchRows: ChannelArRow[] }) {
+  // This is a display-only pass-through — actual filter state lives in ReconciliationView.
+  // We render the pill row structure here so it sits inside the sticky header,
+  // and ReconciliationView reads these via internal state (no prop-drilling needed for initial version).
+  if (!visible) return null;
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-2.5">
+      <div className="flex items-center gap-2 text-[12px] text-[var(--muted)]">
+        <span>{batchRows.length} 个批次</span>
+        <span className="text-[var(--border)]">·</span>
+        <span>{batchRows.filter(r => r.actualNet === null).length} 个待到账</span>
+        <span className="text-[var(--border)]">·</span>
+        <span className={batchRows.filter(r => r.variance !== null && r.variance !== 0).length > 0 ? 'font-semibold text-amber-600' : ''}>
+          {batchRows.filter(r => r.variance !== null && r.variance !== 0).length} 笔差异
+        </span>
+      </div>
+      <span className="text-[11px] text-[var(--muted-foreground)]">筛选可在下方明细表格中操作</span>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Tab 1：结算对账视图
 // 每个渠道作为一个"清算账户"：销售→扣减→OMS预期→银行到账→差异
@@ -439,19 +718,26 @@ function ActionQueue({ items }: { items: ActionItem[] }) {
 
 const CHANNEL_ORDER = ['Amazon', 'Shopify', 'TikTok Shop', 'Walmart'] as const;
 
-function ReconciliationView() {
-  const [batchRows, setBatchRows] = useState<ChannelArRow[]>(channelArRows);
+function ReconciliationView({ batchRows, setBatchRows, onToast, search, dimension, setDimension, statusFilter, channelFilter, dateRange, erpFilter }: {
+  batchRows: ChannelArRow[];
+  setBatchRows: React.Dispatch<React.SetStateAction<ChannelArRow[]>>;
+  onToast: (msg: string) => void;
+  search: string;
+  dimension: 'batch' | 'order' | 'sku';
+  setDimension: (d: 'batch' | 'order' | 'sku') => void;
+  statusFilter: ChannelArStatus | 'all';
+  channelFilter: string | null;
+  dateRange: string;
+  erpFilter: 'all' | 'pending' | 'synced';
+}) {
   const [expandedBatch, setExpandedBatch] = useState<string | null>(null);
-  const [activeChannel, setActiveChannel] = useState<string | null>(null);
-  const [dimension, setDimension] = useState<'batch' | 'order' | 'sku'>('batch');
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<ChannelArStatus | 'all'>('all');
-  const [dateRange,     setDateRange]   = useState<string>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedOrderKey, setSelectedOrderKey] = useState<string | null>(null);
-  const [showManualSettlement, setShowManualSettlement] = useState(false);
   const [confirmReceived, setConfirmReceived] = useState<ChannelArRow | null>(null);
   const [confirmedAmount, setConfirmedAmount] = useState('');
+  const [confirmedDate, setConfirmedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [confirmedRef, setConfirmedRef] = useState('');
+  const [confirmedAccount, setConfirmedAccount] = useState('公司主账户 · Chase ****4821');
 
   function handleConfirmReceived(id: string, actualNet: number) {
     setBatchRows(prev => prev.map(r => {
@@ -462,28 +748,38 @@ function ReconciliationView() {
         actualNet,
         variance,
         status: Math.abs(variance) < 0.01 ? '已到账' as ChannelArStatus : '差异' as ChannelArStatus,
-        settledAt: new Date().toISOString().slice(0, 10),
+        settledAt: confirmedDate || new Date().toISOString().slice(0, 10),
         erpSync: 'pending' as const,
       };
     }));
     setConfirmReceived(null);
     setConfirmedAmount('');
+    setConfirmedDate(new Date().toISOString().slice(0, 10));
+    setConfirmedRef('');
+    onToast('✓ 已确认到账，ERP 同步已加入队列');
   }
 
-  function handleAddManualSettlement(row: ChannelArRow) {
-    setBatchRows(prev => [row, ...prev]);
-    setShowManualSettlement(false);
+  function handleWriteOff(id: string) {
+    setBatchRows(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      return {
+        ...r,
+        status: '已核销' as ChannelArStatus,
+        note: (r.note ?? '') + `（差异已核销 · ${new Date().toLocaleDateString('zh-CN')}）`,
+      };
+    }));
+    onToast('✓ 差异已核销');
   }
 
-  // 日期范围预设（基于 mock 数据的实际时间范围）
-  const DATE_PRESETS: { value: string; label: string; from: string; to: string }[] = [
-    { value: 'all',        label: '全部时间',    from: '',           to: '' },
-    { value: 'this-month', label: '本月',        from: '2026-09-01', to: '2026-09-30' },
-    { value: 'last-month', label: '上月',        from: '2026-08-01', to: '2026-08-31' },
-    { value: '90d',        label: '近 3 个月',   from: '2026-07-01', to: '2026-09-30' },
-  ];
+  function handleMarkErpSynced(id: string) {
+    setBatchRows(prev => prev.map(r =>
+      r.id === id ? { ...r, erpSync: 'synced' as const } : r,
+    ));
+    onToast('✓ 已标记 ERP 同步完成');
+  }
 
-  const selectedPreset = DATE_PRESETS.find(p => p.value === dateRange)!;
+  // 日期范围预设（使用页面级常量）
+  const selectedPreset = DATE_PRESETS_PAGE.find(p => p.value === dateRange)!;
 
   const allOrderRows = useMemo(() => buildOrderViewRows(), []);
   const allSkuRows   = useMemo(() => buildSkuViewRows(), []);
@@ -498,202 +794,40 @@ function ReconciliationView() {
   const filteredBatch = useMemo(() => batchRows.filter(r => {
     const q = search.toLowerCase();
     if (q && !r.settlementNo.toLowerCase().includes(q) && !r.merchant.toLowerCase().includes(q)) return false;
-    if (activeChannel && r.channel !== activeChannel) return false;
+    if (channelFilter && r.channel !== channelFilter) return false;
     if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+    if (erpFilter === 'pending' && r.erpSync !== 'pending') return false;
+    if (erpFilter === 'synced'  && r.erpSync !== 'synced')  return false;
     if (selectedPreset.from && r.periodStart < selectedPreset.from) return false;
     if (selectedPreset.to   && r.periodEnd   > selectedPreset.to)   return false;
     return true;
-  }), [search, activeChannel, statusFilter, selectedPreset, batchRows]);
+  }), [search, channelFilter, statusFilter, erpFilter, selectedPreset, batchRows]);
 
   const filteredOrder = useMemo(() => allOrderRows.filter(r => {
     const q = search.toLowerCase();
     if (q && !r.orderId.toLowerCase().includes(q) && !(r.msku ?? '').toLowerCase().includes(q)) return false;
-    if (activeChannel && r.channel !== activeChannel) return false;
+    if (channelFilter && r.channel !== channelFilter) return false;
     if (selectedPreset.from && r.date < selectedPreset.from) return false;
     if (selectedPreset.to   && r.date > selectedPreset.to)   return false;
     return true;
-  }), [allOrderRows, search, activeChannel, selectedPreset]);
+  }), [allOrderRows, search, channelFilter, selectedPreset]);
 
   const filteredSku = useMemo(() => allSkuRows.filter(r => {
     const q = search.toLowerCase();
     if (q && !r.msku.toLowerCase().includes(q) && !r.productName.toLowerCase().includes(q)) return false;
-    if (activeChannel && r.channel !== activeChannel) return false;
+    if (channelFilter && r.channel !== channelFilter) return false;
     return true;
-  }), [allSkuRows, search, activeChannel]);
+  }), [allSkuRows, search, channelFilter]);
 
   return (
-    <div className="space-y-4">
+    <div>
 
-      {/* ── 渠道清算账户健康仪表 ── */}
-      <div>
-        <div className="mb-2 flex items-center gap-2">
-          <h2 className="text-[13px] font-semibold text-[var(--foreground)]">渠道清算账户</h2>
-          <span className="text-[11px] text-[var(--muted)]">— 余额趋近于零代表结算健康；点击卡片筛选下方明细</span>
-          <button
-            onClick={() => setShowManualSettlement(true)}
-            className="ml-auto flex h-7 items-center gap-1.5 rounded-lg bg-[var(--primary)] px-2.5 text-[11px] font-semibold text-white hover:opacity-90 shrink-0">
-            <Plus className="size-3" />手动录入结算
-          </button>
-          {activeChannel && (
-            <button onClick={() => setActiveChannel(null)}
-              className="flex items-center gap-1 text-[11px] text-[var(--primary)] underline underline-offset-2">
-              <X className="size-3" />清除筛选
-            </button>
-          )}
-        </div>
+      {dimension === 'batch' && <BatchDimensionTable rows={filteredBatch} onRowClick={setSelectedId} onConfirmReceived={row => { setConfirmReceived(row); setConfirmedAmount(row.expectedNet.toFixed(2)); }} onWriteOff={handleWriteOff} onMarkErpSynced={handleMarkErpSynced} />}
+      {dimension === 'order' && <OrderDimensionTable rows={filteredOrder} onRowClick={setSelectedOrderKey} batchRows={batchRows} />}
+      {dimension === 'sku'   && <SkuDimensionTable rows={filteredSku} />}
 
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {CHANNEL_ORDER.map(channel => {
-            const rows    = batchRows.filter(r => r.channel === channel);
-            if (rows.length === 0) return null;
-
-            const clearing  = getClearingBalance(channel);
-            const hasIssue  = rows.some(r => r.variance !== null && r.variance !== 0);
-            const isHealthy = clearing === 0 && !hasIssue;
-            const isActive  = activeChannel === channel;
-            const ch        = CH[channel] ?? CH['手工订单'];
-            const latestSettled = rows.find(r => r.actualNet !== null);
-            const totalSettled  = rows.filter(r => r.actualNet !== null).reduce((s, r) => s + (r.actualNet ?? 0), 0);
-
-            return (
-              <button
-                key={channel}
-                onClick={() => setActiveChannel(prev => prev === channel ? null : channel)}
-                className={cn(
-                  'rounded-xl border p-4 text-left transition-all shadow-[var(--shadow-soft)]',
-                  isActive ? `ring-2 ${ch.ring}` : '',
-                  hasIssue ? 'border-amber-200 bg-amber-50/40' :
-                  clearing > 0 ? 'border-[var(--border)] bg-[var(--surface-subtle)]' :
-                  'border-emerald-200 bg-emerald-50/30',
-                )}>
-                {/* 渠道 + 健康状态 */}
-                <div className="mb-2.5 flex items-center justify-between gap-2">
-                  <span className={cn('rounded-md px-1.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset', ch.badge)}>
-                    {channel}
-                  </span>
-                  {isHealthy ? (
-                    <CheckCircle2 className="size-4 text-emerald-500" />
-                  ) : hasIssue ? (
-                    <AlertTriangle className="size-4 text-amber-500" />
-                  ) : (
-                    <Clock className="size-4 text-blue-400" />
-                  )}
-                </div>
-
-                {/* 清算余额 */}
-                <div className="mb-1">
-                  <div className="text-[10px] text-[var(--muted)]">清算余额</div>
-                  <div className={cn('text-[18px] font-bold tracking-tight',
-                    clearing === 0 && !hasIssue ? 'text-emerald-700' :
-                    hasIssue ? 'text-amber-700' : 'text-[var(--foreground)]')}>
-                    {clearing === 0 && !hasIssue ? '$ 0 ✓' : fmt(clearing)}
-                  </div>
-                </div>
-
-                {/* 状态说明 */}
-                <div className="text-[11px] text-[var(--muted)]">
-                  {isHealthy && '全部结算完成'}
-                  {!isHealthy && clearing > 0 && !hasIssue && '结算中，等待到账'}
-                  {hasIssue && <span className="font-semibold text-amber-600">有差异待核查</span>}
-                </div>
-
-                {/* 已到账汇总 */}
-                {totalSettled > 0 && (
-                  <div className="mt-2 border-t border-[var(--border-subtle)] pt-2 text-[10px] text-[var(--muted)]">
-                    本期已到账 {fmt(totalSettled)}
-                    {latestSettled?.settledAt && ` · ${latestSettled.settledAt}`}
-                  </div>
-                )}
-
-                {/* 待确认到账的结算 */}
-                {rows.filter(r => r.actualNet === null && (r.status === '待到账' || r.status === '处理中')).length > 0 && (
-                  <div className="mt-2 text-[10px] font-medium text-blue-600 opacity-70">
-                    ↓ 在下方结算批次表格中点"确认到账"
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── 结算明细表 ── */}
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)]">
-        {/* 区段标题 */}
-        <div className="border-b border-[var(--border)] px-5 py-3.5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-[14px] font-semibold text-[var(--foreground)]">结算明细</h2>
-              <p className="mt-0.5 text-[11px] text-[var(--muted)]">
-                {activeChannel ? `已筛选：${activeChannel}` : '全渠道'}
-                {' · '}每笔结算完整核算路径：销售 → 扣减 → 预期净额 → 银行到账 → 差异
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* 工具栏 */}
-        <div className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-2.5">
-          <div className="flex items-center rounded-lg bg-[var(--surface-subtle)] p-0.5">
-            {(['batch', 'order', 'sku'] as const).map(d => (
-              <button key={d} onClick={() => setDimension(d)}
-                className={cn('rounded-md px-3 py-1.5 text-[12px] font-semibold transition-colors',
-                  dimension === d ? 'bg-[var(--surface)] text-[var(--foreground)] shadow-sm' : 'text-[var(--muted)] hover:text-[var(--foreground)]')}>
-                {{ batch: '结算批次', order: '订单', sku: 'SKU' }[d]}
-              </button>
-            ))}
-          </div>
-          <div className="h-5 w-px shrink-0 bg-[var(--border)]" />
-          <div className="flex flex-1 max-w-xs items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5">
-            <Search className="size-3.5 shrink-0 text-[var(--muted)]" />
-            <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder={dimension === 'order' ? '订单号 / MSKU' : dimension === 'sku' ? 'SKU / 商品' : '结算单号 / 店铺'}
-              className="flex-1 bg-transparent text-[12px] outline-none placeholder:text-[var(--muted-foreground)]" />
-            {search && <button onClick={() => setSearch('')}><X className="size-3 text-[var(--muted)]" /></button>}
-          </div>
-          {dimension === 'batch' && (
-            <>
-              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as ChannelArStatus | 'all')}
-                className={cn('h-8 shrink-0 rounded-lg border px-2.5 text-[12px] outline-none transition-colors',
-                  statusFilter !== 'all' ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]' : 'border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--muted-foreground)]')}>
-                <option value="all">全部状态</option>
-                <option value="处理中">处理中</option>
-                <option value="待到账">待到账</option>
-                <option value="已到账">已到账</option>
-                <option value="差异">差异 ⚠</option>
-              </select>
-            </>
-          )}
-
-          {/* 日期范围（所有维度生效） */}
-          <select value={dateRange} onChange={e => setDateRange(e.target.value)}
-            className={cn('h-8 shrink-0 rounded-lg border px-2.5 text-[12px] outline-none transition-colors',
-              dateRange !== 'all' ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]' : 'border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--muted-foreground)]')}>
-            {DATE_PRESETS.map(p => (
-              <option key={p.value} value={p.value}>{p.label}</option>
-            ))}
-          </select>
-
-          <div className="ml-auto flex shrink-0 items-center gap-2">
-            <span className="text-[12px] text-[var(--muted)]">
-              {dimension === 'batch' ? filteredBatch.length : dimension === 'order' ? filteredOrder.length : filteredSku.length} 条
-            </span>
-            <button className="flex h-7 items-center gap-1 rounded-md border border-[var(--border)] px-2 text-[11px] hover:bg-[var(--surface-subtle)]">
-              <Download className="size-3" />导出
-            </button>
-          </div>
-        </div>
-
-        {dimension === 'batch' && <BatchDimensionTable rows={filteredBatch} onRowClick={setSelectedId} onConfirmReceived={row => { setConfirmReceived(row); setConfirmedAmount(row.expectedNet.toFixed(2)); }} />}
-        {dimension === 'order' && <OrderDimensionTable rows={filteredOrder} onRowClick={setSelectedOrderKey} />}
-        {dimension === 'sku'   && <SkuDimensionTable rows={filteredSku} />}
-
-        <SettlementDetailDrawer row={batchRows.find(r => r.id === selectedId) ?? null} onClose={() => setSelectedId(null)} />
-        <OrderDetailDrawer row={allOrderRows.find(r => r.key === selectedOrderKey) ?? null} onClose={() => setSelectedOrderKey(null)} />
-      </div>
-
-      {/* 手动录入结算抽屉 */}
-      <ManualSettlementDrawer open={showManualSettlement} onClose={() => setShowManualSettlement(false)} onAdd={handleAddManualSettlement} />
+      <SettlementDetailDrawer row={batchRows.find(r => r.id === selectedId) ?? null} onClose={() => setSelectedId(null)} />
+      <OrderDetailDrawer row={allOrderRows.find(r => r.key === selectedOrderKey) ?? null} onClose={() => setSelectedOrderKey(null)} batchRows={batchRows} />
 
       {/* 确认到账弹窗 */}
       {confirmReceived && (
@@ -725,11 +859,35 @@ function ReconciliationView() {
                   </p>
                 )}
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-[12px] font-medium text-[var(--foreground)]">到账日期 *</label>
+                  <input type="date" value={confirmedDate} onChange={e => setConfirmedDate(e.target.value)}
+                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--primary)]" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[12px] font-medium text-[var(--foreground)]">收款账户</label>
+                  <select value={confirmedAccount} onChange={e => setConfirmedAccount(e.target.value)}
+                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5 text-[12px] outline-none focus:border-[var(--primary)]">
+                    <option>公司主账户 · Chase ****4821</option>
+                    <option>USD 结算账户 · Citibank ****9034</option>
+                    <option>EUR 账户 · HSBC ****7156</option>
+                    <option>PayPal 商户账户</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-[12px] font-medium text-[var(--foreground)]">银行流水号 / 参考号 *</label>
+                <input value={confirmedRef} onChange={e => setConfirmedRef(e.target.value)}
+                  placeholder="如：TXN-20261001-8823"
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5 font-mono text-[12px] outline-none focus:border-[var(--primary)]" />
+                {!confirmedRef && confirmedAmount && <p className="mt-1 text-[11px] text-red-500">流水号为必填项</p>}
+              </div>
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border)] px-6 py-4">
               <button onClick={() => setConfirmReceived(null)} className="flex h-8 items-center rounded-lg border border-[var(--border)] px-3 text-[13px] hover:bg-[var(--surface-subtle)]">取消</button>
               <button
-                disabled={!confirmedAmount || isNaN(parseFloat(confirmedAmount))}
+                disabled={!confirmedAmount || isNaN(parseFloat(confirmedAmount)) || !confirmedRef}
                 onClick={() => handleConfirmReceived(confirmReceived.id, parseFloat(confirmedAmount))}
                 className="flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40">
                 确认到账
@@ -743,17 +901,254 @@ function ReconciliationView() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Tab 3：B2B 客户应收
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const AR_STATUS_CONFIG: Record<string, { cls: string; dot: string }> = {
+  '未到期':     { cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200',   dot: 'bg-emerald-500' },
+  '逾期1-30天': { cls: 'bg-amber-50 text-amber-700 ring-amber-200',         dot: 'bg-amber-400' },
+  '逾期31-60天':{ cls: 'bg-orange-50 text-orange-700 ring-orange-200',      dot: 'bg-orange-500' },
+  '逾期61-90天':{ cls: 'bg-red-50 text-red-700 ring-red-200',               dot: 'bg-red-400' },
+  '逾期90天+':  { cls: 'bg-red-100 text-red-800 ring-red-300',              dot: 'bg-red-600' },
+  '已收款':     { cls: 'bg-slate-50 text-slate-500 ring-slate-200',          dot: 'bg-slate-400' },
+  '已核销':     { cls: 'bg-slate-50 text-slate-400 ring-slate-200',          dot: 'bg-slate-300' },
+};
+
+function B2bView({ onToast, search, filter, channelFilter, invoiceTypeFilter, dueFilter, invoices, setInvoices }: {
+  onToast: (msg: string) => void;
+  search: string;
+  filter: 'all' | 'overdue' | 'current' | 'collected';
+  channelFilter: string;
+  invoiceTypeFilter: string;
+  dueFilter: string;
+  invoices: typeof arRows[0][];
+  setInvoices: React.Dispatch<React.SetStateAction<typeof arRows[0][]>>;
+}) {
+  const B2B_PAGE_SIZE = 10;
+  const [b2bPage, setB2bPage] = useState(1);
+  const [b2bJumpPage, setB2bJumpPage] = useState('1');
+  const [paymentTarget, setPaymentTarget] = useState<typeof arRows[0] | null>(null);
+  const [payAmount, setPayAmount] = useState('');
+
+  const AR_TODAY = '2026-10-15';
+  const AR_7D    = '2026-10-22';
+  const AR_30D   = '2026-11-14';
+
+  const filtered = useMemo(() => invoices.filter(r => {
+    const q = search.toLowerCase();
+    if (q && !r.customer.toLowerCase().includes(q) && !r.invoiceNo.toLowerCase().includes(q)) return false;
+    if (channelFilter && r.channel !== channelFilter) return false;
+    // invoiceTypeFilter: 从 note 中匹配（新建发票时写入了类型信息），无 note 时视为正式发票
+    if (invoiceTypeFilter) {
+      const note = (r.note ?? '').toLowerCase();
+      if (invoiceTypeFilter === 'invoice'     && note.includes('贷项') || note.includes('形式发票') || note.includes('借记')) return false;
+      if (invoiceTypeFilter === 'credit_note' && !note.includes('贷项')) return false;
+      if (invoiceTypeFilter === 'proforma'    && !note.includes('形式发票')) return false;
+    }
+    // 到期状态
+    if (dueFilter === 'overdue' && !(r.dueDate < AR_TODAY && r.balanceDue > 0)) return false;
+    if (dueFilter === '7d'      && !(r.dueDate >= AR_TODAY && r.dueDate <= AR_7D  && r.balanceDue > 0)) return false;
+    if (dueFilter === '30d'     && !(r.dueDate >= AR_TODAY && r.dueDate <= AR_30D && r.balanceDue > 0)) return false;
+    if (dueFilter === 'ok'      && !(r.dueDate >= AR_TODAY && r.balanceDue > 0)) return false;
+    // 状态 pill filter
+    if (filter === 'overdue')   return r.overdueDays > 0 && r.balanceDue > 0;
+    if (filter === 'current')   return r.overdueDays === 0 && r.balanceDue > 0;
+    if (filter === 'collected') return r.balanceDue === 0;
+    return true;
+  }), [invoices, search, filter, channelFilter, invoiceTypeFilter, dueFilter]);
+
+  // 筛选变化时重置分页
+  React.useEffect(() => { setB2bPage(1); setB2bJumpPage('1'); }, [filtered.length]);
+
+  const b2bTotalPages = Math.max(1, Math.ceil(filtered.length / B2B_PAGE_SIZE));
+  const pagedFiltered = useMemo(
+    () => filtered.slice((b2bPage - 1) * B2B_PAGE_SIZE, b2bPage * B2B_PAGE_SIZE),
+    [filtered, b2bPage],
+  );
+
+  const totalPending = invoices.filter(r => r.balanceDue > 0).reduce((s, r) => s + r.balanceDue, 0);
+  const totalOverdue = invoices.filter(r => r.overdueDays > 0 && r.balanceDue > 0).reduce((s, r) => s + r.balanceDue, 0);
+
+  function handleMarkPaid(id: string, amount: number) {
+    setInvoices(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const newPaid = r.paidAmount + amount;
+      const newBal  = Math.max(0, r.invoiceAmount - newPaid);
+      return { ...r, paidAmount: newPaid, balanceDue: newBal, agingStatus: newBal === 0 ? '已收款' : r.agingStatus };
+    }));
+    onToast('✓ 收款已登记');
+  }
+
+  return (
+    <div>
+      {/* 发票表格 — 直接在主卡片内，无嵌套卡片 */}
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-collapse text-left text-[12px]">
+          <thead className="bg-[var(--surface-subtle)] text-[10px] font-semibold uppercase tracking-[0.07em] text-[var(--muted-foreground)]">
+            <tr>
+              <th className="whitespace-nowrap px-4 py-2.5">发票号</th>
+              <th className="whitespace-nowrap px-3 py-2.5">客户</th>
+              <th className="whitespace-nowrap px-3 py-2.5">渠道</th>
+              <th className="whitespace-nowrap px-3 py-2.5">开单日</th>
+                <th className="whitespace-nowrap px-3 py-2.5">到期日</th>
+                <th className="whitespace-nowrap px-3 py-2.5">账期</th>
+                <th className="whitespace-nowrap px-3 py-2.5 text-right">发票金额</th>
+                <th className="whitespace-nowrap px-3 py-2.5 text-right">已收</th>
+                <th className="whitespace-nowrap px-3 py-2.5 text-right">未收余额</th>
+                <th className="whitespace-nowrap px-3 py-2.5">状态</th>
+                <th className="whitespace-nowrap px-3 py-2.5">操作</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border-subtle)]">
+              {filtered.length === 0 && (
+                <tr><td colSpan={11} className="py-10 text-center text-[13px] text-[var(--muted)]">暂无匹配发票</td></tr>
+              )}
+              {pagedFiltered.map(row => {
+                const sc = AR_STATUS_CONFIG[row.agingStatus] ?? AR_STATUS_CONFIG['未到期'];
+                const isOverdue = row.overdueDays > 0 && row.balanceDue > 0;
+                return (
+                  <tr key={row.id} className={cn('group hover:bg-[var(--surface-subtle)]',
+                    isOverdue && row.overdueDays > 30 ? 'bg-red-50/20' : '')}>
+                    <td className="px-4 py-3 font-mono text-[11px] font-medium text-[var(--foreground)]">
+                      {row.invoiceNo}
+                      {row.sourceOrderId && <div className="text-[10px] text-[var(--muted)]">{row.sourceOrderId}</div>}
+                    </td>
+                    <td className="px-3 py-3 text-[12px] font-medium text-[var(--foreground)]">{row.customer}</td>
+                    <td className="px-3 py-3 text-[11px] text-[var(--muted)]">{row.channel}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-[11px] text-[var(--muted)]">{row.invoiceDate}</td>
+                    <td className="whitespace-nowrap px-3 py-3">
+                      <span className={cn('text-[11px]', isOverdue ? 'font-semibold text-red-600' : 'text-[var(--muted)]')}>
+                        {row.dueDate}
+                      </span>
+                      {isOverdue && <div className="text-[10px] font-medium text-red-500">逾期 {row.overdueDays} 天</div>}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 text-[11px] text-[var(--muted)]">{row.paymentTerms ?? '—'}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right text-[12px] font-semibold">{fmtD(row.invoiceAmount)}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right text-[12px] text-emerald-600">
+                      {row.paidAmount > 0 ? fmtD(row.paidAmount) : '—'}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right">
+                      {row.balanceDue > 0
+                        ? <span className={cn('text-[13px] font-bold', isOverdue ? 'text-red-700' : 'text-[var(--foreground)]')}>{fmtD(row.balanceDue)}</span>
+                        : <span className="text-[12px] text-emerald-600">已结清</span>}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3">
+                      <StatusBadge status={row.agingStatus} />
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3">
+                      <div className="flex items-center gap-1.5">
+                        {row.balanceDue > 0 && (
+                          <button
+                            onClick={() => { setPaymentTarget(row); setPayAmount(row.balanceDue.toFixed(2)); }}
+                            className="h-6 rounded border border-emerald-300 bg-emerald-50 px-2 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100">
+                            登记收款
+                          </button>
+                        )}
+                        {isOverdue && (
+                          <button
+                            onClick={() => onToast(`催款邮件已发送至 ${row.customer}`)}
+                            className="h-6 rounded border border-amber-200 bg-amber-50 px-2 text-[11px] font-medium text-amber-700 hover:bg-amber-100">
+                            发催款
+                          </button>
+                        )}
+                        {row.note && (
+                          <span className="text-[10px] text-[var(--muted)]" title={row.note}>📝</span>
+                        )}
+                        <button className="ml-auto inline-flex size-7 items-center justify-center rounded-md opacity-0 transition hover:bg-[var(--surface-hover)] group-hover:opacity-100">
+                          <MoreHorizontal className="size-4 text-[var(--muted)]" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {/* 汇总行 + 分页 */}
+        <div className="grid grid-cols-3 border-t border-[var(--border)] bg-[var(--surface-subtle)] text-[12px]">
+          {[
+            { l: '发票总额', v: fmtD(filtered.reduce((s, r) => s + r.invoiceAmount, 0)) },
+            { l: '已收合计', v: fmtD(filtered.reduce((s, r) => s + r.paidAmount, 0)) },
+            { l: '未收余额', v: fmtD(filtered.reduce((s, r) => s + r.balanceDue, 0)) },
+          ].map(({ l, v }) => (
+            <div key={l} className="border-r border-[var(--border-subtle)] px-5 py-3 last:border-r-0">
+              <span className="text-[var(--muted)]">{l}</span>
+              <span className="ml-3 font-semibold text-[var(--foreground)]">{v}</span>
+            </div>
+          ))}
+        </div>
+        <div className="sticky -bottom-5 lg:-bottom-6 z-20 flex items-center justify-between rounded-b-xl border-t border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 pb-[calc(0.625rem+20px)] lg:pb-[calc(0.625rem+24px)] text-[13px] text-[var(--muted)]">
+          <span>共 {filtered.length} 条</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-[12px]">每页</span>
+              <span className="text-[12px] font-medium text-[var(--foreground)]">{B2B_PAGE_SIZE}</span>
+              <span className="text-[12px]">条</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button onClick={() => setB2bPage(p => Math.max(1, p - 1))} disabled={b2bPage <= 1} className="flex size-7 items-center justify-center rounded-md border border-[var(--border)] text-[12px] transition hover:bg-[var(--surface-hover)] disabled:opacity-40 disabled:cursor-not-allowed">‹</button>
+              <span className="px-1 text-[12px] text-[var(--foreground)]">{b2bPage} / {b2bTotalPages}</span>
+              <button onClick={() => setB2bPage(p => Math.min(b2bTotalPages, p + 1))} disabled={b2bPage >= b2bTotalPages} className="flex size-7 items-center justify-center rounded-md border border-[var(--border)] text-[12px] transition hover:bg-[var(--surface-hover)] disabled:opacity-40 disabled:cursor-not-allowed">›</button>
+              <div className="ml-2 flex items-center gap-1">
+                <span className="text-[12px]">跳至</span>
+                <input type="number" min={1} max={b2bTotalPages} value={b2bJumpPage} onChange={e => setB2bJumpPage(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { const p = Math.max(1, Math.min(b2bTotalPages, Number(b2bJumpPage))); setB2bPage(p); setB2bJumpPage(String(p)); } }} className="w-12 rounded border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-center text-[12px] outline-none focus:ring-1 focus:ring-[var(--focus-ring)]" />
+                <span className="text-[12px]">页</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      {/* 收款凭证弹窗 */}
+      {paymentTarget && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => { setPaymentTarget(null); setPayAmount(''); }} />
+          <div className="fixed left-1/2 top-1/2 z-50 w-[420px] max-w-[90vw] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl bg-[var(--surface)] shadow-2xl">
+            <div className="border-b border-[var(--border)] px-6 py-4">
+              <h2 className="text-[15px] font-bold text-[var(--foreground)]">登记收款</h2>
+              <p className="mt-0.5 text-[12px] text-[var(--muted)]">{paymentTarget.invoiceNo} · {paymentTarget.customer}</p>
+            </div>
+            <ArPaymentForm
+              balanceDue={paymentTarget.balanceDue}
+              payAmount={payAmount}
+              onAmountChange={setPayAmount}
+              onConfirm={(amount) => {
+                setInvoices(prev => prev.map(r => {
+                  if (r.id !== paymentTarget.id) return r;
+                  const newPaid = r.paidAmount + amount;
+                  const newBal  = Math.max(0, r.invoiceAmount - newPaid);
+                  return { ...r, paidAmount: newPaid, balanceDue: newBal, agingStatus: newBal === 0 ? '已收款' : r.agingStatus };
+                }));
+                setPaymentTarget(null);
+                setPayAmount('');
+                onToast('✓ 收款凭证已记录');
+              }}
+              onClose={() => { setPaymentTarget(null); setPayAmount(''); }}
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Tab 2：账龄管理视图
 // 以客户为中心，每个客户一行，展示各账龄桶的余额
 // 对应 QuickBooks / Xero / NetSuite 的 AR Aging Report 标准格式
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function AgingView({ dso }: { dso: number }) {
-  const [invoices, setInvoices] = useState<typeof arRows[0][]>(arRows);
-  const [search, setSearch]           = useState('');
-  const [agingFilter, setAgingFilter] = useState<string>('all');
+function AgingView({ dso, search, agingFilter, channelFilter, paymentTermsFilter, minBalance, invoices, setInvoices }: {
+  dso: number;
+  search: string;
+  agingFilter: 'all' | 'current' | 'overdue' | 'critical';
+  channelFilter: string;
+  paymentTermsFilter: string;
+  minBalance: string;
+  invoices: typeof arRows[0][];
+  setInvoices: React.Dispatch<React.SetStateAction<typeof arRows[0][]>>;
+}) {
   const [expandedCustomer, setExpandedCustomer] = useState<string | null>(null);
-  const [showNewInvoice, setShowNewInvoice] = useState(false);
   const [paymentTarget, setPaymentTarget] = useState<typeof arRows[0] | null>(null);
   const [payAmount, setPayAmount] = useState('');
   // 分页
@@ -776,11 +1171,6 @@ function AgingView({ dso }: { dso: number }) {
     }));
     setPaymentTarget(null);
     setPayAmount('');
-  }
-
-  function handleAddInvoice(inv: typeof arRows[0]) {
-    setInvoices(prev => [inv, ...prev]);
-    setShowNewInvoice(false);
   }
 
   // 按客户聚合（标准 AR Aging Report 按客户分组）
@@ -811,11 +1201,14 @@ function AgingView({ dso }: { dso: number }) {
   const filtered = useMemo(() => customerMap.filter(c => {
     const q = search.toLowerCase();
     if (q && !c.customer.toLowerCase().includes(q)) return false;
+    if (channelFilter && !c.invoices.some(inv => inv.channel === channelFilter)) return false;
+    if (paymentTermsFilter && !c.invoices.some(inv => inv.paymentTerms === paymentTermsFilter)) return false;
+    if (minBalance && c.total < parseFloat(minBalance)) return false;
     if (agingFilter === 'current' && c.d1_30 + c.d31_60 + c.d61_90 + c.d90plus > 0) return false;
     if (agingFilter === 'overdue' && c.d1_30 + c.d31_60 + c.d61_90 + c.d90plus === 0) return false;
     if (agingFilter === 'critical' && c.d61_90 + c.d90plus === 0) return false;
     return true;
-  }), [customerMap, search, agingFilter]);
+  }), [customerMap, search, agingFilter, channelFilter, paymentTermsFilter, minBalance]);
 
   const totals = useMemo(() => ({
     current: customerMap.reduce((s, c) => s + c.current, 0),
@@ -841,100 +1234,48 @@ function AgingView({ dso }: { dso: number }) {
   );
 
   return (
-    <div className="space-y-4">
-
-      {/* ── 账龄分布 + DSO ── */}
-      <div className="grid gap-4 lg:grid-cols-[1fr_220px]">
+    <div>
+      {/* ── 账龄分布 + DSO（平铺，border-b 分隔）── */}
+      <div className="grid gap-6 border-b border-[var(--border-subtle)] px-5 py-4 lg:grid-cols-[1fr_200px]">
         {/* 账龄分布图 */}
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4 shadow-[var(--shadow-soft)]">
+        <div>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[14px] font-semibold text-[var(--foreground)]">应收账款账龄分布</h2>
-            <span className="text-[12px] text-[var(--muted)]">
-              总计 <span className="font-semibold text-[var(--foreground)]">{fmtD(totals.total)}</span>
-            </span>
+            <span className="text-[13px] font-semibold text-[var(--foreground)]">应收账款账龄分布</span>
+            <span className="text-[12px] text-[var(--muted)]">总计 <span className="font-semibold text-[var(--foreground)]">{fmtD(totals.total)}</span></span>
           </div>
-          {/* 堆叠条 */}
           <div className="flex h-3 overflow-hidden rounded-full">
             {agingBuckets.map(b => (
               <div key={b.key} className={cn('h-full transition-all', b.cls)}
                 style={{ width: totals.total > 0 ? `${(b.amount / totals.total) * 100}%` : '0' }} />
             ))}
           </div>
-          {/* 图例 */}
           <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
             {agingBuckets.map(b => (
               <div key={b.key} className="flex items-center gap-1.5">
                 <span className={cn('size-2.5 shrink-0 rounded-full', b.cls)} />
                 <span className="text-[12px] text-[var(--muted)]">{b.label}</span>
                 <span className="text-[12px] font-semibold tabular-nums">{fmtD(b.amount)}</span>
-                {totals.total > 0 && (
-                  <span className="text-[11px] text-[var(--muted)]">
-                    ({Math.round(b.amount / totals.total * 100)}%)
-                  </span>
-                )}
+                {totals.total > 0 && <span className="text-[11px] text-[var(--muted)]">({Math.round(b.amount / totals.total * 100)}%)</span>}
               </div>
             ))}
           </div>
         </div>
-
-        {/* DSO 指标卡 */}
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4 shadow-[var(--shadow-soft)]">
-          <div className="text-[13px] font-semibold text-[var(--foreground)]">DSO 回款效率</div>
-          <div className={cn('mt-2 text-[36px] font-bold tracking-tight',
-            dso <= 30 ? 'text-emerald-700' : dso <= 45 ? 'text-amber-700' : 'text-red-700')}>
-            {dso}<span className="text-[16px] font-normal text-[var(--muted)] ml-1">天</span>
+        {/* DSO 小卡 */}
+        <div className="flex items-center gap-5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3 lg:flex-col lg:items-start lg:gap-2">
+          <div>
+            <div className="text-[11px] text-[var(--muted)]">DSO 回款天数</div>
+            <div className={cn('text-[28px] font-bold tracking-tight', dso <= 30 ? 'text-emerald-700' : dso <= 45 ? 'text-amber-700' : 'text-red-700')}>
+              {dso}<span className="text-[13px] font-normal text-[var(--muted)] ml-1">天</span>
+            </div>
           </div>
-          <div className="mt-2 space-y-1.5 text-[11px]">
-            <div className="flex justify-between">
-              <span className="text-[var(--muted)]">行业基准</span>
-              <span className="font-semibold">30 天</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-[var(--muted)]">状态</span>
-              <span className={cn('font-semibold',
-                dso <= 30 ? 'text-emerald-600' : dso <= 45 ? 'text-amber-600' : 'text-red-600')}>
-                {dso <= 30 ? '良好' : dso <= 45 ? '偏高，需改善' : '危险，立即行动'}
-              </span>
-            </div>
-            <div className="mt-2 border-t border-[var(--border-subtle)] pt-2 text-[10px] text-[var(--muted)]">
-              DSO = 待回款 ÷ 日均销售额 × 30天
+          <div className="text-[11px] text-[var(--muted)]">
+            <div>行业基准：30 天</div>
+            <div className={cn('font-semibold', dso <= 30 ? 'text-emerald-600' : dso <= 45 ? 'text-amber-600' : 'text-red-600')}>
+              {dso <= 30 ? '状态良好' : dso <= 45 ? '偏高，需改善' : '危险，立即行动'}
             </div>
           </div>
         </div>
       </div>
-
-      {/* ── 客户账龄表（AR Aging Report 标准格式）── */}
-      <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)]">
-        {/* 工具栏 */}
-        <div className="flex items-center gap-3 border-b border-[var(--border)] px-5 py-3">
-          <div>
-            <h2 className="text-[14px] font-semibold text-[var(--foreground)]">B2B 应收 · 客户账期管理</h2>
-            <p className="mt-0.5 text-[11px] text-[var(--muted)]">
-              账期订单发货后自动生成应收记录；无系统订单可手动新建发票
-            </p>
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              onClick={() => setShowNewInvoice(true)}
-              className="flex h-7 items-center gap-1 rounded-lg bg-[var(--primary)] px-2.5 text-[11px] font-semibold text-white hover:opacity-90 shrink-0">
-              <Plus className="size-3" />新建发票
-            </button>
-            <div className="flex w-44 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5">
-              <Search className="size-3.5 shrink-0 text-[var(--muted)]" />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="客户名称"
-                className="flex-1 bg-transparent text-[12px] outline-none placeholder:text-[var(--muted-foreground)]" />
-              {search && <button onClick={() => setSearch('')}><X className="size-3 text-[var(--muted)]" /></button>}
-            </div>
-            <select value={agingFilter} onChange={e => setAgingFilter(e.target.value)}
-              className="h-8 rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 text-[12px] outline-none text-[var(--muted-foreground)]">
-              <option value="all">全部客户</option>
-              <option value="current">仅未到期</option>
-              <option value="overdue">有逾期</option>
-              <option value="critical">61天+ 高风险</option>
-            </select>
-            <span className="text-[12px] text-[var(--muted)]">{filtered.length} 家客户</span>
-          </div>
-        </div>
 
         <div className="overflow-x-auto">
           <table className="min-w-full border-collapse text-left text-[12px]">
@@ -1157,9 +1498,21 @@ function AgingView({ dso }: { dso: number }) {
               </tr>
             </tfoot>
           </table>
-          <ArPagination total={filtered.length} page={agingPage} pageSize={AGING_PAGE_SIZE} onChange={setAgingPage} />
+          {/* orders 规范 sticky footer 分页 */}
+          {(() => {
+            const totalPages = Math.max(1, Math.ceil(filtered.length / AGING_PAGE_SIZE));
+            return (
+              <div className="sticky -bottom-5 lg:-bottom-6 z-20 flex items-center justify-between rounded-b-xl border-t border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 pb-[calc(0.625rem+20px)] lg:pb-[calc(0.625rem+24px)] text-[13px] text-[var(--muted)]">
+                <span>共 {filtered.length} 家客户</span>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => setAgingPage(p => Math.max(1, p - 1))} disabled={agingPage <= 1} className="flex size-7 items-center justify-center rounded-md border border-[var(--border)] text-[12px] transition hover:bg-[var(--surface-hover)] disabled:opacity-40 disabled:cursor-not-allowed">‹</button>
+                  <span className="px-1 text-[12px] text-[var(--foreground)]">{agingPage} / {totalPages}</span>
+                  <button onClick={() => setAgingPage(p => Math.min(totalPages, p + 1))} disabled={agingPage >= totalPages} className="flex size-7 items-center justify-center rounded-md border border-[var(--border)] text-[12px] transition hover:bg-[var(--surface-hover)] disabled:opacity-40 disabled:cursor-not-allowed">›</button>
+                </div>
+              </div>
+            );
+          })()}
         </div>
-      </div>
 
       {/* 录入收款弹窗 */}
       {paymentTarget && (
@@ -1180,9 +1533,6 @@ function AgingView({ dso }: { dso: number }) {
           </div>
         </>
       )}
-
-      {/* 新建发票抽屉 */}
-      <NewInvoiceDrawer open={showNewInvoice} onClose={() => setShowNewInvoice(false)} onAdd={handleAddInvoice} />
 
       {/* 发票预览弹窗 */}
       {invoicePreviewTarget && (
@@ -1219,10 +1569,12 @@ function KpiCard({ label, value, sub, warn, success, danger }: {
 
 // ─── 结算批次表 ───────────────────────────────────────────────────────────────
 
-function BatchDimensionTable({ rows, onRowClick, onConfirmReceived }: {
+function BatchDimensionTable({ rows, onRowClick, onConfirmReceived, onWriteOff, onMarkErpSynced }: {
   rows: ChannelArRow[];
   onRowClick: (id: string) => void;
   onConfirmReceived: (row: ChannelArRow) => void;
+  onWriteOff: (id: string) => void;
+  onMarkErpSynced: (id: string) => void;
 }) {
   const PAGE_SIZE = 10;
   const [page, setPage] = useState(1);
@@ -1242,15 +1594,18 @@ function BatchDimensionTable({ rows, onRowClick, onConfirmReceived }: {
           <thead className="bg-[var(--surface-subtle)] text-[10px] font-semibold uppercase tracking-[0.07em] text-[var(--muted-foreground)]">
             <tr>
               <th className="whitespace-nowrap px-4 py-2.5">结算单号 / 渠道</th>
-              <th className="whitespace-nowrap px-3 py-2.5">店铺</th>
+              <th className="whitespace-nowrap px-3 py-2.5">店铺 / 结算主体</th>
               <th className="whitespace-nowrap px-3 py-2.5">结算周期</th>
               <th className="whitespace-nowrap px-3 py-2.5 text-right">订单数</th>
-              <th className="whitespace-nowrap px-3 py-2.5 text-right">销售总额</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-right">收款本金</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-right">退款本金</th>
               <th className="whitespace-nowrap px-3 py-2.5 text-right">平台扣减</th>
               <th className="whitespace-nowrap px-3 py-2.5 text-right">OMS预期净额</th>
               <th className="whitespace-nowrap px-3 py-2.5 text-right">银行到账</th>
               <th className="whitespace-nowrap px-3 py-2.5 text-right">差异 Δ</th>
-              <th className="whitespace-nowrap px-3 py-2.5">状态</th>
+              <th className="whitespace-nowrap px-3 py-2.5">资金进度</th>
+              <th className="whitespace-nowrap px-3 py-2.5">核对状态</th>
+              <th className="whitespace-nowrap px-3 py-2.5">银行核销</th>
               <th className="whitespace-nowrap px-3 py-2.5">ERP</th>
               <th className="whitespace-nowrap px-3 py-2.5">操作</th>
             </tr>
@@ -1266,7 +1621,7 @@ function BatchDimensionTable({ rows, onRowClick, onConfirmReceived }: {
               const isOverdue  = !!row.expectedReceiptDate && row.actualNet === null && row.expectedReceiptDate < PROTO_TODAY;
               return (
                 <tr key={row.id} onClick={() => onRowClick(row.id)}
-                  className={cn('cursor-pointer hover:bg-[var(--surface-subtle)]',
+                  className={cn('group cursor-pointer hover:bg-[var(--surface-subtle)]',
                     row.status === '差异' && 'bg-amber-50/30')}>
                   <td className="px-4 py-3">
                     <div className="font-mono text-[11px] font-medium">{row.settlementNo}</div>
@@ -1275,23 +1630,50 @@ function BatchDimensionTable({ rows, onRowClick, onConfirmReceived }: {
                       {row.channel}
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-3 text-[12px]">{row.merchant}</td>
+                  <td className="px-3 py-3 text-[12px]">
+                    <div className="font-medium">{row.merchant}</div>
+                    {row.settlementOwner && row.settlementOwner !== row.merchant && (
+                      <div className="mt-0.5 text-[10px] text-[var(--muted)]">{row.settlementOwner}</div>
+                    )}
+                  </td>
                   <td className="whitespace-nowrap px-3 py-3 text-[11px] text-[var(--muted)]">
                     {row.periodStart}<br /><span className="text-[10px]">~ {row.periodEnd}</span>
                   </td>
                   <td className="whitespace-nowrap px-3 py-3 text-right text-[var(--muted)]">{row.orderCount.toLocaleString()}</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-right text-[13px] font-medium">{fmtD(row.grossAmount)}</td>
+                  {/* 收款本金 */}
                   <td className="whitespace-nowrap px-3 py-3 text-right">
-                    <span className="text-[13px] text-[var(--muted)]">-{fmtD(row.totalDeduction)}</span>
-                    <div className="text-[10px] text-[var(--muted-foreground)]">{deductRate}%</div>
+                    <span className="text-[12px] font-medium text-emerald-700">
+                      {row.chargePrincipal != null ? fmtD(row.chargePrincipal) : fmtD(row.grossAmount)}
+                    </span>
+                  </td>
+                  {/* 退款本金（独立追踪，文档 8.8） */}
+                  <td className="whitespace-nowrap px-3 py-3 text-right">
+                    {row.refundPrincipal != null && row.refundPrincipal > 0
+                      ? <span className="text-[12px] font-medium text-red-600">-{fmtD(row.refundPrincipal)}</span>
+                      : <span className="text-[11px] text-[var(--muted)]">—</span>}
+                  </td>
+                  {/* 平台扣减（不含退款本金，只含费用）*/}
+                  <td className="whitespace-nowrap px-3 py-3 text-right">
+                    <span className="text-[13px] text-[var(--muted)]">
+                      -{fmtD(row.totalDeduction - (row.refundPrincipal ?? row.deductionBreakdown?.refunds ?? 0))}
+                    </span>
+                    <div className="text-[10px] text-[var(--muted-foreground)]">{deductRate}% 费率</div>
                   </td>
                   <td className="whitespace-nowrap px-3 py-3 text-right text-[13px] font-semibold">{fmtD(row.expectedNet)}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-right">
                     {row.actualNet !== null
-                      ? <span className={cn('text-[13px] font-semibold',
-                          row.variance === 0 ? 'text-emerald-600' : 'text-amber-600')}>
-                          {fmtD(row.actualNet)}
-                        </span>
+                      ? <div>
+                          <span className={cn('text-[13px] font-semibold',
+                            row.variance === 0 ? 'text-emerald-600' : 'text-amber-600')}>
+                            {fmtD(row.actualNet)}
+                          </span>
+                          {row.bankMatchedAmount != null && row.bankMatchedAmount !== row.actualNet && (
+                            <div className="text-[10px] text-amber-600">核销 {fmtD(row.bankMatchedAmount)}</div>
+                          )}
+                          {row.bankMatchedAmount === row.actualNet && row.bankMatchedAmount != null && (
+                            <div className="text-[10px] text-emerald-600">✓ 银行已核销</div>
+                          )}
+                        </div>
                       : <div>
                           <span className="text-[11px] text-[var(--muted)]">—</span>
                           {row.expectedReceiptDate && (
@@ -1308,17 +1690,51 @@ function BatchDimensionTable({ rows, onRowClick, onConfirmReceived }: {
                         ? <span className="text-[12px] text-emerald-600">✓</span>
                         : <span className="text-[11px] text-[var(--muted)]">—</span>}
                   </td>
+                  {/* 资金进度（文档 12.2）*/}
                   <td className="whitespace-nowrap px-3 py-3">
-                    <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset', sc.cls)}>
-                      <span className={cn('size-1.5 rounded-full', sc.dot)} />{row.status}
-                    </span>
+                    {row.fundProgress ? (() => {
+                      const fp = fundProgressConfig[row.fundProgress];
+                      return (
+                        <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset', fp.cls)}>
+                          <span className={cn('size-1.5 rounded-full', fp.dot)} />{fp.label}
+                        </span>
+                      );
+                    })() : <span className="text-[11px] text-[var(--muted)]">—</span>}
+                    {row.estimatedArrivalFrom && row.fundProgress !== 'PROVIDER_PAID' && (
+                      <div className="mt-0.5 text-[10px] text-[var(--muted)]">
+                        预计 {row.estimatedArrivalFrom}
+                        {row.predictionConfidence === 'LOW' && <span className="ml-1 text-amber-500">~</span>}
+                      </div>
+                    )}
+                  </td>
+                  {/* 核对状态（文档 12.3）*/}
+                  <td className="whitespace-nowrap px-3 py-3">
+                    {row.settlementCheckStatus ? (() => {
+                      const sc2 = settlementCheckConfig[row.settlementCheckStatus];
+                      return (
+                        <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset', sc2.cls)}>
+                          <span className={cn('size-1.5 rounded-full', sc2.dot)} />{sc2.label}
+                        </span>
+                      );
+                    })() : <StatusBadge status={row.status} />}
+                  </td>
+                  {/* 银行核销（文档 12.4）*/}
+                  <td className="whitespace-nowrap px-3 py-3">
+                    {row.bankMatchStatus ? (() => {
+                      const bm = bankMatchConfig[row.bankMatchStatus];
+                      return (
+                        <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset', bm.cls)}>
+                          <span className={cn('size-1.5 rounded-full', bm.dot)} />{bm.label}
+                        </span>
+                      );
+                    })() : <span className="text-[11px] text-[var(--muted)]">—</span>}
                   </td>
                   <td className="whitespace-nowrap px-3 py-3">
-                    <span className={cn('text-[11px] font-medium', erc.cls)}>{erc.label}</span>
-                    {row.erpSystem && <div className="text-[10px] text-[var(--muted)]">{row.erpSystem}</div>}
+                    <StatusBadge status={row.erpSync === 'synced' ? '已同步' : row.erpSync === 'pending' ? '待同步' : row.erpSync === 'error' ? '同步失败' : '—'} />
+                    {row.erpSystem && <div className="mt-0.5 text-[10px] text-[var(--muted)]">{row.erpSystem}</div>}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-3">
-                    <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                  <td className="whitespace-nowrap px-3 py-3" onClick={e => e.stopPropagation()}>
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <button onClick={() => onRowClick(row.id)}
                         className="h-6 rounded border border-[var(--border)] px-2 text-[11px] text-[var(--muted)] hover:bg-[var(--surface-subtle)]">
                         查看
@@ -1329,6 +1745,21 @@ function BatchDimensionTable({ rows, onRowClick, onConfirmReceived }: {
                           确认到账
                         </button>
                       )}
+                      {row.status === '差异' && (
+                        <button onClick={() => onWriteOff(row.id)}
+                          className="h-6 rounded border border-amber-300 bg-amber-50 px-2 text-[11px] font-medium text-amber-700 hover:bg-amber-100">
+                          核销差异
+                        </button>
+                      )}
+                      {row.erpSync === 'pending' && row.actualNet !== null && (
+                        <button onClick={() => onMarkErpSynced(row.id)}
+                          className="h-6 rounded border border-blue-200 bg-blue-50 px-2 text-[11px] font-medium text-blue-700 hover:bg-blue-100">
+                          标记已同步
+                        </button>
+                      )}
+                      <button className="ml-auto inline-flex size-7 items-center justify-center rounded-md opacity-0 transition hover:bg-[var(--surface-hover)] group-hover:opacity-100">
+                        <MoreHorizontal className="size-4 text-[var(--muted)]" />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -1337,12 +1768,13 @@ function BatchDimensionTable({ rows, onRowClick, onConfirmReceived }: {
           </tbody>
         </table>
       </div>
-      <div className="grid grid-cols-4 border-t border-[var(--border)] bg-[var(--surface-subtle)] text-[12px]">
+      <div className="grid grid-cols-5 border-t border-[var(--border)] bg-[var(--surface-subtle)] text-[12px]">
         {[
-          { l: '销售总额', v: fmt(total.gross), c: '' },
-          { l: 'OMS预期', v: fmt(total.exp), c: '' },
-          { l: '实际到账', v: fmt(total.act), c: 'text-emerald-600' },
-          { l: '差异合计', v: total.varr === 0 ? '✓ 无差异' : `Δ ${fmtD(total.varr)}`,
+          { l: '收款本金',   v: fmt(rows.reduce((s, r) => s + (r.chargePrincipal ?? r.grossAmount), 0)), c: 'text-emerald-700' },
+          { l: '退款本金',   v: fmt(rows.reduce((s, r) => s + (r.refundPrincipal ?? 0), 0)), c: 'text-red-600' },
+          { l: 'OMS预期',    v: fmt(total.exp), c: '' },
+          { l: '实际到账',   v: fmt(total.act), c: 'text-emerald-600' },
+          { l: '差异合计',   v: total.varr === 0 ? '✓ 无差异' : `Δ ${fmtD(total.varr)}`,
             c: total.varr !== 0 ? 'font-semibold text-amber-600' : 'text-emerald-600' },
         ].map(({ l, v, c }) => (
           <div key={l} className="border-r border-[var(--border-subtle)] px-5 py-3 last:border-r-0">
@@ -1351,20 +1783,51 @@ function BatchDimensionTable({ rows, onRowClick, onConfirmReceived }: {
           </div>
         ))}
       </div>
-      <ArPagination total={rows.length} page={page} pageSize={PAGE_SIZE} onChange={setPage} />
+      {/* 分页 — orders 规范 sticky footer */}
+      {(() => {
+        const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+        return (
+          <div className="sticky -bottom-5 lg:-bottom-6 z-20 flex items-center justify-between rounded-b-xl border-t border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 pb-[calc(0.625rem+20px)] lg:pb-[calc(0.625rem+24px)] text-[13px] text-[var(--muted)]">
+            <span>共 {rows.length} 条</span>
+            <div className="flex items-center gap-1.5">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} className="flex size-7 items-center justify-center rounded-md border border-[var(--border)] text-[12px] transition hover:bg-[var(--surface-hover)] disabled:opacity-40 disabled:cursor-not-allowed">‹</button>
+              <span className="px-1 text-[12px] text-[var(--foreground)]">{page} / {totalPages}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="flex size-7 items-center justify-center rounded-md border border-[var(--border)] text-[12px] transition hover:bg-[var(--surface-hover)] disabled:opacity-40 disabled:cursor-not-allowed">›</button>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
 
 // ─── 订单维度表 ───────────────────────────────────────────────────────────────
 
-function OrderDimensionTable({ rows, onRowClick }: { rows: OrderViewRow[]; onRowClick: (key: string) => void }) {
+function OrderDimensionTable({ rows, onRowClick, batchRows }: {
+  rows: OrderViewRow[];
+  onRowClick: (key: string) => void;
+  batchRows: ChannelArRow[];
+}) {
+  // 按 channel + periodStart 快速查找所属批次结算信息
+  function getParentBatch(row: OrderViewRow): ChannelArRow | undefined {
+    const [periodStart] = row.batchPeriod.split('~');
+    return batchRows.find(b => b.channel === row.channel && b.periodStart === periodStart);
+  }
+
+  const BATCH_STATUS_STYLE: Record<string, { cls: string; dot: string }> = {
+    '处理中': { cls: 'bg-blue-50 text-blue-700 ring-blue-200',     dot: 'bg-blue-500' },
+    '待到账': { cls: 'bg-amber-50 text-amber-700 ring-amber-200',   dot: 'bg-amber-400' },
+    '已到账': { cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200', dot: 'bg-emerald-500' },
+    '差异':   { cls: 'bg-red-50 text-red-700 ring-red-200',         dot: 'bg-red-500' },
+    '已核销': { cls: 'bg-slate-50 text-slate-500 ring-slate-200',   dot: 'bg-slate-400' },
+  };
+
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full border-collapse text-left text-[12px]">
         <thead className="bg-[var(--surface-subtle)] text-[10px] font-semibold uppercase tracking-[0.07em] text-[var(--muted-foreground)]">
           <tr>
-            <th className="whitespace-nowrap px-4 py-2.5">渠道 / 店铺</th>
+            <th className="whitespace-nowrap px-4 py-2.5">来源 · 支付 · 结算</th>
             <th className="whitespace-nowrap px-3 py-2.5">订单号</th>
             <th className="whitespace-nowrap px-3 py-2.5">商品 / MSKU</th>
             <th className="whitespace-nowrap px-3 py-2.5 text-right">数量</th>
@@ -1372,68 +1835,118 @@ function OrderDimensionTable({ rows, onRowClick }: { rows: OrderViewRow[]; onRow
             <th className="whitespace-nowrap px-3 py-2.5 text-right">平台费</th>
             <th className="whitespace-nowrap px-3 py-2.5 text-right">退款</th>
             <th className="whitespace-nowrap px-3 py-2.5 text-right">净额</th>
-            <th className="whitespace-nowrap px-3 py-2.5">渠道特有字段</th>
-            <th className="whitespace-nowrap px-3 py-2.5">日期</th>
+            <th className="whitespace-nowrap px-3 py-2.5">所属批次 / 打款周期</th>
+            <th className="whitespace-nowrap px-3 py-2.5">预计到账</th>
+            <th className="whitespace-nowrap px-3 py-2.5">打款状态</th>
+            <th className="whitespace-nowrap px-3 py-2.5">下单日期</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-[var(--border-subtle)]">
-          {rows.length === 0 && <tr><td colSpan={10} className="py-10 text-center text-[13px] text-[var(--muted)]">无匹配订单</td></tr>}
-          {rows.map(row => (
-            <tr key={row.key} onClick={() => onRowClick(row.key)}
-              className={cn('cursor-pointer hover:bg-[var(--surface-subtle)]', row.isRefund && 'bg-red-50/40')}>
-              <td className="px-4 py-2.5">
-                <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset', OMS_CH_COLORS[row.channel] ?? OMS_CH_COLORS['手工订单'])}>{row.channel}</span>
-                <div className="mt-0.5 text-[10px] text-[var(--muted)]">{row.storeCode}</div>
-              </td>
-              <td className="whitespace-nowrap px-3 py-2.5">
-                <div className="font-mono text-[11px] font-medium">{row.orderId}</div>
-                {row.isRefund && <div className="text-[10px] text-red-600">↩ 退款单</div>}
-              </td>
-              <td className="px-3 py-2.5">
-                {row.productName && <div className="text-[11px] font-medium">{row.productName}</div>}
-                {row.msku && <div className="font-mono text-[10px] text-[var(--muted)]">{row.msku}</div>}
-                {!row.productName && !row.msku && <span className="text-[11px] text-[var(--muted)]">—</span>}
-              </td>
-              <td className="whitespace-nowrap px-3 py-2.5 text-right text-[var(--muted)]">{row.quantity || '—'}</td>
-              <td className="whitespace-nowrap px-3 py-2.5 text-right">
-                {row.income > 0 ? <span className="text-[12px] font-medium text-emerald-700">{fmtD(row.income)}</span> : <span className="text-[11px] text-[var(--muted)]">—</span>}
-              </td>
-              <td className="whitespace-nowrap px-3 py-2.5 text-right">
-                {row.platformFee !== 0 ? <span className="text-[12px] font-medium text-orange-700">{fmtD(row.platformFee)}</span> : <span className="text-[11px] text-[var(--muted)]">—</span>}
-              </td>
-              <td className="whitespace-nowrap px-3 py-2.5 text-right">
-                {row.refund !== 0 ? <span className="text-[12px] font-medium text-red-600">{fmtD(row.refund)}</span> : <span className="text-[11px] text-[var(--muted)]">—</span>}
-              </td>
-              <td className="whitespace-nowrap px-3 py-2.5 text-right">
-                <span className={cn('text-[13px] font-bold', row.net >= 0 ? 'text-[var(--foreground)]' : 'text-red-600')}>{fmtD(row.net)}</span>
-              </td>
-              <td className="px-3 py-2.5">
-                {row.channel === 'Amazon' && row.amazonBreakdown && (
-                  <div className="flex flex-wrap gap-1 text-[10px]">
-                    {row.amazonBreakdown.fbaFee !== 0 && <span className="rounded bg-orange-50 px-1.5 py-0.5 text-orange-700 ring-1 ring-orange-200">FBA {fmtD(Math.abs(row.amazonBreakdown.fbaFee))}</span>}
-                    {row.amazonBreakdown.commission !== 0 && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700 ring-1 ring-amber-200">佣金 {fmtD(Math.abs(row.amazonBreakdown.commission))}</span>}
-                  </div>
-                )}
-                {row.channel === 'TikTok Shop' && row.tiktokData && (
-                  <div className="flex flex-wrap gap-1 text-[10px]">
-                    <span className="rounded bg-pink-50 px-1.5 py-0.5 text-pink-700 ring-1 ring-pink-200">交货 {fmtD(row.tiktokData.deliveryIncome)}</span>
-                    {row.tiktokData.profit !== undefined && (
-                      <span className={cn('rounded px-1.5 py-0.5 ring-1', row.tiktokData.profit >= 0 ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-red-50 text-red-700 ring-red-200')}>
-                        利润 {fmtD(row.tiktokData.profit)}
-                      </span>
-                    )}
-                  </div>
-                )}
-                {row.channel === 'Shopify' && row.shopifyData && (
-                  <div className="flex flex-wrap gap-1 text-[10px]">
-                    {row.shopifyData.discountAmount < 0 && <span className="rounded bg-blue-50 px-1.5 py-0.5 text-blue-700 ring-1 ring-blue-200">折扣 {fmtD(row.shopifyData.discountAmount)}</span>}
-                    <span className="rounded bg-orange-50 px-1.5 py-0.5 text-orange-700 ring-1 ring-orange-200">Stripe {fmtD(row.shopifyData.feeAmount)}</span>
-                  </div>
-                )}
-              </td>
-              <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[var(--muted)]">{row.date}</td>
-            </tr>
-          ))}
+          {rows.length === 0 && <tr><td colSpan={12} className="py-10 text-center text-[13px] text-[var(--muted)]">无匹配订单</td></tr>}
+          {rows.map(row => {
+            const batch = getParentBatch(row);
+            const ss = batch ? (BATCH_STATUS_STYLE[batch.status] ?? BATCH_STATUS_STYLE['处理中']) : null;
+            return (
+              <tr key={row.key} onClick={() => onRowClick(row.key)}
+                className={cn('cursor-pointer hover:bg-[var(--surface-subtle)]', row.isRefund && 'bg-red-50/40')}>
+                <td className="px-4 py-2.5">
+                  {/* 渠道链路：来源 → 支付 → 结算 */}
+                  {(row.sourceChannel && row.sourceChannel !== row.channel) ? (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">来源</span>
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 ring-1 ring-slate-200">{row.sourceChannel}</span>
+                      </div>
+                      {row.paymentGateway && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">支付</span>
+                          <span className="max-w-[96px] truncate text-[10px] text-[var(--muted)]" title={row.paymentGateway}>{row.paymentGateway.split(' (')[0]}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">结算</span>
+                        <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset', OMS_CH_COLORS[row.channel] ?? OMS_CH_COLORS['手工订单'])}>{row.channel}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset', OMS_CH_COLORS[row.channel] ?? OMS_CH_COLORS['手工订单'])}>{row.channel}</span>
+                      {row.paymentGateway && <div className="mt-0.5 max-w-[90px] truncate text-[10px] text-[var(--muted)]" title={row.paymentGateway}>{row.paymentGateway}</div>}
+                      <div className="mt-0.5 text-[10px] text-[var(--muted)]">{row.storeCode}</div>
+                    </div>
+                  )}
+                </td>
+                <td className="whitespace-nowrap px-3 py-2.5">
+                  <div className="font-mono text-[11px] font-medium">{row.orderId}</div>
+                  {row.isRefund && <div className="text-[10px] text-red-600">↩ 退款单</div>}
+                </td>
+                <td className="px-3 py-2.5">
+                  {row.productName && <div className="text-[11px] font-medium">{row.productName}</div>}
+                  {row.msku && <div className="font-mono text-[10px] text-[var(--muted)]">{row.msku}</div>}
+                  {!row.productName && !row.msku && <span className="text-[11px] text-[var(--muted)]">—</span>}
+                </td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-right text-[var(--muted)]">{row.quantity || '—'}</td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-right">
+                  {row.income > 0 ? <span className="text-[12px] font-medium text-emerald-700">{fmtD(row.income)}</span> : <span className="text-[11px] text-[var(--muted)]">—</span>}
+                </td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-right">
+                  {row.platformFee !== 0 ? <span className="text-[12px] font-medium text-orange-700">{fmtD(row.platformFee)}</span> : <span className="text-[11px] text-[var(--muted)]">—</span>}
+                </td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-right">
+                  {row.refund !== 0 ? <span className="text-[12px] font-medium text-red-600">{fmtD(row.refund)}</span> : <span className="text-[11px] text-[var(--muted)]">—</span>}
+                </td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-right">
+                  <span className={cn('text-[13px] font-bold', row.net >= 0 ? 'text-[var(--foreground)]' : 'text-red-600')}>{fmtD(row.net)}</span>
+                </td>
+                {/* 所属批次 / 打款周期 */}
+                <td className="px-3 py-2.5">
+                  {batch ? (
+                    <div>
+                      <div className="font-mono text-[10px] font-medium text-[var(--primary)]">{batch.settlementNo}</div>
+                      <div className="mt-0.5 text-[10px] text-[var(--muted)]">{row.batchPeriod}</div>
+                      <div className="mt-0.5 text-[10px] text-[var(--muted)]">{batch.orderCount} 笔 / 批</div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="text-[10px] text-[var(--muted)]">{row.batchPeriod}</div>
+                      <div className="mt-0.5 text-[10px] text-amber-600">未匹配 AR 记录</div>
+                    </div>
+                  )}
+                </td>
+                {/* 预计到账 */}
+                <td className="whitespace-nowrap px-3 py-2.5">
+                  {batch?.actualNet !== null && batch?.settledAt ? (
+                    <div>
+                      <div className="text-[11px] font-medium text-emerald-700">{batch.settledAt}</div>
+                      <div className="text-[10px] text-emerald-600">已到账 {fmtD(batch.actualNet ?? 0)}</div>
+                    </div>
+                  ) : batch?.expectedReceiptDate ? (
+                    <div>
+                      <div className="text-[11px] text-[var(--muted)]">{batch.expectedReceiptDate}</div>
+                      <div className="text-[10px] text-amber-600">预计打款</div>
+                    </div>
+                  ) : (
+                    <span className="text-[11px] text-[var(--muted)]">—</span>
+                  )}
+                </td>
+                {/* 打款状态 */}
+                <td className="whitespace-nowrap px-3 py-2.5">
+                  {ss && batch ? (
+                    <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset', ss.cls)}>
+                      <span className={cn('size-1.5 rounded-full', ss.dot)} />
+                      {batch.status}
+                      {batch.variance !== null && batch.variance !== 0 && (
+                        <span className="ml-0.5 font-bold">Δ{fmtD(batch.variance)}</span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-[var(--muted)]">—</span>
+                  )}
+                </td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[var(--muted)]">{row.date}</td>
+              </tr>
+            );
+          })}
         </tbody>
         {/* 汇总行 */}
         {rows.length > 0 && (() => {
@@ -1445,15 +1958,13 @@ function OrderDimensionTable({ rows, onRowClick }: { rows: OrderViewRow[]; onRow
           };
           return (
             <tfoot>
-              <tr className="border-t-2 border-[var(--border)] bg-[var(--surface-subtle)] text-[12px]">
-                <td colSpan={4} className="px-4 py-2.5 font-semibold text-[var(--foreground)]">
-                  合计 {rows.length} 笔订单
-                </td>
-                <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums text-emerald-700">{fmtD(total.income)}</td>
-                <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums text-orange-700">{total.fee !== 0 ? fmtD(total.fee) : '—'}</td>
-                <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums text-red-600">{total.refund !== 0 ? fmtD(total.refund) : '—'}</td>
-                <td className="whitespace-nowrap px-3 py-2.5 text-right font-bold tabular-nums text-[var(--foreground)]">{fmtD(total.net)}</td>
-                <td colSpan={2} />
+              <tr className="border-t-2 border-[var(--border)] bg-[var(--surface-subtle)]">
+                <td colSpan={4} className="px-4 py-2.5 text-[11px] font-bold text-[var(--muted-foreground)]">合计 {rows.length} 笔</td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-right text-[12px] font-semibold text-emerald-700">{fmtD(total.income)}</td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-right text-[12px] font-semibold text-orange-700">{fmtD(total.fee)}</td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-right text-[12px] font-semibold text-red-600">{fmtD(total.refund)}</td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-right text-[13px] font-bold">{fmtD(total.net)}</td>
+                <td colSpan={4} />
               </tr>
             </tfoot>
           );
@@ -1462,6 +1973,9 @@ function OrderDimensionTable({ rows, onRowClick }: { rows: OrderViewRow[]; onRow
     </div>
   );
 }
+
+// ─── SKU 维度表 ───────────────────────────────────────────────────────────────
+
 
 function SkuDimensionTable({ rows }: { rows: SkuViewRow[] }) {
   const total = { income: rows.reduce((s, r) => s + r.totalIncome, 0), fee: rows.reduce((s, r) => s + r.totalPlatformFee, 0), net: rows.reduce((s, r) => s + r.totalNet, 0) };
@@ -1536,28 +2050,72 @@ function SettlementDetailDrawer({ row, onClose }: { row: ChannelArRow | null; on
     ...(bd?.fulfillmentFee ? [{ label: 'FBA / 配送费', value: bd.fulfillmentFee }] : []),
     ...(bd?.advertisingFee ? [{ label: '广告费扣减', value: bd.advertisingFee }] : []),
     ...(bd?.transactionFee ? [{ label: '支付手续费', value: bd.transactionFee }] : []),
-    ...(bd?.refunds        ? [{ label: '退款扣减', value: bd.refunds }] : []),
+    ...(bd?.refunds        ? [{ label: '退款本金', value: bd.refunds, note: '独立追踪（公式 8.8）' }] : []),
     ...(bd?.other          ? [{ label: '其他调整', value: bd.other }] : []),
   ];
 
   return (
     <>
       <div className="fixed inset-0 z-30 bg-black/20" onClick={onClose} />
-      <div className="fixed right-0 top-0 z-40 flex h-full w-[480px] max-w-full flex-col overflow-hidden bg-[var(--surface)] shadow-2xl">
+      <div className="fixed right-0 top-0 z-40 flex h-full w-[500px] max-w-full flex-col overflow-hidden bg-[var(--surface)] shadow-2xl">
         <div className="flex shrink-0 items-start justify-between border-b border-[var(--border)] px-6 py-4">
           <div>
             <div className="font-mono text-[15px] font-bold text-[var(--foreground)]">{row.settlementNo}</div>
-            <div className="mt-1.5 flex items-center gap-1.5">
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               <span className={cn('rounded px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset', OMS_CH_COLORS[row.channel] ?? OMS_CH_COLORS['手工订单'])}>{row.channel}</span>
-              <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset', sc.cls)}>
-                <span className={cn('size-1.5 rounded-full', sc.dot)} />{row.status}
-              </span>
+              {row.settlementOwner && (
+                <span className="text-[10px] text-[var(--muted)]">结算主体: {row.settlementOwner}</span>
+              )}
             </div>
           </div>
           <button onClick={onClose} className="flex size-8 items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[var(--surface-subtle)]"><X className="size-4" /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-5 px-6 py-5">
+
+          {/* ── 三维状态（文档 12）── */}
+          <section>
+            <DrawerTitle>综合状态（文档 §12 三维独立）</DrawerTitle>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {/* 资金进度 12.2 */}
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2.5">
+                <div className="mb-1.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">资金进度</div>
+                {row.fundProgress ? (() => {
+                  const fp = fundProgressConfig[row.fundProgress];
+                  return (
+                    <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset', fp.cls)}>
+                      <span className={cn('size-1.5 rounded-full', fp.dot)} />{fp.label}
+                    </span>
+                  );
+                })() : <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset', sc.cls)}><span className={cn('size-1.5 rounded-full', sc.dot)} />{row.status}</span>}
+              </div>
+              {/* 核对状态 12.3 */}
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2.5">
+                <div className="mb-1.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">核对状态</div>
+                {row.settlementCheckStatus ? (() => {
+                  const sc2 = settlementCheckConfig[row.settlementCheckStatus];
+                  return (
+                    <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset', sc2.cls)}>
+                      <span className={cn('size-1.5 rounded-full', sc2.dot)} />{sc2.label}
+                    </span>
+                  );
+                })() : <span className="text-[11px] text-[var(--muted)]">—</span>}
+              </div>
+              {/* 银行核销 12.4 */}
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2.5">
+                <div className="mb-1.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">银行核销</div>
+                {row.bankMatchStatus ? (() => {
+                  const bm = bankMatchConfig[row.bankMatchStatus];
+                  return (
+                    <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset', bm.cls)}>
+                      <span className={cn('size-1.5 rounded-full', bm.dot)} />{bm.label}
+                    </span>
+                  );
+                })() : <span className="text-[11px] text-[var(--muted)]">—</span>}
+              </div>
+            </div>
+          </section>
+
           <section>
             <DrawerTitle>基本信息</DrawerTitle>
             <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-2.5">
@@ -1611,6 +2169,89 @@ function SettlementDetailDrawer({ row, onClose }: { row: ChannelArRow | null; on
                   <ExternalLink className="size-3" />在 ERP 中查看
                 </button>
               )}
+            </div>
+          </section>
+
+          {/* ── 预测依据（文档 9.1-9.7）── */}
+          {(row.estimatedPayoutDate || row.estimatedArrivalFrom) && (
+            <section>
+              <DrawerTitle>预测依据（文档 §9）</DrawerTitle>
+              <div className="mt-2 space-y-2 rounded-xl border border-[var(--border)] px-4 py-3 text-[12px]">
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--muted)]">结算主体</span>
+                  <span className="font-medium">{row.settlementOwner ?? row.channel}</span>
+                </div>
+                {row.estimatedPayoutDate && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[var(--muted)]">预计发起打款日</span>
+                    <span className="font-medium">{row.estimatedPayoutDate}</span>
+                  </div>
+                )}
+                {row.estimatedArrivalFrom && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[var(--muted)]">预计到账区间</span>
+                    <span className="font-medium">
+                      {row.estimatedArrivalFrom}
+                      {row.estimatedArrivalTo && row.estimatedArrivalTo !== row.estimatedArrivalFrom && ` ~ ${row.estimatedArrivalTo}`}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between border-t border-[var(--border-subtle)] pt-1.5">
+                  <span className="text-[var(--muted)]">预测置信度</span>
+                  <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium',
+                    row.predictionConfidence === 'HIGH' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' :
+                    row.predictionConfidence === 'LOW'  ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' :
+                    'bg-slate-50 text-slate-500 ring-1 ring-slate-200')}>
+                    {row.predictionConfidence === 'HIGH' ? '高置信度（有账户规则依据）' :
+                     row.predictionConfidence === 'LOW'  ? '低置信度（仅地区基线）' : '数据不足'}
+                  </span>
+                </div>
+                <p className="text-[10px] text-[var(--muted)]">
+                  ⚠️ 以上为内部预测，不代表机构承诺。实际到账后此栏将由银行凭证核销结果替代。
+                </p>
+              </div>
+            </section>
+          )}
+
+          {/* ── 银行核销（文档 12.4）── */}
+          <section>
+            <DrawerTitle>银行核销（文档 §12.4）</DrawerTitle>
+            <div className="mt-2 rounded-xl border border-[var(--border)] px-4 py-3 text-[12px]">
+              {row.bankMatchStatus && (() => {
+                const bm = bankMatchConfig[row.bankMatchStatus];
+                return (
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[var(--muted)]">核销状态</span>
+                      <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset', bm.cls)}>
+                        <span className={cn('size-1.5 rounded-full', bm.dot)} />{bm.label}
+                      </span>
+                    </div>
+                    {row.bankMatchedAmount != null && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[var(--muted)]">银行凭证核销金额</span>
+                        <span className="font-semibold text-emerald-700">{fmtD(row.bankMatchedAmount)}</span>
+                      </div>
+                    )}
+                    {row.actualNet != null && row.bankMatchedAmount != null && row.bankMatchedAmount !== row.actualNet && (
+                      <div className="flex items-center justify-between text-amber-700">
+                        <span>到账差异</span>
+                        <span className="font-bold">Δ {fmtD(row.bankMatchedAmount - row.actualNet)}</span>
+                      </div>
+                    )}
+                    {row.bankMatchStatus === 'NO_EVIDENCE' && (
+                      <p className="text-[11px] text-[var(--muted)]">
+                        尚未取得银行凭证。机构报告已入账不等于银行核销完成（文档口径 5）。
+                      </p>
+                    )}
+                    {row.bankMatchStatus === 'TO_MATCH' && (
+                      <button className="mt-1 flex h-7 w-full items-center justify-center gap-1.5 rounded-lg bg-amber-600 text-[12px] font-medium text-white hover:bg-amber-700">
+                        上传银行凭证 / 手动核销
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </section>
 
@@ -1828,19 +2469,58 @@ function SettlementRawLines({ row }: { row: ChannelArRow }) {
 
 // ─── 订单详情抽屉 ─────────────────────────────────────────────────────────────
 
-function OrderDetailDrawer({ row, onClose }: { row: OrderViewRow | null; onClose: () => void }) {
+function OrderDetailDrawer({ row, onClose, batchRows }: {
+  row: OrderViewRow | null;
+  onClose: () => void;
+  batchRows: ChannelArRow[];
+}) {
   if (!row) return null;
   const chColor = OMS_CH_COLORS[row.channel] ?? OMS_CH_COLORS['手工订单'];
+  const isCrossChannel = !!(row.sourceChannel && row.sourceChannel !== row.channel);
+
+  // 查找父批次
+  const parentBatch = (() => {
+    const [periodStart] = row.batchPeriod.split('~');
+    return batchRows.find(b => b.channel === row.channel && b.periodStart === periodStart);
+  })();
+
+  // 数据完整性评估
+  const completeness: { label: string; cls: string; note: string } = (() => {
+    if (isCrossChannel) return {
+      label: '部分（来源数据待补）',
+      cls: 'bg-amber-50 text-amber-700 ring-amber-200',
+      note: `订单来源于 ${row.sourceChannel}，但在 ${row.channel} 结算。来源渠道的销售/退款明细需通过外部报告补充。`,
+    };
+    if (row.amazonBreakdown || row.shopifyData || row.tiktokData) return {
+      label: '完整',
+      cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+      note: '已取得来源结算报告数据，费用明细完整。',
+    };
+    return {
+      label: '待核实',
+      cls: 'bg-slate-50 text-slate-500 ring-slate-200',
+      note: '仅有聚合数据，未取得来源结算报告行级明细。',
+    };
+  })();
 
   return (
     <>
       <div className="fixed inset-0 z-30 bg-black/20" onClick={onClose} />
-      <div className="fixed right-0 top-0 z-40 flex h-full w-[520px] max-w-full flex-col overflow-hidden bg-[var(--surface)] shadow-2xl">
+      <div className="fixed right-0 top-0 z-40 flex h-full w-[540px] max-w-full flex-col overflow-hidden bg-[var(--surface)] shadow-2xl">
+        {/* ── 标题 ── */}
         <div className="flex shrink-0 items-start justify-between border-b border-[var(--border)] px-6 py-4">
           <div>
             <div className="font-mono text-[15px] font-bold text-[var(--foreground)]">{row.orderId}</div>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              <span className={cn('rounded px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset', chColor)}>{row.channel}</span>
+              {isCrossChannel ? (
+                <>
+                  <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 ring-1 ring-slate-200">{row.sourceChannel}</span>
+                  <span className="text-[10px] text-[var(--muted)]">→</span>
+                  <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset', chColor)}>{row.channel} 结算</span>
+                </>
+              ) : (
+                <span className={cn('rounded px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset', chColor)}>{row.channel}</span>
+              )}
               <span className="text-[11px] text-[var(--muted)]">{row.storeCode}</span>
               {row.isRefund && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">↩ 退款单</span>}
               <span className="text-[11px] text-[var(--muted)]">{row.date}</span>
@@ -1850,18 +2530,181 @@ function OrderDetailDrawer({ row, onClose }: { row: OrderViewRow | null; onClose
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-5 px-6 py-5">
+
+          {/* ── 渠道链路（文档 §7.6 / §17 收款路径）── */}
+          <section>
+            <DrawerTitle>渠道链路</DrawerTitle>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2.5">
+                <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">来源渠道</div>
+                <div className="text-[12px] font-medium">{row.sourceChannel ?? row.channel}</div>
+                <div className="mt-0.5 text-[10px] text-[var(--muted)]">订单从哪里进来</div>
+              </div>
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2.5">
+                <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">支付处理</div>
+                <div className="text-[12px] font-medium">{row.paymentGateway?.split(' (')[0] ?? '—'}</div>
+                <div className="mt-0.5 text-[10px] text-[var(--muted)] truncate" title={row.paymentGateway ?? ''}>{row.paymentGateway ?? '—'}</div>
+              </div>
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2.5">
+                <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">结算渠道</div>
+                <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset', chColor)}>{row.channel}</span>
+                <div className="mt-0.5 text-[10px] text-[var(--muted)]">谁打款给商家</div>
+              </div>
+            </div>
+            {isCrossChannel && (
+              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+                ⚠️ 跨渠道订单：订单来自 <strong>{row.sourceChannel}</strong>，但经由 <strong>{row.channel}</strong> 收款和结算。
+                {row.channel === 'Amazon' && ' Buy with Prime / Amazon MCF 场景，费用按 Amazon 规则计算。'}
+              </div>
+            )}
+          </section>
+
+          {/* ── 资金汇总（文档 §8.3-8.6 本渠道收款/退款/净额）── */}
+          <section>
+            <DrawerTitle>资金汇总</DrawerTitle>
+            <div className="mt-2 rounded-xl border border-[var(--border)] overflow-hidden text-[13px]">
+              <div className="divide-y divide-[var(--border-subtle)]">
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <div>
+                    <div className="text-[var(--foreground)]">本渠道收款</div>
+                    <div className="text-[10px] text-[var(--muted)]">成功 SALE/CAPTURE 交易合计（文档 §8.3）</div>
+                  </div>
+                  <span className="tabular-nums font-semibold text-emerald-700">{fmtD(row.income)}</span>
+                </div>
+                {row.refund !== 0 && (
+                  <div className="flex items-center justify-between px-4 py-2.5">
+                    <div>
+                      <div className="text-[var(--foreground)]">退款扣减</div>
+                      <div className="text-[10px] text-[var(--muted)]">成功 REFUND 交易合计（文档 §8.4）</div>
+                    </div>
+                    <span className="tabular-nums font-semibold text-red-600">{fmtD(row.refund)}</span>
+                  </div>
+                )}
+                {row.platformFee !== 0 && (
+                  <div className="flex items-center justify-between px-4 py-2.5">
+                    <div>
+                      <div className="text-[var(--foreground)]">平台费用扣减</div>
+                      <div className="text-[10px] text-[var(--muted)]">佣金 + FBA/配送费 + 手续费等</div>
+                    </div>
+                    <span className="tabular-nums font-semibold text-orange-700">{fmtD(row.platformFee)}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between bg-[var(--surface-subtle)] px-4 py-3">
+                  <div>
+                    <div className="font-bold text-[var(--foreground)]">预计结算净额</div>
+                    <div className="text-[10px] text-[var(--muted)]">文档公式 §8.6：收款 - 退款 - 费用</div>
+                  </div>
+                  <span className={cn('text-[16px] font-bold tabular-nums', row.net >= 0 ? 'text-[var(--foreground)]' : 'text-red-600')}>{fmtD(row.net)}</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* ── 批次关系（文档 §17 所属批次）── */}
+          <section>
+            <DrawerTitle>批次关系</DrawerTitle>
+            {parentBatch ? (
+              <div className="mt-2 rounded-xl border border-[var(--border)] px-4 py-3 space-y-3">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="font-mono text-[12px] font-semibold text-[var(--primary)]">{parentBatch.settlementNo}</div>
+                    <div className="text-[10px] text-[var(--muted)]">{row.batchPeriod} · 共 {parentBatch.orderCount.toLocaleString()} 笔</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[11px] text-[var(--muted)]">本单净贡献</div>
+                    <div className={cn('text-[13px] font-bold', row.net >= 0 ? 'text-[var(--foreground)]' : 'text-red-600')}>{fmtD(row.net)}</div>
+                  </div>
+                </div>
+                {/* 三维状态 */}
+                <div className="grid grid-cols-3 gap-2">
+                  {parentBatch.fundProgress && (() => {
+                    const fp = fundProgressConfig[parentBatch.fundProgress];
+                    return (
+                      <div className="rounded-lg bg-[var(--surface-subtle)] px-2 py-1.5">
+                        <div className="text-[9px] text-[var(--muted-foreground)] mb-1">资金进度</div>
+                        <span className={cn('inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium ring-1 ring-inset', fp.cls)}>
+                          <span className={cn('size-1 rounded-full', fp.dot)} />{fp.label}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                  {parentBatch.settlementCheckStatus && (() => {
+                    const sc2 = settlementCheckConfig[parentBatch.settlementCheckStatus];
+                    return (
+                      <div className="rounded-lg bg-[var(--surface-subtle)] px-2 py-1.5">
+                        <div className="text-[9px] text-[var(--muted-foreground)] mb-1">核对状态</div>
+                        <span className={cn('inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium ring-1 ring-inset', sc2.cls)}>
+                          <span className={cn('size-1 rounded-full', sc2.dot)} />{sc2.label}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                  {parentBatch.bankMatchStatus && (() => {
+                    const bm = bankMatchConfig[parentBatch.bankMatchStatus];
+                    return (
+                      <div className="rounded-lg bg-[var(--surface-subtle)] px-2 py-1.5">
+                        <div className="text-[9px] text-[var(--muted-foreground)] mb-1">银行核销</div>
+                        <span className={cn('inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium ring-1 ring-inset', bm.cls)}>
+                          <span className={cn('size-1 rounded-full', bm.dot)} />{bm.label}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+                {/* 批次预计到账 */}
+                {parentBatch.actualNet !== null ? (
+                  <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-2 text-[12px]">
+                    <span className="text-emerald-700">批次已到账</span>
+                    <span className="font-semibold text-emerald-700">{fmtD(parentBatch.actualNet)} · {parentBatch.settledAt}</span>
+                  </div>
+                ) : parentBatch.estimatedArrivalFrom ? (
+                  <div className="flex items-center justify-between rounded-lg bg-[var(--surface-subtle)] px-3 py-2 text-[12px]">
+                    <span className="text-[var(--muted)]">
+                      预计到账
+                      {parentBatch.predictionConfidence === 'LOW' && <span className="ml-1 text-amber-500">（低置信度）</span>}
+                    </span>
+                    <span className="font-medium">
+                      {parentBatch.estimatedArrivalFrom}
+                      {parentBatch.estimatedArrivalTo && parentBatch.estimatedArrivalTo !== parentBatch.estimatedArrivalFrom && ` ~ ${parentBatch.estimatedArrivalTo}`}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-700">
+                <div className="font-semibold">批次未匹配</div>
+                <div className="mt-0.5">结算周期 {row.batchPeriod} — 批次明细尚未同步，或该渠道为外部结算路径。</div>
+              </div>
+            )}
+          </section>
+
+          {/* ── 基本信息 ── */}
           <section>
             <DrawerTitle>基本信息</DrawerTitle>
             <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-2.5">
-              <DrawerField label="渠道" value={row.channel} />
-              <DrawerField label="店铺" value={row.storeCode} />
               {row.productName && <DrawerField label="商品" value={row.productName} />}
               {row.msku && <DrawerField label="MSKU" value={row.msku} />}
               <DrawerField label="数量" value={String(row.quantity)} />
               <DrawerField label="结算周期" value={row.batchPeriod} />
+              {row.paymentGateway && <DrawerField label="支付处理方" value={row.paymentGateway} />}
+              {row.sourceChannel && row.sourceChannel !== row.channel && (
+                <DrawerField label="来源渠道" value={row.sourceChannel} />
+              )}
             </div>
           </section>
 
+          {/* ── 数据完整性（文档 §17 字段）── */}
+          <section>
+            <DrawerTitle>数据完整性</DrawerTitle>
+            <div className="mt-2 flex items-start gap-3 rounded-xl border border-[var(--border)] px-4 py-3">
+              <span className={cn('mt-0.5 inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset shrink-0', completeness.cls)}>
+                {completeness.label}
+              </span>
+              <p className="text-[11px] text-[var(--muted)] leading-4">{completeness.note}</p>
+            </div>
+          </section>
+
+          {/* ── Amazon 费用明细 ── */}
           {row.channel === 'Amazon' && row.amazonBreakdown && (
             <section>
               <DrawerTitle>🟠 Amazon 费用明细</DrawerTitle>
@@ -1890,6 +2733,7 @@ function OrderDetailDrawer({ row, onClose }: { row: OrderViewRow | null; onClose
             </section>
           )}
 
+          {/* ── Shopify 费用明细 ── */}
           {row.channel === 'Shopify' && row.shopifyData && (
             <section>
               <DrawerTitle>🟢 Shopify / Stripe 费用明细</DrawerTitle>
@@ -1918,6 +2762,7 @@ function OrderDetailDrawer({ row, onClose }: { row: OrderViewRow | null; onClose
             </section>
           )}
 
+          {/* ── TikTok 费用明细 ── */}
           {row.channel === 'TikTok Shop' && row.tiktokData && (
             <section>
               <DrawerTitle>🩷 TikTok Shop 结算明细</DrawerTitle>
@@ -1949,6 +2794,21 @@ function OrderDetailDrawer({ row, onClose }: { row: OrderViewRow | null; onClose
                     </div>
                   )}
                 </div>
+              </div>
+            </section>
+          )}
+
+          {/* 跨渠道 / 无明细时的提示 */}
+          {isCrossChannel && !row.amazonBreakdown && !row.shopifyData && !row.tiktokData && (
+            <section>
+              <DrawerTitle>费用明细</DrawerTitle>
+              <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-700">
+                <div className="font-semibold mb-1">外部结算数据待补</div>
+                <p>
+                  该订单来自 <strong>{row.sourceChannel}</strong>，在 <strong>{row.channel}</strong> 结算。
+                  费用明细需从 {row.channel} 结算报告导入，OMS 暂无行级拆分数据。
+                </p>
+                <p className="mt-1">净额 <strong>{fmtD(row.net)}</strong> 来自批次聚合数据。</p>
               </div>
             </section>
           )}
@@ -2444,126 +3304,418 @@ function ManualSettlementDrawer({ open, onClose, onAdd }: {
   );
 }
 
-// ─── 新建 B2B 发票 Drawer ─────────────────────────────────────────────────────
+
+// ─── 新建 B2B 应收发票 Drawer（完整财务录入）──────────────────────────────────
+
+const EXISTING_CUSTOMERS = Array.from(new Set(arRows.map(r => r.customer)));
+
+const INVOICE_TYPE_CONFIG = [
+  { value: 'invoice',     label: '正式发票（Invoice）',        hint: '标准商业发票，确认 B2B 销售应收款' },
+  { value: 'proforma',    label: '形式发票（Proforma）',        hint: '预开发票，供客户备款或报关，不计入账龄' },
+  { value: 'credit_note', label: '贷项通知单（Credit Note）',   hint: '减少应收款：退货、折扣、价格调整' },
+  { value: 'debit_note',  label: '借记通知单（Debit Note）',    hint: '增加应收款：额外费用、欠款补录' },
+] as const;
+type InvoiceType = (typeof INVOICE_TYPE_CONFIG)[number]['value'];
+
+function generateInvoiceNo(): string {
+  const yy = new Date().getFullYear();
+  return `INV-${yy}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
+}
+
+type LineItem = { description: string; qty: string; unitPrice: string };
 
 function NewInvoiceDrawer({ open, onClose, onAdd }: {
   open: boolean;
   onClose: () => void;
   onAdd: (inv: typeof arRows[0]) => void;
 }) {
-  const inputCls = 'w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5 text-[13px] text-[var(--foreground)] outline-none focus:border-[var(--primary)] focus:bg-[var(--surface)] transition-colors placeholder:text-[var(--muted-foreground)]';
+  const cls = 'w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5 text-[13px] text-[var(--foreground)] outline-none focus:border-[var(--primary)] focus:bg-[var(--surface)] transition-colors placeholder:text-[var(--muted-foreground)]';
+  const today = new Date().toISOString().slice(0, 10);
 
-  const [form, setForm] = useState({
-    customer: '',
-    channel: 'Direct',
-    invoiceDate: new Date().toISOString().slice(0, 10),
-    paymentTerms: 'Net 30',
-    invoiceAmount: '',
-    currency: 'USD',
-    sourceOrderId: '',
-    note: '',
-  });
+  const [invoiceNo, setInvoiceNo] = useState(() => generateInvoiceNo());
+  const [invoiceType, setInvoiceType] = useState<InvoiceType>('invoice');
+  const [invoiceDate, setInvoiceDate] = useState(today);
+  const [paymentTerms, setPaymentTerms] = useState('Net 30');
+  const [currency, setCurrency] = useState('USD');
+  const [receivingAccount, setReceivingAccount] = useState('公司主账户 · Chase ****4821');
+  const [customerMode, setCustomerMode] = useState<'existing' | 'new'>('existing');
+  const [customer, setCustomer] = useState('');
+  const [customerNew, setCustomerNew] = useState('');
+  const [channel, setChannel] = useState('Direct');
+  const [items, setItems] = useState<LineItem[]>([{ description: '', qty: '1', unitPrice: '' }]);
+  const [taxRate, setTaxRate] = useState('0');
+  const [isManualSync, setIsManualSync] = useState(false);
+  const [sourceOrders, setSourceOrders] = useState('');
+  const [note, setNote] = useState('');
 
-  function set(k: keyof typeof form, v: string) { setForm(p => ({ ...p, [k]: v })); }
+  const daysMap: Record<string, number> = { 'Net 15': 15, 'Net 30': 30, 'Net 45': 45, 'Net 60': 60, 'Net 90': 90, 'COD': 0, 'Prepaid': -1 };
+  const daysAdd = daysMap[paymentTerms] ?? 30;
+  const dueDate = daysAdd >= 0
+    ? new Date(new Date(invoiceDate).getTime() + daysAdd * 86400000).toISOString().slice(0, 10)
+    : invoiceDate;
 
-  const amount = parseFloat(form.invoiceAmount) || 0;
-  const daysMap: Record<string, number> = { 'Net 15': 15, 'Net 30': 30, 'Net 45': 45, 'Net 60': 60, 'Net 90': 90 };
-  const days = daysMap[form.paymentTerms] ?? 30;
-  const dueDate = new Date(new Date(form.invoiceDate).getTime() + days * 86400000).toISOString().slice(0, 10);
+  const effectiveCustomer = customerMode === 'existing' ? customer : customerNew;
+  const subtotal = items.reduce((s, it) => s + (parseFloat(it.qty) || 0) * (parseFloat(it.unitPrice) || 0), 0);
+  const taxAmt   = subtotal * (parseFloat(taxRate) || 0) / 100;
+  const totalAmt = invoiceType === 'credit_note' ? -(subtotal + taxAmt) : subtotal + taxAmt;
+  const isValid  = !!effectiveCustomer && Math.abs(totalAmt) > 0 && !!invoiceDate && !!invoiceNo;
 
-  const isValid = form.customer && amount > 0 && form.invoiceDate;
+  function addItem() { setItems(p => [...p, { description: '', qty: '1', unitPrice: '' }]); }
+  function removeItem(i: number) { setItems(p => p.filter((_, idx) => idx !== i)); }
+  function setItemField(i: number, k: keyof LineItem, v: string) {
+    setItems(p => p.map((it, idx) => idx === i ? { ...it, [k]: v } : it));
+  }
+
+  function handleReset() {
+    setInvoiceNo(generateInvoiceNo()); setInvoiceType('invoice');
+    setInvoiceDate(today); setPaymentTerms('Net 30'); setCurrency('USD');
+    setCustomerMode('existing'); setCustomer(''); setCustomerNew(''); setChannel('Direct');
+    setItems([{ description: '', qty: '1', unitPrice: '' }]); setTaxRate('0');
+    setIsManualSync(false); setSourceOrders(''); setNote('');
+  }
+
+  function handleAdd() {
+    const invAmount = Math.abs(totalAmt);
+    const typeMeta = INVOICE_TYPE_CONFIG.find(t => t.value === invoiceType);
+    onAdd({
+      id: `ar_${Date.now()}`,
+      invoiceNo,
+      customer: effectiveCustomer,
+      channel,
+      invoiceDate,
+      dueDate,
+      paymentTerms,
+      invoiceAmount: invAmount,
+      paidAmount: 0,
+      balanceDue: invAmount,
+      overdueDays: 0,
+      agingStatus: '未到期' as typeof arRows[0]['agingStatus'],
+      sourceOrderId: sourceOrders.trim() || undefined,
+      note: [
+        invoiceType !== 'invoice' ? `类型：${typeMeta?.label}` : '',
+        `收款账户：${receivingAccount}`,
+        note,
+      ].filter(Boolean).join(' · ') || undefined,
+    });
+    handleReset();
+    onClose();
+  }
 
   if (!open) return null;
 
   return (
     <>
       <div className="fixed inset-0 z-30 bg-black/20" onClick={onClose} />
-      <div className="fixed right-0 top-0 z-40 flex h-full w-[440px] max-w-full flex-col overflow-hidden bg-[var(--surface)] shadow-2xl">
+      <div className="fixed right-0 top-0 z-40 flex h-full w-[520px] max-w-full flex-col overflow-hidden bg-[var(--surface)] shadow-2xl">
         <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-6 py-4">
           <div>
-            <h2 className="text-[15px] font-bold text-[var(--foreground)]">新建应收发票</h2>
-            <p className="mt-0.5 text-[12px] text-[var(--muted)]">手动创建 B2B 应收账单，不依赖系统订单</p>
+            <h2 className="text-[15px] font-bold text-[var(--foreground)]">录入应收发票</h2>
+            <p className="mt-0.5 text-[12px] text-[var(--muted)]">手工创建 B2B 应收账单 · 或补录系统未自动同步的发票</p>
           </div>
           <button onClick={onClose} className="flex size-8 items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[var(--surface-subtle)]">
             <X className="size-4" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-          <div>
-            <label className="mb-1 block text-[12px] font-medium">客户名称 *</label>
-            <input value={form.customer} onChange={e => set('customer', e.target.value)} placeholder="如 TechCorp Inc." className={inputCls} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-[12px] font-medium">销售渠道</label>
-              <select value={form.channel} onChange={e => set('channel', e.target.value)} className={inputCls}>
-                <option>Direct</option><option>EDI</option><option>Shopify</option><option>Amazon</option><option>其他</option>
-              </select>
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+          <section>
+            <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-[var(--muted-foreground)]">发票信息</h3>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-[12px] font-medium">发票号 *</label>
+                  <input value={invoiceNo} onChange={e => setInvoiceNo(e.target.value)} className={cn(cls, 'font-mono')} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[12px] font-medium">发票类型 *</label>
+                  <select value={invoiceType} onChange={e => setInvoiceType(e.target.value as InvoiceType)} className={cls}>
+                    {INVOICE_TYPE_CONFIG.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                  <p className="mt-0.5 text-[10px] text-[var(--muted)]">{INVOICE_TYPE_CONFIG.find(t => t.value === invoiceType)?.hint}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-[12px] font-medium">开单日期 *</label>
+                  <input type="date" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} className={cls} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[12px] font-medium">到期日（自动计算）</label>
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5 text-[13px] text-[var(--muted)]">{dueDate}</div>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="mb-1 block text-[12px] font-medium">账期</label>
+                  <select value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} className={cls}>
+                    {['Net 15','Net 30','Net 45','Net 60','Net 90','COD','Prepaid'].map(t => <option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-[12px] font-medium">币种</label>
+                  <select value={currency} onChange={e => setCurrency(e.target.value)} className={cls}>
+                    {['USD','EUR','GBP','CAD','AUD','CNY'].map(c => <option key={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-[12px] font-medium">收款账户</label>
+                  <select value={receivingAccount} onChange={e => setReceivingAccount(e.target.value)} className={cls}>
+                    <option>公司主账户 · Chase ****4821</option>
+                    <option>USD 结算账户 · Citibank ****9034</option>
+                    <option>EUR 账户 · HSBC ****7156</option>
+                  </select>
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="mb-1 block text-[12px] font-medium">付款条款</label>
-              <select value={form.paymentTerms} onChange={e => set('paymentTerms', e.target.value)} className={inputCls}>
-                <option>Net 15</option><option>Net 30</option><option>Net 45</option><option>Net 60</option><option>Net 90</option>
-              </select>
+          </section>
+
+          <section>
+            <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-[var(--muted-foreground)]">客户信息</h3>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 items-center rounded-full border border-[var(--border)] bg-[var(--surface)] p-0.5">
+                  {(['existing', 'new'] as const).map(m => (
+                    <button key={m} onClick={() => setCustomerMode(m)}
+                      className={cn('rounded-full px-3 py-0.5 text-[11px] font-medium transition-colors',
+                        customerMode === m ? 'bg-[var(--primary)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--foreground)]')}>
+                      {m === 'existing' ? '已有客户' : '新客户'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {customerMode === 'existing' ? (
+                <div>
+                  <label className="mb-1 block text-[12px] font-medium">客户 *</label>
+                  <select value={customer} onChange={e => setCustomer(e.target.value)} className={cls}>
+                    <option value="">请选择客户...</option>
+                    {EXISTING_CUSTOMERS.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="mb-1 block text-[12px] font-medium">客户名称 *</label>
+                  <input value={customerNew} onChange={e => setCustomerNew(e.target.value)} placeholder="如 TechCorp Inc." className={cls} />
+                </div>
+              )}
+              <div>
+                <label className="mb-1 block text-[12px] font-medium">销售渠道</label>
+                <select value={channel} onChange={e => setChannel(e.target.value)} className={cls}>
+                  <option>Direct</option><option>EDI</option><option>Shopify</option>
+                  <option>Amazon</option><option>TikTok Shop</option><option>其他</option>
+                </select>
+              </div>
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-[12px] font-medium">开单日期 *</label>
-              <input type="date" value={form.invoiceDate} onChange={e => set('invoiceDate', e.target.value)} className={inputCls} />
+          </section>
+
+          <section>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-[10px] font-semibold uppercase tracking-widest text-[var(--muted-foreground)]">商品 / 服务明细</h3>
+              <button onClick={addItem}
+                className="flex h-6 items-center gap-1 rounded-md border border-[var(--border)] px-2 text-[11px] text-[var(--foreground)] hover:bg-[var(--surface-subtle)]">
+                <Plus className="size-3" />添加行
+              </button>
             </div>
-            <div>
-              <label className="mb-1 block text-[12px] font-medium">到期日（自动计算）</label>
-              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5 text-[13px] text-[var(--muted)]">{dueDate}</div>
+            <div className="space-y-2">
+              <div className="grid grid-cols-[1fr_52px_80px_76px_20px] gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)] px-0.5">
+                <span>描述 / 商品名</span><span className="text-right">数量</span><span className="text-right">单价</span><span className="text-right">小计</span><span />
+              </div>
+              {items.map((it, i) => {
+                const lineTotal = (parseFloat(it.qty) || 0) * (parseFloat(it.unitPrice) || 0);
+                return (
+                  <div key={i} className="grid grid-cols-[1fr_52px_80px_76px_20px] gap-1.5 items-center">
+                    <input value={it.description} onChange={e => setItemField(i, 'description', e.target.value)}
+                      placeholder="如 B2B Wholesale Q3" className={cls} />
+                    <input type="number" min="0" value={it.qty} onChange={e => setItemField(i, 'qty', e.target.value)}
+                      className={cn(cls, 'text-right')} />
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[11px] text-[var(--muted)]">$</span>
+                      <input type="number" min="0" value={it.unitPrice} onChange={e => setItemField(i, 'unitPrice', e.target.value)}
+                        className={cn(cls, 'pl-5 text-right')} />
+                    </div>
+                    <div className="rounded-lg border border-[var(--border-subtle)] px-2 py-1.5 text-right text-[12px] font-medium tabular-nums">
+                      {lineTotal > 0 ? fmtD(lineTotal) : '—'}
+                    </div>
+                    {items.length > 1
+                      ? <button onClick={() => removeItem(i)} className="flex size-5 items-center justify-center rounded text-[var(--muted)] hover:text-[var(--danger)]"><X className="size-3" /></button>
+                      : <span />}
+                  </div>
+                );
+              })}
             </div>
-          </div>
-          <div>
-            <label className="mb-1 block text-[12px] font-medium">应收金额 *</label>
-            <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px] text-[var(--muted)]">$</span>
-              <input type="number" value={form.invoiceAmount} onChange={e => set('invoiceAmount', e.target.value)} placeholder="0.00" className={cn(inputCls, 'pl-6')} />
+            <div className="mt-3 space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
+              <div className="flex items-center justify-between text-[12px]">
+                <span className="text-[var(--muted)]">小计</span>
+                <span className="font-medium tabular-nums">{fmtD(subtotal)}</span>
+              </div>
+              <div className="flex items-center justify-between text-[12px]">
+                <div className="flex items-center gap-2">
+                  <span className="text-[var(--muted)]">税率</span>
+                  <div className="relative">
+                    <input type="number" min="0" max="100" value={taxRate} onChange={e => setTaxRate(e.target.value)}
+                      className="w-16 rounded border border-[var(--border)] bg-[var(--surface-subtle)] px-2 py-0.5 text-right text-[12px] outline-none focus:border-[var(--primary)]" />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[var(--muted)]">%</span>
+                  </div>
+                </div>
+                <span className="tabular-nums">{fmtD(taxAmt)}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg bg-[var(--surface-subtle)] px-3 py-2">
+                <span className="text-[13px] font-semibold">
+                  {invoiceType === 'credit_note' ? '贷项金额' : invoiceType === 'debit_note' ? '借记金额' : '发票总额'}
+                </span>
+                <span className={cn('text-[16px] font-bold tabular-nums', invoiceType === 'credit_note' ? 'text-red-600' : 'text-[var(--foreground)]')}>
+                  {invoiceType === 'credit_note' ? '−' : ''}{fmtD(Math.abs(totalAmt))} {currency}
+                </span>
+              </div>
             </div>
-          </div>
-          <div>
-            <label className="mb-1 block text-[12px] font-medium">关联订单号（可选）</label>
-            <input value={form.sourceOrderId} onChange={e => set('sourceOrderId', e.target.value)} placeholder="如 SO-2026-0001" className={cn(inputCls, 'font-mono')} />
-          </div>
-          <div>
-            <label className="mb-1 block text-[12px] font-medium">备注</label>
-            <textarea value={form.note} onChange={e => set('note', e.target.value)} rows={2} className={cn(inputCls, 'resize-none')} />
-          </div>
+          </section>
+
+          <section>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-[10px] font-semibold uppercase tracking-widest text-[var(--muted-foreground)]">关联订单 / 来源单号</h3>
+              <button onClick={() => setIsManualSync(!isManualSync)}
+                className={cn('flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold transition-colors',
+                  isManualSync ? 'bg-amber-100 text-amber-700' : 'border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-subtle)]')}>
+                {isManualSync ? '⚡ 补录模式 ON' : '系统未同步？开启补录模式'}
+              </button>
+            </div>
+            {isManualSync && (
+              <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+                补录模式：该发票对应已完成的交易，因系统未自动同步而手动录入。请填写原始订单号以便追溯。
+              </div>
+            )}
+            <textarea value={sourceOrders} onChange={e => setSourceOrders(e.target.value)}
+              rows={2} placeholder={'关联销售订单号，多个换行。如：\nSO-2026-0881\nSO-2026-0882'}
+              className={cn(cls, 'resize-none font-mono text-[12px]')} />
+            <p className="mt-1 text-[10px] text-[var(--muted)]">多个订单号可换行或逗号分隔</p>
+          </section>
+
+          <section>
+            <label className="mb-1 block text-[12px] font-medium">内部备注</label>
+            <textarea value={note} onChange={e => setNote(e.target.value)}
+              rows={2} placeholder="财务内部说明，不出现在发票正文"
+              className={cn(cls, 'resize-none')} />
+          </section>
         </div>
 
-        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[var(--border)] px-6 py-4">
+        <div className="flex shrink-0 items-center justify-between border-t border-[var(--border)] px-6 py-4">
           <button onClick={onClose} className="flex h-8 items-center rounded-lg border border-[var(--border)] px-3 text-[13px] hover:bg-[var(--surface-subtle)]">取消</button>
-          <button
-            disabled={!isValid}
-            onClick={() => {
-              const today = new Date().toISOString().slice(0, 10);
-              const newInv = {
-                id: `ar_manual_${Date.now()}`,
-                invoiceNo: `INV-MAN-${today.replace(/-/g, '')}-${Math.floor(Math.random() * 9000) + 1000}`,
-                sourceOrderId: form.sourceOrderId || undefined,
-                paymentTerms: form.paymentTerms,
-                customer: form.customer,
-                channel: form.channel,
-                invoiceDate: form.invoiceDate,
-                dueDate,
-                invoiceAmount: amount,
-                paidAmount: 0,
-                balanceDue: amount,
-                currency: form.currency,
-                agingStatus: '未到期' as const,
-                overdueDays: 0,
-                note: form.note || undefined,
-              };
-              onAdd(newInv);
-            }}
-            className="flex h-8 items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40">
-            创建发票
+          <button disabled={!isValid} onClick={handleAdd}
+            className="flex h-8 items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40">
+            保存发票
           </button>
         </div>
+      </div>
+    </>
+  );
+}
+
+// ─── AR 收款表单（独立组件，含凭证上传）────────────────────────────────────
+
+function ArPaymentForm({ balanceDue, payAmount, onAmountChange, onConfirm, onClose }: {
+  balanceDue: number;
+  payAmount: string;
+  onAmountChange: (v: string) => void;
+  onConfirm: (amount: number) => void;
+  onClose: () => void;
+}) {
+  const [receiptDate, setReceiptDate] = useState(new Date().toISOString().slice(0, 10));
+  const [payMethod, setPayMethod] = useState('银行转账');
+  const [account, setAccount] = useState('公司主账户 · Chase ****4821');
+  const [ref, setRef] = useState('');
+  const [attachmentName, setAttachmentName] = useState<string | null>(null);
+
+  const parsed = parseFloat(payAmount);
+  const attachmentRequired = parsed > 5000;
+  const isValid = !isNaN(parsed) && parsed > 0 && !!ref
+    && (!attachmentRequired || attachmentName !== null);
+
+  return (
+    <>
+      <div className="space-y-3 px-6 py-5">
+        <div className="rounded-lg bg-[var(--surface-subtle)] px-3 py-2 text-[12px]">
+          <div className="flex justify-between"><span className="text-[var(--muted)]">未收余额</span><span className="font-semibold">{fmtD(balanceDue)}</span></div>
+        </div>
+        <div>
+          <label className="mb-1 block text-[12px] font-medium">本次收款金额 *</label>
+          <div className="relative">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px] text-[var(--muted)]">$</span>
+            <input type="number" value={payAmount} onChange={e => onAmountChange(e.target.value)}
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] py-1.5 pl-6 pr-2.5 text-[13px] font-semibold outline-none focus:border-[var(--primary)]" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-[12px] font-medium">到账日期</label>
+            <input type="date" value={receiptDate} onChange={e => setReceiptDate(e.target.value)}
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--primary)]" />
+          </div>
+          <div>
+            <label className="mb-1 block text-[12px] font-medium">收款方式</label>
+            <select value={payMethod} onChange={e => setPayMethod(e.target.value)}
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--primary)]">
+              <option>银行转账</option><option>支票</option><option>信用卡</option><option>PayPal</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-[12px] font-medium">收款账户</label>
+          <select value={account} onChange={e => setAccount(e.target.value)}
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5 text-[12px] outline-none focus:border-[var(--primary)]">
+            <option>公司主账户 · Chase ****4821</option>
+            <option>USD 结算账户 · Citibank ****9034</option>
+            <option>EUR 账户 · HSBC ****7156</option>
+            <option>PayPal 商户账户</option>
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-[12px] font-medium">银行流水号 / 参考号 *</label>
+          <input value={ref} onChange={e => setRef(e.target.value)} placeholder="如：TXN-20261001-8823"
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5 font-mono text-[12px] outline-none focus:border-[var(--primary)]" />
+          {!ref && parsed > 0 && <p className="mt-1 text-[11px] text-red-500">流水号为必填项</p>}
+        </div>
+
+        {/* 收款凭证上传 */}
+        <div>
+          <label className="mb-1 flex items-center gap-1.5 text-[12px] font-medium">
+            收款凭证
+            {attachmentRequired
+              ? <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">必填（金额 &gt;$5,000）</span>
+              : <span className="rounded-full bg-[var(--surface-subtle)] px-1.5 py-0.5 text-[10px] text-[var(--muted)]">建议上传</span>
+            }
+          </label>
+          {attachmentName ? (
+            <div className="flex items-center justify-between rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2">
+              <div className="flex items-center gap-2 text-[12px] text-emerald-700">
+                <span className="font-medium">{attachmentName}</span>
+              </div>
+              <button onClick={() => setAttachmentName(null)} className="text-[var(--muted)] hover:text-[var(--danger)]">
+                <X className="size-3.5" />
+              </button>
+            </div>
+          ) : (
+            <label className={cn(
+              'flex cursor-pointer items-center gap-2.5 rounded-lg border-2 border-dashed px-3 py-2.5 transition-colors',
+              attachmentRequired ? 'border-red-300 bg-red-50 hover:border-red-400' : 'border-[var(--border)] hover:border-[var(--primary)]',
+            )}>
+              <div className="size-4 shrink-0 text-[var(--muted)]">↑</div>
+              <div>
+                <div className={cn('text-[12px] font-medium', attachmentRequired ? 'text-red-600' : 'text-[var(--foreground)]')}>
+                  {attachmentRequired ? '请上传银行到账凭证（必填）' : '上传到账凭证（推荐）'}
+                </div>
+                <div className="text-[10px] text-[var(--muted)]">支持 PDF、PNG、JPG，最大 10MB</div>
+              </div>
+              <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden"
+                onChange={e => { if (e.target.files?.[0]) setAttachmentName(e.target.files[0].name); }} />
+            </label>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center justify-end gap-2 border-t border-[var(--border)] px-6 py-4">
+        <button onClick={onClose} className="flex h-8 items-center rounded-lg border border-[var(--border)] px-3 text-[13px] hover:bg-[var(--surface-subtle)]">取消</button>
+        <button disabled={!isValid} onClick={() => onConfirm(parsed)}
+          className="flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40">
+          确认收款
+        </button>
       </div>
     </>
   );
@@ -2621,107 +3773,6 @@ function ArPagination({ total, page, pageSize, onChange }: {
   );
 }
 
-// ─── AR 收款表单（独立组件，含凭证上传）────────────────────────────────────
-
-function ArPaymentForm({ balanceDue, payAmount, onAmountChange, onConfirm, onClose }: {
-  balanceDue: number;
-  payAmount: string;
-  onAmountChange: (v: string) => void;
-  onConfirm: (amount: number) => void;
-  onClose: () => void;
-}) {
-  const [receiptDate, setReceiptDate] = useState(new Date().toISOString().slice(0, 10));
-  const [payMethod, setPayMethod] = useState('银行转账');
-  const [ref, setRef] = useState('');
-  const [attachmentName, setAttachmentName] = useState<string | null>(null);
-
-  const parsed = parseFloat(payAmount);
-  const attachmentRequired = parsed > 5000;
-  const isValid = !isNaN(parsed) && parsed > 0
-    && (!attachmentRequired || attachmentName !== null);
-
-  return (
-    <>
-      <div className="space-y-3 px-6 py-5">
-        <div className="rounded-lg bg-[var(--surface-subtle)] px-3 py-2 text-[12px]">
-          <div className="flex justify-between"><span className="text-[var(--muted)]">未收余额</span><span className="font-semibold">{fmtD(balanceDue)}</span></div>
-        </div>
-        <div>
-          <label className="mb-1 block text-[12px] font-medium">本次收款金额 *</label>
-          <div className="relative">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px] text-[var(--muted)]">$</span>
-            <input type="number" value={payAmount} onChange={e => onAmountChange(e.target.value)}
-              className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] py-1.5 pl-6 pr-2.5 text-[13px] font-semibold outline-none focus:border-[var(--primary)]" />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="mb-1 block text-[12px] font-medium">到账日期</label>
-            <input type="date" value={receiptDate} onChange={e => setReceiptDate(e.target.value)}
-              className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--primary)]" />
-          </div>
-          <div>
-            <label className="mb-1 block text-[12px] font-medium">收款方式</label>
-            <select value={payMethod} onChange={e => setPayMethod(e.target.value)}
-              className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--primary)]">
-              <option>银行转账</option><option>支票</option><option>信用卡</option><option>PayPal</option>
-            </select>
-          </div>
-        </div>
-        <div>
-          <label className="mb-1 block text-[12px] font-medium">银行流水号（可选）</label>
-          <input value={ref} onChange={e => setRef(e.target.value)} placeholder="参考号/流水号"
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2.5 py-1.5 font-mono text-[12px] outline-none focus:border-[var(--primary)]" />
-        </div>
-
-        {/* 收款凭证上传 */}
-        <div>
-          <label className="mb-1 flex items-center gap-1.5 text-[12px] font-medium">
-            收款凭证
-            {attachmentRequired
-              ? <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">必填（金额 &gt;$5,000）</span>
-              : <span className="rounded-full bg-[var(--surface-subtle)] px-1.5 py-0.5 text-[10px] text-[var(--muted)]">建议上传</span>
-            }
-          </label>
-          {attachmentName ? (
-            <div className="flex items-center justify-between rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2">
-              <div className="flex items-center gap-2 text-[12px] text-emerald-700">
-                <span className="font-medium">{attachmentName}</span>
-              </div>
-              <button onClick={() => setAttachmentName(null)} className="text-[var(--muted)] hover:text-[var(--danger)]">
-                <X className="size-3.5" />
-              </button>
-            </div>
-          ) : (
-            <label className={cn(
-              'flex cursor-pointer items-center gap-2.5 rounded-lg border-2 border-dashed px-3 py-2.5 transition-colors',
-              attachmentRequired ? 'border-red-300 bg-red-50 hover:border-red-400' : 'border-[var(--border)] hover:border-[var(--primary)]',
-            )}>
-              <div className="size-4 shrink-0 text-[var(--muted)]">↑</div>
-              <div>
-                <div className={cn('text-[12px] font-medium', attachmentRequired ? 'text-red-600' : 'text-[var(--foreground)]')}>
-                  {attachmentRequired ? '请上传银行到账凭证（必填）' : '上传到账凭证（推荐）'}
-                </div>
-                <div className="text-[10px] text-[var(--muted)]">支持 PDF、PNG、JPG，最大 10MB</div>
-              </div>
-              <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden"
-                onChange={e => { if (e.target.files?.[0]) setAttachmentName(e.target.files[0].name); }} />
-            </label>
-          )}
-        </div>
-      </div>
-      <div className="flex items-center justify-end gap-2 border-t border-[var(--border)] px-6 py-4">
-        <button onClick={onClose} className="flex h-8 items-center rounded-lg border border-[var(--border)] px-3 text-[13px] hover:bg-[var(--surface-subtle)]">取消</button>
-        <button
-          disabled={!isValid}
-          onClick={() => isValid && onConfirm(parsed)}
-          className="flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40">
-          确认收款
-        </button>
-      </div>
-    </>
-  );
-}
 
 // ─── AR 发票预览弹窗 ──────────────────────────────────────────────────────────
 

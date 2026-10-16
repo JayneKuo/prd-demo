@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState, Fragment } from 'react';
+import { useState, Fragment, useMemo } from 'react';
 import Link from 'next/link';
 import {
   AlertTriangle, CheckCircle2, Clock,
@@ -24,6 +24,7 @@ import {
   STEP_FINANCIALS,
   LANE_ARROW_CONFIG,
 } from '@/lib/mock-data/finance-dashboard';
+import { monthlyTrend, weeklyTrend } from '@/lib/mock-data/finance-report';
 
 // ─── utils ────────────────────────────────────────────────────────────────────
 
@@ -70,14 +71,16 @@ function Sparkline({ data, color = '#3b82f6' }: { data: number[]; color?: string
   );
 }
 
-// ─── Sparkline mock data ──────────────────────────────────────────────────────
+// ─── Sparkline data — derived from real monthly trend ────────────────────────
 
 const SPARK = {
-  netRevenue:         [240, 258, 245, 271, 265, 279, 281],
-  grossMargin:        [61.2, 60.8, 61.5, 59.8, 60.4, 60.9, 60.2],
-  contributionMargin: [41.8, 42.1, 42.5, 42.0, 43.2, 42.8, 43.0],
-  pendingSettlement:  [45,   52,   38,   61,   47,   55,   40  ],
-  totalPayable:       [62,   58,   55,   59,   56,   52,   54  ],
+  // 取最近 6 个月趋势，用千美元为单位归一化
+  netRevenue:         monthlyTrend.slice(-6).map(p => p.revenue / 1000),
+  grossMargin:        monthlyTrend.slice(-6).map(p => +(p.grossProfit / p.revenue * 100).toFixed(1)),
+  contributionMargin: monthlyTrend.slice(-6).map(p => +(p.contribution / p.revenue * 100).toFixed(1)),
+  // 待回款 & 应付用近 8 周订单量趋势代替（方向正确即可）
+  pendingSettlement:  weeklyTrend.slice(-6).map(p => p.orderCount),
+  totalPayable:       weeklyTrend.slice(-6).map(p => p.totalCost / 1000),
 };
 
 // ─── AR / AP aging buckets (mock) ─────────────────────────────────────────────
@@ -111,11 +114,22 @@ const DATE_RANGES: { key: DateRange; label: string }[] = [
 export default function FinanceDashboardPage() {
   const [dateRange, setDateRange] = useState<DateRange>('this-month');
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [resolved, setResolved] = useState<Set<string>>(new Set());
   const [flowOpen, setFlowOpen] = useState(false);
+  const [toastMsg, setToastMsg] = useState('');
+
+  const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 2600); };
+
+  // 日期范围过滤渠道数据（用日期范围影响可见渠道数量，模拟时间过滤效果）
+  const filteredChannelCards = useMemo(() => {
+    if (dateRange === '7d')   return channelFinanceCards.filter(c => c.status === '已到账' || c.status === '差异');
+    if (dateRange === '90d')  return channelFinanceCards;
+    return channelFinanceCards;
+  }, [dateRange]);
 
   const kpi        = financeDashboardKpi;
-  const highAlerts = financeAlerts.filter(a => a.severity === 'high' && !dismissed.has(a.id));
-  const otherAlerts = financeAlerts.filter(a => a.severity !== 'high');
+  const highAlerts = financeAlerts.filter(a => a.severity === 'high' && !dismissed.has(a.id) && !resolved.has(a.id));
+  const otherAlerts = financeAlerts.filter(a => a.severity !== 'high' && !resolved.has(a.id));
 
   return (
     <div className="mx-auto max-w-[1440px] space-y-4 pt-5 lg:pt-6">
@@ -189,6 +203,13 @@ export default function FinanceDashboardPage() {
                   {alert.actionLabel}
                 </Link>
                 <button
+                  onClick={() => { setResolved(prev => new Set([...prev, alert.id])); showToast('已标记为处理完成'); }}
+                  className="flex h-6 items-center gap-1 rounded-md border border-red-200 bg-white px-2 text-[10px] font-medium text-red-500 transition hover:text-red-700"
+                  title="标记为已处理"
+                >
+                  ✓ 已处理
+                </button>
+                <button
                   onClick={() => setDismissed(prev => new Set([...prev, alert.id]))}
                   className="flex size-6 items-center justify-center rounded text-red-400 transition hover:text-red-600"
                 >
@@ -250,13 +271,20 @@ export default function FinanceDashboardPage() {
       </div>
 
       {/* ── 渠道对比表 ── */}
-      <ChannelTable />
+      <ChannelTable cards={filteredChannelCards} dateRange={dateRange} />
 
       {/* ── 中/低优先级待处理 ── */}
       {otherAlerts.length > 0 && <OtherAlertsSection alerts={otherAlerts} />}
 
       {/* ── 业务流程面板 ── */}
       {flowOpen && <FinanceFlowPanel onClose={() => setFlowOpen(false)} />}
+
+      {/* Toast */}
+      {toastMsg && (
+        <div className="fixed bottom-6 left-1/2 z-[200] -translate-x-1/2 rounded-xl bg-[var(--foreground)] px-4 py-2.5 text-[13px] font-medium text-[var(--background)] shadow-xl">
+          {toastMsg}
+        </div>
+      )}
     </div>
   );
 }
@@ -350,6 +378,16 @@ function PLWaterfallCard() {
           const isStart     = bar.type === 'start';
           const isNeg       = bar.type === 'negative';
 
+          // P&L 行点击导航
+          const drillLink: Record<string, string> = {
+            warehouse:   '/dashboard/payables',
+            freight:     '/dashboard/payables',
+            platform:    '/dashboard/payables',
+            payment:     '/dashboard/payables',
+            returns:     '/dashboard/receivables',
+          };
+          const href = drillLink[bar.id];
+
           const barPct    = (isMilestone || isStart)
             ? (bar.runningTotal / GROSS) * 100
             : (Math.abs(bar.amount) / GROSS) * 100;
@@ -371,8 +409,10 @@ function PLWaterfallCard() {
                 'grid items-center gap-3 px-2 py-[5px]',
                 rowBg,
                 isMilestone ? 'mt-2' : '',
+                href ? 'cursor-pointer rounded hover:bg-[var(--surface-subtle)] transition-colors group' : '',
               )}
               style={{ gridTemplateColumns: '1fr 52px 68px' }}
+              onClick={href ? () => window.location.href = href : undefined}
             >
               {/* 进度条 + 标签 */}
               <div className="min-w-0">
@@ -394,6 +434,9 @@ function PLWaterfallCard() {
                   {bar.label}
                   {!isMilestone && !isStart && (
                     <span className="ml-1.5 text-[9px] opacity-50">{bar.labelEn}</span>
+                  )}
+                  {href && (
+                    <span className="ml-1 hidden text-[9px] text-[var(--primary)] group-hover:inline">→ 查看明细</span>
                   )}
                 </span>
               </div>
@@ -564,11 +607,14 @@ function SnapRow({ label, value, cls, href }: {
 
 // ─── Channel Comparison Table ─────────────────────────────────────────────────
 
-function ChannelTable() {
-  const totalGross      = channelFinanceCards.reduce((s, c) => s + c.grossSales, 0);
-  const totalDeductions = channelFinanceCards.reduce((s, c) => s + c.totalDeduction, 0);
-  const totalNet        = channelFinanceCards.reduce((s, c) => s + c.netSettlement, 0);
-  const blendedFeeRate  = ((totalDeductions / totalGross) * 100).toFixed(1);
+function ChannelTable({ cards, dateRange }: {
+  cards: typeof channelFinanceCards;
+  dateRange: string;
+}) {
+  const totalGross      = cards.reduce((s, c) => s + c.grossSales, 0);
+  const totalDeductions = cards.reduce((s, c) => s + c.totalDeduction, 0);
+  const totalNet        = cards.reduce((s, c) => s + c.netSettlement, 0);
+  const blendedFeeRate  = totalGross > 0 ? ((totalDeductions / totalGross) * 100).toFixed(1) : '0';
 
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)]">
@@ -611,7 +657,7 @@ function ChannelTable() {
           </thead>
 
           <tbody className="divide-y divide-[var(--border-subtle)]">
-            {channelFinanceCards.map((ch) => {
+            {cards.map((ch) => {
               const feeHigh = ch.feeRate > 20;
               const feeMed  = !feeHigh && ch.feeRate > 10;
               return (
