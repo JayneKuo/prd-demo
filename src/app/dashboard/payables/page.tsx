@@ -166,9 +166,9 @@ export default function PayablesPage() {
   }), [filtered, searchQuery, statusFilter, vendorFilter, billTypeFilter, allocationFilter, dueFilter, startDate, endDate]);
 
   // AP 状态选项 — 从实际数据中提取
-  const apStatusOptions = useMemo(() => Array.from(new Set(rows.map(r => r.status).filter((s): s is string => !!s))).sort(), [rows]);
+  const apStatusOptions = useMemo(() => Array.from(new Set(rows.map(r => r.status).filter(Boolean))).sort(), [rows]);
   // AP 账单类型选项
-  const apBillTypeOptions = useMemo(() => Array.from(new Set(rows.map(r => r.billType).filter((t): t is string => !!t))).sort(), [rows]);
+  const apBillTypeOptions = useMemo(() => Array.from(new Set(rows.map(r => r.billType).filter(Boolean))).sort(), [rows]);
 
   const totalPages = Math.max(1, Math.ceil(filteredWithSearch.length / pageSize));
 
