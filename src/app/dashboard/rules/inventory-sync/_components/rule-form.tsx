@@ -1612,7 +1612,7 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
                           <button type="button"
                             onClick={() => {
                               setForm((cur) => {
-                                let configs = [...cur.skuLevelConfigs];
+                                const configs = [...cur.skuLevelConfigs];
                                 selectedOverrideCodes.forEach((skuCode) => {
                                   const idx = configs.findIndex((c) => c.skuCode === skuCode);
                                   if (idx < 0) return;
