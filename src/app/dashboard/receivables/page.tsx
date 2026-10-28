@@ -3385,6 +3385,7 @@ function NewInvoiceDrawer({ open, onClose, onAdd }: {
       invoiceDate,
       dueDate,
       paymentTerms,
+      currency,
       invoiceAmount: invAmount,
       paidAmount: 0,
       balanceDue: invAmount,
