@@ -10,6 +10,7 @@ import { warehouses as warehouseList } from '@/lib/mock-data/warehouses';
 import { cn } from '@/lib/utils';
 import { OrderTimeline } from '@/components/dashboard/order-timeline';
 import { CreateFulfillmentModal, type CreateFulfillmentResult } from '@/components/orders/create-fulfillment-modal';
+import { FulfillmentDecisionModal } from '@/components/orders/fulfillment-decision-modal';
 import { RefundModal } from '@/components/orders/refund-modal';
 import { ConfirmPaymentModal } from '@/components/orders/confirm-payment-modal';
 import { CancelOrderModal } from '@/components/orders/cancel-order-modal';
@@ -2328,104 +2329,19 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
       {/* ─── 决策详情弹窗 ─── */}
       {decisionModal && (() => {
-        // 获取当前履约单关联的所有决策事件
-        const relatedEvents = detail.events
-          .filter((e) => e.type === 'fulfillment' && (e.fulfillmentOrderNo === decisionModal || !e.fulfillmentOrderNo))
-          .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
-
-        // 找到对应的 fulfillment 包裹信息
         const relatedFuls = orderState.fulfillments.filter((f) => f.fulfillmentOrderNo === decisionModal);
-
+        const mainFul = relatedFuls[0];
+        if (!mainFul) return null;
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setDecisionModal(null)}>
-            <div className="mx-4 w-full max-w-[640px] max-h-[80vh] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-xl" onClick={(e) => e.stopPropagation()}>
-              {/* Modal Header */}
-              <div className="flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-5 py-4">
-                <div>
-                  <h3 className="text-[15px] font-semibold text-[var(--foreground)]">履约决策详情</h3>
-                  <p className="mt-0.5 inline-flex items-center font-mono text-[12px] text-[var(--muted)]">{decisionModal}<CopyButton text={decisionModal} /></p>
-                </div>
-                <button type="button" onClick={() => setDecisionModal(null)} className="flex size-8 items-center justify-center rounded-lg text-[var(--muted)] transition hover:bg-[var(--surface)] hover:text-[var(--foreground)]">
-                  <svg className="size-4" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8m0-8l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-                </button>
-              </div>
-
-              {/* Modal Body */}
-              <div className="overflow-y-auto px-5 py-4" style={{ maxHeight: 'calc(80vh - 130px)' }}>
-                {/* 履约单概况 */}
-                {relatedFuls.length > 0 && (
-                  <div className="mb-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">履约单概况</div>
-                    <div className="mt-2 grid gap-3 sm:grid-cols-3 text-[12px]">
-                      <div>
-                        <div className="text-[var(--muted)]">命中规则</div>
-                        <div className="mt-0.5 font-medium text-[var(--foreground)]">{relatedFuls[0].matchedRule ?? '—'}</div>
-                      </div>
-                      <div>
-                        <div className="text-[var(--muted)]">选仓结果</div>
-                        <div className="mt-0.5 font-medium text-[var(--foreground)]">{relatedFuls[0].warehouse ?? '—'}</div>
-                      </div>
-                      <div>
-                        <div className="text-[var(--muted)]">选仓原因</div>
-                        <div className="mt-0.5 font-medium text-[var(--foreground)]">{relatedFuls[0].warehouseReason ?? '—'}</div>
-                      </div>
-                    </div>
-                    {relatedFuls.length > 1 && (
-                      <div className="mt-3 space-y-2 border-t border-[var(--border-subtle)] pt-3">
-                        <div className="text-[11px] font-semibold text-[var(--muted-foreground)]">出库单拆分 ({relatedFuls.length} 个包裹)</div>
-                        {relatedFuls.map((f, i) => (
-                          <div key={f.id} className="flex items-center gap-3 rounded-lg bg-[var(--surface)] px-2.5 py-1.5 ring-1 ring-inset ring-[var(--border-subtle)]">
-                            <span className="flex size-5 items-center justify-center rounded bg-[var(--primary-soft)] text-[10px] font-bold text-[var(--primary)]">{i + 1}</span>
-                            <span className="font-mono text-[11px] text-[var(--foreground)]">{f.outboundOrderNo}</span>
-                            <span className="text-[11px] text-[var(--muted)]">{f.carrier} · {f.lineItemIds.length} 件</span>
-                            {f.warehouseReason && <span className="ml-auto text-[10px] text-[var(--muted)]">{f.warehouseReason}</span>}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* 决策时间线 (正序展示) */}
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)] mb-3">决策流程 ({relatedEvents.length} 步)</div>
-                {relatedEvents.length === 0 ? (
-                  <div className="py-6 text-center text-[13px] text-[var(--muted)]">暂无决策记录</div>
-                ) : (
-                  <ol className="relative border-l-2 border-[var(--border-subtle)] pl-5 space-y-4">
-                    {relatedEvents.map((event, idx) => (
-                      <li key={event.id} className="relative">
-                        <span className={cn(
-                          'absolute -left-[21px] flex size-5 items-center justify-center rounded-full text-[10px] font-bold ring-2 ring-[var(--surface)]',
-                          idx === relatedEvents.length - 1 ? 'bg-[var(--primary)] text-white' : 'bg-[var(--surface-subtle)] text-[var(--muted-foreground)] ring-[var(--border-subtle)]'
-                        )}>{idx + 1}</span>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-[13px] font-medium text-[var(--foreground)]">{event.title}</span>
-                          <span className="shrink-0 text-[10px] text-[var(--muted-foreground)]">{event.time}</span>
-                        </div>
-                        {event.description && (
-                          <p className="mt-1 rounded-lg bg-[var(--surface-subtle)] px-3 py-2 text-[12px] leading-5 text-[var(--muted)]">{event.description}</p>
-                        )}
-                        {event.ruleName && (
-                          <div className="mt-1.5">
-                            <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-[var(--primary)] ring-1 ring-inset ring-blue-200">
-                              ⚡ {event.ruleName}
-                            </span>
-                          </div>
-                        )}
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </div>
-
-              {/* Modal Footer */}
-              <div className="border-t border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-5 py-3 text-right">
-                <button type="button" onClick={() => setDecisionModal(null)} className="h-8 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 text-[13px] font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-hover)]">
-                  关闭
-                </button>
-              </div>
-            </div>
-          </div>
+          <FulfillmentDecisionModal
+            fulfillmentOrderNo={decisionModal}
+            fulfillment={mainFul}
+            relatedFuls={relatedFuls}
+            lineItems={detail.lineItems}
+            shippingAddress={orderState.shippingAddress}
+            events={orderState.events}
+            onClose={() => setDecisionModal(null)}
+          />
         );
       })()}
 

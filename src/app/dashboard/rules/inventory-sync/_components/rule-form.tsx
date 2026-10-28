@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, ChevronDown, ChevronLeft, Loader2, Play, Upload, MapPin, Plus, X, Zap, Search } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronLeft, Loader2, Play, Upload, MapPin, Plus, X, Zap, Search, Info, AlertTriangle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { parseSkuImportFile } from './sku-import';
 
@@ -99,6 +99,16 @@ const RETAILER_OPTIONS: { value: string; sub: string }[] = [
   { value: 'SHOPIFY_US',    sub: 'Shopify US' },
 ];
 
+// 各 SKU 在其他 Retailer 规则中已占用的分配比例（模拟数据）
+const MOCK_SKU_ALLOCATIONS: Record<string, number> = {
+  'SKU-A001': 40, 'SKU-A002': 30, 'SKU-A003': 60, 'SKU-A004': 0,
+  'SKU-B001': 50, 'SKU-B002': 20, 'SKU-B003': 70,
+  'SKU-C001': 0,  'SKU-C002': 45, 'SKU-C003': 80,
+  'SKU-D001': 0,  'SKU-D002': 35, 'SKU-D003': 60,  'SKU-D004': 0,  'SKU-D005': 25,
+  'SKU-E001': 0,  'SKU-E002': 50, 'SKU-E003': 40,
+  'SKU-F001': 30, 'SKU-F002': 0,
+};
+
 // 规则名称常用模板
 const RULE_NAME_TEMPLATES: { value: string; sub: string }[] = [
   { value: 'Walmart EDI · 每日同步',      sub: 'Retailer 渠道' },
@@ -116,11 +126,13 @@ const RULE_NAME_TEMPLATES: { value: string; sub: string }[] = [
 ];
 
 type PlatformTargetLocation = { mode: 'preset' | 'custom'; presetId: string; customCode: string };
-type QtyMode   = 'full' | 'deduct' | 'ratio';
+type QtyMode        = 'configured' | 'deduct';
+type SyncValueType  = 'ratio' | 'fixed';
 type SkuMode   = 'all'  | 'include' | 'exclude';
 type SkuBy     = 'sku_list' | 'tag' | 'category';
 type OwnerMode = 'all'  | 'include' | 'exclude';
-type SkuLevelConfig = { skuCode: string; overrideType: 'ratio' | 'fixed' | 'deduct'; value: string };
+type SkuLevelConfig = { skuCode: string; overrideType: '' | 'ratio' | 'fixed' | 'deduct'; value: string; allocationRatio: string };
+
 
 type FormState = {
   // 基本信息
@@ -144,6 +156,8 @@ type FormState = {
   skuCategories: string;
   // 库存计算
   qtyMode: QtyMode;
+  syncValueType: SyncValueType;
+  fixedQty: string;
   deductOpenOrder: boolean;
   deductSafety: boolean;
   safetyQty: string;
@@ -169,6 +183,9 @@ type FormState = {
   // SKU 差异化配置
   skuLevelOverrideEnabled: boolean;
   skuLevelConfigs: SkuLevelConfig[];
+  // 分配约束
+  allocationConstraint: boolean;
+  overflowPolicy: 'cap' | 'skip' | 'force_alert';
   // 异常处理
   retryMax: string;
   retryInterval: string;
@@ -192,7 +209,9 @@ const DEFAULT_FORM: FormState = {
   skuList: '',
   skuTags: '',
   skuCategories: '',
-  qtyMode: 'full',
+  qtyMode: 'configured',
+  syncValueType: 'ratio',
+  fixedQty: '',
   deductOpenOrder: true,
   deductSafety: false,
   safetyQty: '',
@@ -215,6 +234,8 @@ const DEFAULT_FORM: FormState = {
   scheduledDatetimes: [''],
   skuLevelOverrideEnabled: false,
   skuLevelConfigs: [],
+  allocationConstraint: false,
+  overflowPolicy: 'cap',
   retryMax: '3',
   retryInterval: '5',
   onFailure: 'alert_wait',
@@ -796,12 +817,17 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [runningNow, setRunningNow] = useState(false);
+  const [saving, setSaving]           = useState(false);
+  const [saved, setSaved]             = useState(false);
+  const [runningNow, setRunningNow]   = useState(false);
   const [skuImportMsg, setSkuImportMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [skuSearch, setSkuSearch] = useState('');
+  const [skuSearch, setSkuSearch]     = useState('');
   const [skuOverrideSearch, setSkuOverrideSearch] = useState('');
+  const [skuInventoryLoading, setSkuInventoryLoading] = useState(false);
+  const [skuInventoryData, setSkuInventoryData]       = useState<Record<string, number>>({});
+  const [selectedSkuCodes, setSelectedSkuCodes]       = useState<Set<string>>(new Set());
+  const [selectedOverrideCodes, setSelectedOverrideCodes] = useState<Set<string>>(new Set());
+  const [batchCfg, setBatchCfg] = useState<{ overrideType: SkuLevelConfig['overrideType']; value: string; allocRatio: string }>({ overrideType: '', value: '', allocRatio: '' });
 
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
@@ -820,19 +846,60 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
 
   // 库存计算公式（实时）
   const quantityFormula = useMemo(() => {
-    if (form.qtyMode === 'full') return '同步库存 = 实际可用库存';
-    const parts: string[] = ['实际可用库存'];
-    if (form.deductOpenOrder) parts.push('− Open Order');
-    if (form.deductSafety)    parts.push(`− 安全库存${form.safetyQty ? `（${form.safetyQty}）` : ''}`);
-    if (form.reserveQty)      parts.push(`− 保留数量（${form.reserveQty}）`);
-    if (form.inclInTransit)   parts.push('+ 在途库存');
-    const base = parts.join(' ');
-    if (form.qtyMode === 'ratio') return `同步库存 = (${base}) × ${form.ratio || '?'}%`;
-    return `同步库存 = ${base}`;
-  }, [form.qtyMode, form.deductOpenOrder, form.deductSafety, form.safetyQty, form.reserveQty, form.inclInTransit, form.ratio]);
+    if (form.qtyMode === 'configured') {
+      if (form.syncValueType === 'fixed') return `同步库存 = ${form.fixedQty || '?'} 件（固定）`;
+      return `同步库存 = 实际可用库存 × ${form.ratio || '?'}%`;
+    }
+    // 扣减后同步
+    const deductions: string[] = [];
+    if (form.syncValueType === 'fixed') deductions.push(`${form.fixedQty || '?'} 件`);
+    else                                deductions.push(`实际可用库存 × ${form.ratio || '?'}%`);
+    if (form.deductOpenOrder) deductions.push('Open Order');
+    if (form.deductSafety)    deductions.push(`安全库存${form.safetyQty ? `（${form.safetyQty}）` : ''}`);
+    if (form.reserveQty)      deductions.push(`保留（${form.reserveQty}）`);
+    const extra = form.inclInTransit ? ' + 在途库存' : '';
+    return `同步库存 = 实际可用库存 − (${deductions.join(' + ')})${extra}`;
+  }, [form.qtyMode, form.syncValueType, form.ratio, form.fixedQty, form.deductOpenOrder, form.deductSafety, form.safetyQty, form.reserveQty, form.inclInTransit]);
 
   const syncSkuList = (items: string[]) =>
     set('skuList', Array.from(new Set(items.map((s) => s.trim()).filter(Boolean))).join(','));
+
+  // 获取当前库存（模拟 API）
+  const fetchSkuInventory = async () => {
+    setSkuInventoryLoading(true);
+    await new Promise((r) => setTimeout(r, 900));
+    const data: Record<string, number> = {};
+    MOCK_SKUS.forEach((s) => { data[s.code] = s.qty; });
+    setSkuInventoryData(data);
+    setSkuInventoryLoading(false);
+  };
+
+  // 批量应用配置到已选 SKU
+  const applyBatchConfig = () => {
+    if (!selectedSkuCodes.size) return;
+    setForm((cur) => {
+      let configs = [...cur.skuLevelConfigs];
+      selectedSkuCodes.forEach((sku) => {
+        const idx = configs.findIndex((c) => c.skuCode === sku);
+        const base = idx >= 0 ? configs[idx] : { skuCode: sku, overrideType: '' as const, value: '', allocationRatio: '' };
+        const updated = {
+          ...base,
+          ...(batchCfg.overrideType !== '' ? { overrideType: batchCfg.overrideType, value: batchCfg.value } : {}),
+          ...(batchCfg.allocRatio !== ''   ? { allocationRatio: batchCfg.allocRatio }                      : {}),
+        };
+        if (!updated.overrideType && !updated.allocationRatio) {
+          configs = configs.filter((c) => c.skuCode !== sku);
+        } else if (idx >= 0) {
+          configs[idx] = updated;
+        } else {
+          configs.push(updated);
+        }
+      });
+      return { ...cur, skuLevelConfigs: configs };
+    });
+    setSelectedSkuCodes(new Set());
+    setBatchCfg({ overrideType: '', value: '', allocRatio: '' });
+  };
 
   // Section ④ 差异化配置：已配置的过滤列表（保留原始 index 供更新）
   const filteredSkuOverrideConfigs = useMemo(() => {
@@ -841,6 +908,18 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
       .map((cfg, originalIdx) => ({ cfg, originalIdx }))
       .filter(({ cfg }) => !kw || cfg.skuCode.toLowerCase().includes(kw));
   }, [form.skuLevelConfigs, skuOverrideSearch]);
+
+  // 约束模式：全局比例应用到没有差异化配置的所有 SKU，检测与其他规则是否冲突
+  const globalRatioConflicts = useMemo(() => {
+    if (!form.allocationConstraint || !form.ratio.trim()) return [];
+    const r = parseFloat(form.ratio);
+    if (isNaN(r) || r <= 0) return [];
+    return MOCK_SKUS.filter((s) => {
+      const override = form.skuLevelConfigs.find((c) => c.skuCode === s.code);
+      if (override?.allocationRatio?.trim()) return false; // 已有差异化比例，不用全局
+      return r + (MOCK_SKU_ALLOCATIONS[s.code] ?? 0) > 100;
+    }).map((s) => s.code);
+  }, [form.allocationConstraint, form.ratio, form.skuLevelConfigs]);
 
   const handleSkuFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -861,6 +940,14 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
     }
     if (form.frequency !== 'pull' && !form.pushUrl.trim()) {
       document.getElementById('push-url-input')?.focus(); return;
+    }
+    if (form.allocationConstraint) {
+      const overCount = skuItems.filter((sku) => {
+        const cfg = form.skuLevelConfigs.find((c) => c.skuCode === sku);
+        const ratio = parseFloat(cfg?.allocationRatio || '0');
+        return ratio + (MOCK_SKU_ALLOCATIONS[sku] ?? 0) > 100;
+      }).length;
+      if (overCount > 0) return; // 警告横幅已在列表里提示，此处静默拦截
     }
     setSaving(true);
     await new Promise((r) => setTimeout(r, 800));
@@ -963,7 +1050,7 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
         </Section>
 
         {/* ③  同步范围 */}
-        <Section title="同步范围" desc="筛选哪些货主、仓库、SKU 参与本次同步。三个维度可单独配置也可叠加使用。">
+        <Section title="同步范围" desc="配置货主和仓库的数据来源范围。">
           <div className="space-y-6">
 
             {/* 货主 + 仓库 并排 */}
@@ -1005,152 +1092,81 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
                 </div>
               </Field>
             </div>
+          </div>
+        </Section>
 
-            {/* SKU 条件 */}
-            <Field label="SKU 范围">
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  <ChipButton active={form.skuMode === 'all'}     onClick={() => { set('skuMode', 'all'); setSkuImportMsg(null); }}>全部 SKU</ChipButton>
-                  <ChipButton active={form.skuMode === 'include'} onClick={() => set('skuMode', 'include')}>仅同步指定 SKU</ChipButton>
-                  <ChipButton active={form.skuMode === 'exclude'} onClick={() => set('skuMode', 'exclude')}>排除指定 SKU</ChipButton>
+        {/* ④  SKU 与计算规则 */}
+        <Section title="SKU 与计算规则" desc="先设定全局计算方式，再按 SKU 分别配置计算规则和分配比例。">
+          <div className="space-y-5">
+            <Field label="计算方式">
+              {/* 模式选择 */}
+              <div className="flex gap-2">
+                <ChipButton active={form.qtyMode === 'configured'} onClick={() => set('qtyMode', 'configured')}>按照设置同步</ChipButton>
+                <ChipButton active={form.qtyMode === 'deduct'} onClick={() => setForm((cur) => ({ ...cur, qtyMode: 'deduct', allocationConstraint: false }))}>扣减后同步</ChipButton>
+              </div>
+
+              {/* 值类型 + 输入框 */}
+              <div className="mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-4 space-y-3">
+                <div className="flex gap-2">
+                  <ChipButton active={form.syncValueType === 'ratio'} onClick={() => set('syncValueType', 'ratio')}>百分比</ChipButton>
+                  <ChipButton active={form.syncValueType === 'fixed'} onClick={() => setForm((cur) => ({ ...cur, syncValueType: 'fixed', allocationConstraint: false }))}>固定数量</ChipButton>
                 </div>
 
-                {form.skuMode !== 'all' && (
+                {form.syncValueType === 'ratio' && (
                   <div className="space-y-3">
-                    <Select value={form.skuBy} onChange={(v) => { set('skuBy', v as SkuBy); setSkuImportMsg(null); setSkuSearch(''); }} className="max-w-[200px]">
-                      <option value="sku_list">SKU 列表</option>
-                      <option value="tag">标签</option>
-                      <option value="category">品类</option>
-                    </Select>
-
-                    {form.skuBy === 'tag'      && <Input value={form.skuTags}       onChange={(v) => set('skuTags', v)}       placeholder="标签，如 no-sync,promo" />}
-                    {form.skuBy === 'category' && <Input value={form.skuCategories} onChange={(v) => set('skuCategories', v)} placeholder="品类，如 Electronics,Apparel" />}
-
-                    {form.skuBy === 'sku_list' && (
-                      <div className="space-y-3">
-                        {/* SKU 搜索选择 */}
-                        <SkuPickerPanel
-                          alreadySelected={new Set(skuItems)}
-                          onAdd={(codes) => {
-                            syncSkuList([...skuItems, ...codes]);
-                            setSkuImportMsg({ type: 'success', text: `已添加 ${codes.length} 个 SKU` });
-                          }}
+                    <div className="flex items-center gap-2">
+                      <Input type="number" value={form.ratio} onChange={(v) => set('ratio', v)} placeholder="80" className="w-24" />
+                      <span className="text-[12px] text-[var(--muted)]">
+                        {form.qtyMode === 'configured' ? '% 的实际可用库存' : '% 作为缓冲扣减，同步剩余'}
+                      </span>
+                    </div>
+                    {/* 跨规则约束开关：仅在"按照设置同步 + 百分比"时显示 */}
+                    {form.qtyMode === 'configured' && (
+                      <div className="border-t border-[var(--border-subtle)] pt-3 space-y-2">
+                        <ToggleRow
+                          label="启用跨规则分配总量约束"
+                          hint="启用后，SKU 列表切换为分配模式：各 SKU 填写分配比例，实时显示其他规则已占用量与预估余量，总和不能超过 100%。"
+                          checked={form.allocationConstraint}
+                          onChange={(v) => setForm((cur) => ({ ...cur, allocationConstraint: v }))}
                         />
-                        {/* 文件导入 */}
-                        <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3">
-                          <div>
-                            <div className="text-[12px] font-medium text-[var(--foreground)]">从文件导入</div>
-                            <div className="mt-0.5 text-[11px] text-[var(--muted)]">支持 Excel / CSV，导入后仍可手动追加</div>
-                          </div>
-                          <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleSkuFileImport} />
-                          <button type="button" onClick={() => fileInputRef.current?.click()}
-                            className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-[12px] font-medium transition-colors hover:bg-[var(--surface-subtle)]">
-                            <Upload className="size-3.5" />导入文件
-                          </button>
-                        </div>
-                        {skuImportMsg && (
-                          <div className={cn('text-[11px]', skuImportMsg.type === 'success' ? 'text-green-600' : 'text-red-500')}>
-                            {skuImportMsg.text}
+                        {form.allocationConstraint && globalRatioConflicts.length > 0 && (
+                          <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] text-amber-800">
+                            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                            <span>
+                              当前全局比例 <strong>{form.ratio}%</strong> 与其他规则存在冲突：
+                              <strong>{globalRatioConflicts.length}</strong> 个 SKU 的总分配将超过 100%
+                              （{globalRatioConflicts.slice(0, 3).join('、')}{globalRatioConflicts.length > 3 ? ` 等` : ''}）。
+                              请在下方差异化配置中为这些 SKU 单独设置比例。
+                            </span>
                           </div>
                         )}
-                        {/* SKU 预览列表 */}
-                        {skuItems.length > 0 && (
-                          <div className="space-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3">
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="text-[12px] text-[var(--muted)]">
-                                已选 {skuItems.length} 个 SKU{skuSearch ? ` · 匹配 ${filteredSkuItems.length} 个` : ''}
-                                {form.skuLevelConfigs.filter((c) => skuItems.includes(c.skuCode)).length > 0 && (
-                                  <span className="ml-2 text-[var(--primary)]">
-                                    · {form.skuLevelConfigs.filter((c) => skuItems.includes(c.skuCode)).length} 个已配置差异化
+                        {form.allocationConstraint && (
+                          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3 space-y-2">
+                            <div className="text-[12px] font-medium text-[var(--foreground)]">运行时约束超出处理策略</div>
+                            <p className="text-[11px] text-[var(--muted)]">
+                              WMS 新增商品或其他规则变更导致某 SKU 超出 100% 时，按以下方式处理：
+                            </p>
+                            <div className="space-y-1.5">
+                              {([
+                                { val: 'cap',         label: '按可用余量同步',   hint: '自动将比例降至可用余量上限，安全不丢数据（推荐）' },
+                                { val: 'skip',        label: '跳过该 SKU',      hint: '本次同步跳过超出的 SKU，不推送任何数据' },
+                                { val: 'force_alert', label: '强制同步并告警',  hint: '按配置比例强制推送，同时触发告警通知运营' },
+                              ] as const).map(({ val, label, hint }) => (
+                                <label key={val}
+                                  className={cn('flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2 transition-colors',
+                                    form.overflowPolicy === val
+                                      ? 'border-[var(--primary)] bg-[var(--primary-soft)]'
+                                      : 'border-[var(--border)] bg-[var(--surface)] hover:border-[var(--primary)]/40')}>
+                                  <input type="radio" name="overflowPolicy" value={val}
+                                    checked={form.overflowPolicy === val}
+                                    onChange={() => set('overflowPolicy', val)}
+                                    className="mt-0.5 accent-[var(--primary)]" />
+                                  <span>
+                                    <span className="block text-[12px] font-medium text-[var(--foreground)]">{label}</span>
+                                    <span className="block text-[11px] text-[var(--muted)]">{hint}</span>
                                   </span>
-                                )}
-                              </span>
-                              <div className="flex items-center gap-3">
-                                <Input value={skuSearch} onChange={setSkuSearch} placeholder="搜索…" className="h-8 w-40 text-[11px]" />
-                                <button type="button" onClick={() => {
-                                  syncSkuList([]);
-                                  set('skuLevelConfigs', form.skuLevelConfigs.filter((c) => !skuItems.includes(c.skuCode)));
-                                  setSkuSearch(''); setSkuImportMsg(null);
-                                }} className="text-[12px] text-[var(--muted)] hover:text-red-500">清空</button>
-                              </div>
-                            </div>
-                            {/* 列标签 */}
-                            <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-1.5">
-                              <span className="flex-1 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">SKU 编码</span>
-                              <span className="w-32 shrink-0 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">计算规则</span>
-                              <span className="w-20 shrink-0 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">值</span>
-                              <span className="size-5 shrink-0" />
-                            </div>
-                            {/* 内联差异化配置列表 */}
-                            <div className="max-h-56 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)]">
-                              {filteredSkuItems.length > 0 ? (
-                                <div className="divide-y divide-[var(--border-subtle)]">
-                                  {filteredSkuItems.map((sku) => {
-                                    const overrideIdx = form.skuLevelConfigs.findIndex((c) => c.skuCode === sku);
-                                    const override = overrideIdx >= 0 ? form.skuLevelConfigs[overrideIdx] : null;
-                                    const overrideType = override?.overrideType ?? '';
-                                    return (
-                                      <div key={sku} className="flex items-center gap-2 px-3 py-1.5">
-                                        <span className="min-w-0 flex-1 truncate font-mono text-[12px] font-medium text-[var(--foreground)]">{sku}</span>
-                                        <select
-                                          value={overrideType}
-                                          onChange={(e) => {
-                                            const val = e.target.value;
-                                            if (!val) {
-                                              // 恢复整体规则：移除该 SKU 的覆盖配置
-                                              set('skuLevelConfigs', form.skuLevelConfigs.filter((c) => c.skuCode !== sku));
-                                            } else if (override) {
-                                              const next = [...form.skuLevelConfigs];
-                                              next[overrideIdx] = { ...next[overrideIdx], overrideType: val as SkuLevelConfig['overrideType'] };
-                                              set('skuLevelConfigs', next);
-                                            } else {
-                                              set('skuLevelConfigs', [...form.skuLevelConfigs, { skuCode: sku, overrideType: val as SkuLevelConfig['overrideType'], value: '' }]);
-                                            }
-                                          }}
-                                          className="h-7 w-32 shrink-0 rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-1.5 text-[11px] text-[var(--foreground)] outline-none focus:border-[var(--primary)]">
-                                          <option value="">整体规则</option>
-                                          <option value="ratio">同步比例（%）</option>
-                                          <option value="fixed">固定数量（件）</option>
-                                          <option value="deduct">扣减数量（件）</option>
-                                        </select>
-                                        <div className="relative w-20 shrink-0">
-                                          <input
-                                            type="number"
-                                            value={override?.value ?? ''}
-                                            disabled={!overrideType}
-                                            onChange={(e) => {
-                                              if (overrideIdx >= 0) {
-                                                const next = [...form.skuLevelConfigs];
-                                                next[overrideIdx] = { ...next[overrideIdx], value: e.target.value };
-                                                set('skuLevelConfigs', next);
-                                              }
-                                            }}
-                                            placeholder={overrideType === 'ratio' ? '80' : overrideType ? '50' : '—'}
-                                            className={cn(
-                                              'h-7 w-full rounded-lg border px-2 pr-5 text-[11px] outline-none',
-                                              overrideType
-                                                ? 'border-[var(--border)] bg-[var(--surface-subtle)] focus:border-[var(--primary)]'
-                                                : 'border-transparent bg-transparent text-[var(--muted)] cursor-default'
-                                            )}
-                                          />
-                                          {overrideType === 'ratio' && (
-                                            <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-[var(--muted)]">%</span>
-                                          )}
-                                        </div>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            syncSkuList(skuItems.filter((s) => s !== sku));
-                                            set('skuLevelConfigs', form.skuLevelConfigs.filter((c) => c.skuCode !== sku));
-                                          }}
-                                          className="size-5 shrink-0 text-center text-[13px] leading-none text-[var(--muted)] hover:text-red-500">×</button>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              ) : (
-                                <div className="px-3 py-4 text-center text-[11px] text-[var(--muted)]">没有匹配的 SKU</div>
-                              )}
+                                </label>
+                              ))}
                             </div>
                           </div>
                         )}
@@ -1158,28 +1174,18 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
                     )}
                   </div>
                 )}
-              </div>
-            </Field>
-          </div>
-        </Section>
-
-        {/* ④  库存计算 */}
-        <Section title="库存计算" desc="决定最终同步出去的数字是怎么算的。">
-          <div className="space-y-5">
-            <Field label="计算方式">
-              <div className="flex flex-wrap gap-2">
-                <ChipButton active={form.qtyMode === 'full'}   onClick={() => set('qtyMode', 'full')}>直接同步</ChipButton>
-                <ChipButton active={form.qtyMode === 'deduct'} onClick={() => set('qtyMode', 'deduct')}>扣减后同步</ChipButton>
-                <ChipButton active={form.qtyMode === 'ratio'}  onClick={() => set('qtyMode', 'ratio')}>比例同步</ChipButton>
-              </div>
-              <div className="mt-2 text-[11px] text-[var(--muted)]">
-                {form.qtyMode === 'full'   && '实际可用库存是多少就同步多少。'}
-                {form.qtyMode === 'deduct' && '从实际库存中扣除指定项后，同步剩余数量。'}
-                {form.qtyMode === 'ratio'  && '从实际库存中扣除指定项后，再按设定比例同步。'}
+                {form.syncValueType === 'fixed' && (
+                  <div className="flex items-center gap-2">
+                    <Input type="number" value={form.fixedQty} onChange={(v) => set('fixedQty', v)} placeholder="500" className="w-24" />
+                    <span className="text-[12px] text-[var(--muted)]">
+                      {form.qtyMode === 'configured' ? '件（始终同步该数量，不随库存变动）' : '件 作为缓冲扣减，同步剩余'}
+                    </span>
+                  </div>
+                )}
               </div>
             </Field>
 
-            {form.qtyMode !== 'full' && (
+            {!form.allocationConstraint && form.qtyMode === 'deduct' && (
               <>
                 <div className="space-y-2">
                   <div className="text-[12px] font-medium text-[var(--foreground)]">扣减项</div>
@@ -1202,11 +1208,6 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
                   <Field label="额外保留量" hint="扣减完成后再额外扣除，留空不保留。">
                     <Input type="number" value={form.reserveQty} onChange={(v) => set('reserveQty', v)} placeholder="如：10" />
                   </Field>
-                  {form.qtyMode === 'ratio' && (
-                    <Field label="同步比例（%）">
-                      <Input type="number" value={form.ratio} onChange={(v) => set('ratio', v)} placeholder="如：80" />
-                    </Field>
-                  )}
                 </div>
               </>
             )}
@@ -1215,6 +1216,302 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
             <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3">
               <div className="mb-1 text-[11px] font-medium text-[var(--muted)]">计算公式</div>
               <div className="font-mono text-[13px] text-[var(--foreground)]">{quantityFormula}</div>
+            </div>
+
+            {/* ── SKU 范围 ── */}
+            <div className="border-t border-[var(--border-subtle)] pt-5">
+              <Field label="SKU 范围">
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    <ChipButton active={form.skuMode === 'all'}     onClick={() => { set('skuMode', 'all'); setSkuImportMsg(null); }}>全部 SKU</ChipButton>
+                    <ChipButton active={form.skuMode === 'include'} onClick={() => set('skuMode', 'include')}>仅同步指定 SKU</ChipButton>
+                    <ChipButton active={form.skuMode === 'exclude'} onClick={() => set('skuMode', 'exclude')}>排除指定 SKU</ChipButton>
+                  </div>
+
+                  {form.skuMode === 'all' && (
+                    <div className="flex items-start gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2.5 text-[11px] text-[var(--muted)]">
+                      <Info className="mt-0.5 size-3.5 shrink-0 text-[var(--primary)]" />
+                      <span>
+                        规则动态匹配 WMS 中的<strong className="text-[var(--foreground)]">全部 SKU</strong>，每次同步时实时拉取；
+                        WMS 新增商品会在下次同步自动纳入并遵循整体计算规则，无需手动更新规则。
+                        差异化配置中的 SKU 仍使用各自的独立规则。
+                      </span>
+                    </div>
+                  )}
+
+                  {form.skuMode !== 'all' && (
+                    <div className="space-y-3">
+                      <Select value={form.skuBy} onChange={(v) => { set('skuBy', v as SkuBy); setSkuImportMsg(null); setSkuSearch(''); }} className="max-w-[200px]">
+                        <option value="sku_list">SKU 列表</option>
+                        <option value="tag">标签</option>
+                        <option value="category">品类</option>
+                      </Select>
+
+                      {form.skuBy === 'tag'      && <Input value={form.skuTags}       onChange={(v) => set('skuTags', v)}       placeholder="标签，如 no-sync,promo" />}
+                      {form.skuBy === 'category' && <Input value={form.skuCategories} onChange={(v) => set('skuCategories', v)} placeholder="品类，如 Electronics,Apparel" />}
+
+                      {form.skuBy === 'sku_list' && (
+                        <div className="space-y-3">
+                          <SkuPickerPanel
+                            alreadySelected={new Set(skuItems)}
+                            onAdd={(codes) => {
+                              syncSkuList([...skuItems, ...codes]);
+                              setSkuImportMsg({ type: 'success', text: `已添加 ${codes.length} 个 SKU` });
+                            }}
+                          />
+                          <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3">
+                            <div>
+                              <div className="text-[12px] font-medium text-[var(--foreground)]">从文件导入</div>
+                              <div className="mt-0.5 text-[11px] text-[var(--muted)]">支持 Excel / CSV，导入后仍可手动追加</div>
+                            </div>
+                            <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleSkuFileImport} />
+                            <button type="button" onClick={() => fileInputRef.current?.click()}
+                              className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-[12px] font-medium transition-colors hover:bg-[var(--surface-subtle)]">
+                              <Upload className="size-3.5" />导入文件
+                            </button>
+                          </div>
+                          {skuImportMsg && (
+                            <div className={cn('text-[11px]', skuImportMsg.type === 'success' ? 'text-green-600' : 'text-red-500')}>
+                              {skuImportMsg.text}
+                            </div>
+                          )}
+                          {skuItems.length > 0 && (
+                            <div className="space-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3">
+
+                              {/* 批量操作工具栏 */}
+                              {selectedSkuCodes.size > 0 && (
+                                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--primary)] bg-[var(--primary-soft)] px-3 py-2">
+                                  <span className="shrink-0 text-[12px] font-medium text-[var(--primary)]">已选 {selectedSkuCodes.size} 个</span>
+                                  {form.allocationConstraint ? (
+                                    /* 约束模式：只批量设置分配比例 */
+                                    <div className="relative">
+                                      <input type="number" min="0" max="100" value={batchCfg.allocRatio}
+                                        onChange={(e) => setBatchCfg((c) => ({ ...c, allocRatio: e.target.value }))}
+                                        placeholder="批量分配比例"
+                                        className="h-7 w-28 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 pr-5 text-[11px] outline-none focus:border-[var(--primary)]" />
+                                      <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-[var(--muted)]">%</span>
+                                    </div>
+                                  ) : (
+                                    /* 计算覆盖模式：批量设置计算规则 + 值 */
+                                    <>
+                                      <select value={batchCfg.overrideType}
+                                        onChange={(e) => setBatchCfg((c) => ({ ...c, overrideType: e.target.value as SkuLevelConfig['overrideType'], value: '' }))}
+                                        className="h-7 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 text-[11px] outline-none focus:border-[var(--primary)]">
+                                        <option value="">计算规则（不修改）</option>
+                                        <option value="ratio">同步比例（%）</option>
+                                        <option value="fixed">固定数量（件）</option>
+                                        <option value="deduct">扣减数量（件）</option>
+                                      </select>
+                                      {batchCfg.overrideType && (
+                                        <div className="relative">
+                                          <input type="number" value={batchCfg.value}
+                                            onChange={(e) => setBatchCfg((c) => ({ ...c, value: e.target.value }))}
+                                            placeholder="请输入"
+                                            className="h-7 w-20 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 pr-5 text-[11px] outline-none focus:border-[var(--primary)]" />
+                                          {batchCfg.overrideType === 'ratio' && <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-[var(--muted)]">%</span>}
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+                                  <button type="button" onClick={applyBatchConfig}
+                                    disabled={batchCfg.overrideType === '' && batchCfg.allocRatio === ''}
+                                    className="h-7 rounded-lg bg-[var(--primary)] px-3 text-[11px] font-medium text-white transition hover:opacity-90 disabled:opacity-40">
+                                    应用到已选
+                                  </button>
+                                  <button type="button" onClick={() => setSelectedSkuCodes(new Set())}
+                                    className="ml-auto text-[var(--muted)] hover:text-[var(--foreground)]">
+                                    <X className="size-3.5" />
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* 标题行 */}
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="text-[12px] text-[var(--muted)]">
+                                  已选 {skuItems.length} 个 SKU{skuSearch ? ` · 匹配 ${filteredSkuItems.length} 个` : ''}
+                                  {form.skuLevelConfigs.filter((c) => skuItems.includes(c.skuCode)).length > 0 && (
+                                    <span className="ml-2 text-[var(--primary)]">
+                                      · {form.skuLevelConfigs.filter((c) => skuItems.includes(c.skuCode)).length} 个已配置
+                                    </span>
+                                  )}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <button type="button" onClick={fetchSkuInventory} disabled={skuInventoryLoading}
+                                    className="flex h-7 items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[11px] font-medium transition hover:bg-[var(--surface-subtle)] disabled:opacity-50">
+                                    <RefreshCw className={cn('size-3', skuInventoryLoading && 'animate-spin')} />
+                                    {skuInventoryLoading ? '获取中…' : '获取当前库存'}
+                                  </button>
+                                  <Input value={skuSearch} onChange={setSkuSearch} placeholder="搜索…" className="h-8 w-36 text-[11px]" />
+                                  <button type="button" onClick={() => {
+                                    syncSkuList([]);
+                                    set('skuLevelConfigs', form.skuLevelConfigs.filter((c) => !skuItems.includes(c.skuCode)));
+                                    setSkuSearch(''); setSkuImportMsg(null); setSelectedSkuCodes(new Set());
+                                  }} className="text-[12px] text-[var(--muted)] hover:text-red-500">清空</button>
+                                </div>
+                              </div>
+
+                              {/* 列标签 */}
+                              <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-1.5">
+                                <input type="checkbox"
+                                  checked={filteredSkuItems.length > 0 && filteredSkuItems.every((s) => selectedSkuCodes.has(s))}
+                                  onChange={(e) => {
+                                    if (e.target.checked) setSelectedSkuCodes(new Set([...selectedSkuCodes, ...filteredSkuItems]));
+                                    else setSelectedSkuCodes(new Set([...selectedSkuCodes].filter((s) => !filteredSkuItems.includes(s))));
+                                  }}
+                                  className="size-3.5 shrink-0 accent-[var(--primary)]" />
+                                <span className="flex-1 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">SKU 编码</span>
+                                {form.allocationConstraint ? (
+                                  <>
+                                    <span className="w-20 shrink-0 text-right text-[10px] font-medium uppercase tracking-wide text-[var(--muted)] pr-4">预估余量</span>
+                                    <span className="w-20 shrink-0 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">分配比例</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="w-32 shrink-0 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">计算规则</span>
+                                    <span className="w-16 shrink-0 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">值</span>
+                                  </>
+                                )}
+                                <span className="size-5 shrink-0" />
+                              </div>
+
+                              {/* 数据行 */}
+                              <div className="max-h-56 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)]">                                {filteredSkuItems.length > 0 ? (
+                                  <div className="divide-y divide-[var(--border-subtle)]">
+                                    {filteredSkuItems.map((sku) => {
+                                      const overrideIdx  = form.skuLevelConfigs.findIndex((c) => c.skuCode === sku);
+                                      const override     = overrideIdx >= 0 ? form.skuLevelConfigs[overrideIdx] : null;
+                                      const overrideType = override?.overrideType ?? '';
+                                      const allocRatio   = override?.allocationRatio ?? '';
+                                      const allocUsed    = MOCK_SKU_ALLOCATIONS[sku] ?? 0;
+                                      const allocVal     = parseFloat(allocRatio) || 0;
+                                      const availableCap = 100 - allocUsed;
+                                      // 实际生效比例：有差异化填值就用填值，否则用全局比例
+                                      const effectiveVal = allocRatio ? allocVal : (parseFloat(form.ratio) || 0);
+                                      const allocOver    = form.allocationConstraint && effectiveVal > availableCap;
+                                      const isSelected   = selectedSkuCodes.has(sku);
+                                      const invQty       = skuInventoryData[sku];
+                                      const remainQty    = invQty !== undefined ? Math.round(invQty * Math.max(availableCap, 0) / 100) : null;
+                                      const globalValueLabel = (() => {
+                                        const val = form.syncValueType === 'ratio' ? `${form.ratio || '?'}%` : `${form.fixedQty || '?'} 件`;
+                                        return form.qtyMode === 'deduct' ? `扣减 ${val}` : val;
+                                      })();
+
+                                      const patchCfg = (patch: Partial<SkuLevelConfig>) => {
+                                        const base = override ?? { skuCode: sku, overrideType: '' as const, value: '', allocationRatio: '' };
+                                        const updated = { ...base, ...patch };
+                                        if (!updated.overrideType && !updated.allocationRatio) {
+                                          set('skuLevelConfigs', form.skuLevelConfigs.filter((c) => c.skuCode !== sku));
+                                        } else if (overrideIdx >= 0) {
+                                          const next = [...form.skuLevelConfigs]; next[overrideIdx] = updated; set('skuLevelConfigs', next);
+                                        } else {
+                                          set('skuLevelConfigs', [...form.skuLevelConfigs, updated]);
+                                        }
+                                      };
+
+                                      return (
+                                        <div key={sku} className={cn(
+                                          'flex items-center gap-2 px-3 py-1.5 transition-colors cursor-pointer',
+                                          allocOver  ? 'bg-red-100 ring-1 ring-inset ring-red-200' :
+                                          isSelected ? 'bg-[var(--primary-soft)]' : 'hover:bg-[var(--surface-subtle)]'
+                                        )}
+                                          onClick={(e) => { if (['SELECT','INPUT','BUTTON'].includes((e.target as HTMLElement).tagName)) return; setSelectedSkuCodes((prev) => { const next = new Set(prev); next.has(sku) ? next.delete(sku) : next.add(sku); return next; }); }}>
+                                          <input type="checkbox" checked={isSelected}
+                                            onChange={() => setSelectedSkuCodes((prev) => {
+                                              const next = new Set(prev); next.has(sku) ? next.delete(sku) : next.add(sku); return next;
+                                            })}
+                                            className="size-3.5 shrink-0 accent-[var(--primary)]" />
+                                          <span className="min-w-0 flex-1 truncate font-mono text-[12px] font-medium text-[var(--foreground)]">{sku}</span>
+
+                                          {/* 预估余量（在计算规则之前） */}
+                                          {form.allocationConstraint && (
+                                            <span title={`其他已分配 ${allocUsed}%，可用余量 ${availableCap}%`}
+                                              className={cn('w-20 shrink-0 text-right text-[11px] font-medium tabular-nums pr-4',
+                                                allocOver          ? 'text-red-600 font-semibold' :
+                                                availableCap <= 0  ? 'text-red-600' :
+                                                availableCap <= 10 ? 'text-amber-600' : 'text-green-600')}>
+                                              {availableCap}%
+                                            </span>
+                                          )}
+
+                                          {form.allocationConstraint ? (
+                                            /* 分配模式：只显示分配比例 */
+                                            <div className="relative w-20 shrink-0">
+                                              <input type="number" min="0" max="100" value={allocRatio}
+                                                onChange={(e) => patchCfg({ allocationRatio: e.target.value })}
+                                                placeholder="—"
+                                                className={cn('h-7 w-full rounded-lg border px-2 pr-5 text-[11px] tabular-nums outline-none transition-colors',
+                                                  allocOver ? 'border-red-400 bg-red-50 text-red-700 focus:border-red-500'
+                                                            : 'border-[var(--border)] bg-[var(--surface-subtle)] focus:border-[var(--primary)]')} />
+                                              <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-[var(--muted)]">%</span>
+                                            </div>
+                                          ) : (
+                                            /* 计算覆盖模式：显示计算规则 + 值 */
+                                            <>
+                                              <select value={overrideType}
+                                                onChange={(e) => patchCfg({ overrideType: e.target.value as SkuLevelConfig['overrideType'], value: '' })}
+                                                className="h-7 w-32 shrink-0 rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-1.5 text-[11px] outline-none focus:border-[var(--primary)]">
+                                                <option value="">整体规则</option>
+                                                <option value="ratio">同步比例（%）</option>
+                                                <option value="fixed">固定数量（件）</option>
+                                                <option value="deduct">扣减数量（件）</option>
+                                              </select>
+                                              {overrideType ? (
+                                                <div className="relative w-16 shrink-0">
+                                                  <input type="number" value={override?.value ?? ''}
+                                                    onChange={(e) => patchCfg({ value: e.target.value })}
+                                                    placeholder="请输入"
+                                                    className="h-7 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2 pr-5 text-[11px] outline-none focus:border-[var(--primary)]" />
+                                                  {overrideType === 'ratio' && <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-[var(--muted)]">%</span>}
+                                                </div>
+                                              ) : (
+                                                <div className="flex h-7 w-16 shrink-0 items-center rounded-lg border border-[var(--border-subtle)] px-2 text-[11px] text-[var(--muted)]">
+                                                  {globalValueLabel}
+                                                </div>
+                                              )}
+                                            </>
+                                          )}
+                                          <button type="button"
+                                            onClick={() => {
+                                              syncSkuList(skuItems.filter((s) => s !== sku));
+                                              set('skuLevelConfigs', form.skuLevelConfigs.filter((c) => c.skuCode !== sku));
+                                              setSelectedSkuCodes((prev) => { const next = new Set(prev); next.delete(sku); return next; });
+                                            }}
+                                            className="size-5 shrink-0 text-center text-[13px] leading-none text-[var(--muted)] hover:text-red-500">×</button>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <div className="px-3 py-4 text-center text-[11px] text-[var(--muted)]">没有匹配的 SKU</div>
+                                )}
+                              </div>
+
+                              {/* 超出警告 */}
+                              {form.allocationConstraint && (() => {
+                                const overList = filteredSkuItems.filter((sku) => {
+                                  const cfg = form.skuLevelConfigs.find((c) => c.skuCode === sku);
+                                  const ratio = parseFloat(cfg?.allocationRatio || '0');
+                                  return ratio + (MOCK_SKU_ALLOCATIONS[sku] ?? 0) > 100;
+                                });
+                                if (!overList.length) return null;
+                                return (
+                                  <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-[11px] text-red-700">
+                                    <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                                    <span>
+                                      <strong>{overList.length} 个 SKU 分配超出上限</strong>（{overList.slice(0, 3).join('、')}{overList.length > 3 ? ` 等` : ''}），
+                                      总分配比例不能超过 100%。请调整分配比例后再保存。
+                                    </span>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </Field>
             </div>
 
             {/* SKU 差异化配置：仅在非"仅同步指定 SKU + SKU 列表"模式下显示，避免用户在两处维护同一个 SKU 列表 */}
@@ -1231,7 +1528,26 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
                   type="button"
                   role="switch"
                   aria-checked={form.skuLevelOverrideEnabled}
-                  onClick={() => set('skuLevelOverrideEnabled', !form.skuLevelOverrideEnabled)}
+                  onClick={() => {
+                    const enabling = !form.skuLevelOverrideEnabled;
+                    if (enabling) {
+                      // 自动加载当前 SKU 范围内所有 SKU，已有配置保留
+                      const source = form.skuMode === 'include' && form.skuBy === 'sku_list'
+                        ? skuItems
+                        : MOCK_SKUS.map((s) => s.code);
+                      const existing = new Set(form.skuLevelConfigs.map((c) => c.skuCode));
+                      const toAdd = source
+                        .filter((code) => !existing.has(code))
+                        .map((skuCode) => ({ skuCode, overrideType: '' as const, value: '', allocationRatio: '' }));
+                      setForm((cur) => ({
+                        ...cur,
+                        skuLevelOverrideEnabled: true,
+                        skuLevelConfigs: [...cur.skuLevelConfigs, ...toAdd],
+                      }));
+                    } else {
+                      set('skuLevelOverrideEnabled', false);
+                    }
+                  }}
                   className={cn(
                     'relative mt-0.5 inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]',
                     form.skuLevelOverrideEnabled ? 'bg-[var(--primary)]' : 'bg-[var(--border)]'
@@ -1251,7 +1567,7 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
                     alreadySelected={new Set(form.skuLevelConfigs.map((c) => c.skuCode))}
                     onAdd={(codes) => set('skuLevelConfigs', [
                       ...form.skuLevelConfigs,
-                      ...codes.map((skuCode) => ({ skuCode, overrideType: 'ratio' as const, value: '' })),
+                      ...codes.map((skuCode) => ({ skuCode, overrideType: '' as const, value: '', allocationRatio: '' })),
                     ])}
                     footerHint="未在下方列表中的 SKU 均遵循上方整体计算规则。"
                   />
@@ -1259,6 +1575,68 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
                   {/* 已添加列表 */}
                   {form.skuLevelConfigs.length > 0 && (
                     <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]">
+
+                      {/* 批量操作栏 */}
+                      {selectedOverrideCodes.size > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 border-b border-[var(--primary)] bg-[var(--primary-soft)] px-3 py-2">
+                          <span className="shrink-0 text-[12px] font-medium text-[var(--primary)]">已选 {selectedOverrideCodes.size} 个</span>
+                          {form.allocationConstraint ? (
+                            <div className="relative">
+                              <input type="number" min="0" max="100" value={batchCfg.allocRatio}
+                                onChange={(e) => setBatchCfg((c) => ({ ...c, allocRatio: e.target.value }))}
+                                placeholder="批量分配比例"
+                                className="h-7 w-28 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 pr-5 text-[11px] outline-none focus:border-[var(--primary)]" />
+                              <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-[var(--muted)]">%</span>
+                            </div>
+                          ) : (
+                            <>
+                              <select value={batchCfg.overrideType}
+                                onChange={(e) => setBatchCfg((c) => ({ ...c, overrideType: e.target.value as SkuLevelConfig['overrideType'], value: '' }))}
+                                className="h-7 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 text-[11px] outline-none focus:border-[var(--primary)]">
+                                <option value="">计算规则（不修改）</option>
+                                <option value="ratio">同步比例（%）</option>
+                                <option value="fixed">固定数量（件）</option>
+                                <option value="deduct">扣减数量（件）</option>
+                              </select>
+                              {batchCfg.overrideType && (
+                                <div className="relative">
+                                  <input type="number" value={batchCfg.value}
+                                    onChange={(e) => setBatchCfg((c) => ({ ...c, value: e.target.value }))}
+                                    placeholder="请输入"
+                                    className="h-7 w-20 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 pr-5 text-[11px] outline-none focus:border-[var(--primary)]" />
+                                  {batchCfg.overrideType === 'ratio' && <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-[var(--muted)]">%</span>}
+                                </div>
+                              )}
+                            </>
+                          )}
+                          <button type="button"
+                            onClick={() => {
+                              setForm((cur) => {
+                                let configs = [...cur.skuLevelConfigs];
+                                selectedOverrideCodes.forEach((skuCode) => {
+                                  const idx = configs.findIndex((c) => c.skuCode === skuCode);
+                                  if (idx < 0) return;
+                                  configs[idx] = {
+                                    ...configs[idx],
+                                    ...(batchCfg.overrideType !== '' ? { overrideType: batchCfg.overrideType, value: batchCfg.value } : {}),
+                                    ...(batchCfg.allocRatio !== ''   ? { allocationRatio: batchCfg.allocRatio } : {}),
+                                  };
+                                });
+                                return { ...cur, skuLevelConfigs: configs };
+                              });
+                              setSelectedOverrideCodes(new Set());
+                              setBatchCfg({ overrideType: '', value: '', allocRatio: '' });
+                            }}
+                            disabled={batchCfg.overrideType === '' && batchCfg.allocRatio === ''}
+                            className="h-7 rounded-lg bg-[var(--primary)] px-3 text-[11px] font-medium text-white transition hover:opacity-90 disabled:opacity-40">
+                            应用到已选
+                          </button>
+                          <button type="button" onClick={() => setSelectedOverrideCodes(new Set())}
+                            className="ml-auto text-[var(--muted)] hover:text-[var(--foreground)]">
+                            <X className="size-3.5" />
+                          </button>
+                        </div>
+                      )}
 
                       {/* 工具栏 */}
                       <div className="flex items-center gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2">
@@ -1280,60 +1658,161 @@ export default function InventorySyncRuleForm({ editId }: { editId: string | nul
                         </div>
                         <button
                           type="button"
-                          onClick={() => { set('skuLevelConfigs', []); setSkuOverrideSearch(''); }}
+                          onClick={() => { set('skuLevelConfigs', []); setSkuOverrideSearch(''); setSelectedOverrideCodes(new Set()); }}
                           className="text-[11px] text-[var(--muted)] hover:text-red-500">清空</button>
                       </div>
 
+                      {/* 空态批量提示（未选中任何行时显示） */}
+                      {selectedOverrideCodes.size === 0 && (
+                        <div className="flex items-center gap-1.5 border-b border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-1.5 text-[11px] text-[var(--muted)]">
+                          <span>勾选行后可批量设置</span>
+                          {filteredSkuOverrideConfigs.length > 0 && (
+                            <button type="button"
+                              onClick={() => setSelectedOverrideCodes(new Set(filteredSkuOverrideConfigs.map((c) => c.cfg.skuCode)))}
+                              className="ml-1 text-[var(--primary)] hover:underline">
+                              全选当前 {filteredSkuOverrideConfigs.length} 条
+                            </button>
+                          )}
+                        </div>
+                      )}
+
                       {/* 列标签 */}
-                      <div className="grid grid-cols-[minmax(0,2fr)_160px_120px_32px] gap-2 border-b border-[var(--border-subtle)] bg-[var(--surface)] px-3 py-1.5">
-                        <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">SKU 编码</span>
-                        <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">计算方式</span>
-                        <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">值</span>
-                        <span />
-                      </div>
+                      {form.allocationConstraint ? (
+                        <div className="grid grid-cols-[20px_minmax(0,1fr)_100px_100px_32px] gap-2 border-b border-[var(--border-subtle)] bg-[var(--surface)] px-3 py-1.5">
+                          <input type="checkbox"
+                            checked={filteredSkuOverrideConfigs.length > 0 && filteredSkuOverrideConfigs.every((c) => selectedOverrideCodes.has(c.cfg.skuCode))}
+                            onChange={(e) => {
+                              const codes = filteredSkuOverrideConfigs.map((c) => c.cfg.skuCode);
+                              if (e.target.checked) setSelectedOverrideCodes(new Set([...selectedOverrideCodes, ...codes]));
+                              else setSelectedOverrideCodes(new Set([...selectedOverrideCodes].filter((s) => !codes.includes(s))));
+                            }}
+                            className="size-3.5 accent-[var(--primary)]" />
+                          <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">SKU 编码</span>
+                          <span className="text-[10px] font-medium uppercase tracking-wide text-right text-[var(--muted)] pr-4">预估余量</span>
+                          <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">分配比例</span>
+                          <span />
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-[20px_minmax(0,2fr)_160px_100px_32px] gap-2 border-b border-[var(--border-subtle)] bg-[var(--surface)] px-3 py-1.5">
+                          <input type="checkbox"
+                            checked={filteredSkuOverrideConfigs.length > 0 && filteredSkuOverrideConfigs.every((c) => selectedOverrideCodes.has(c.cfg.skuCode))}
+                            onChange={(e) => {
+                              const codes = filteredSkuOverrideConfigs.map((c) => c.cfg.skuCode);
+                              if (e.target.checked) setSelectedOverrideCodes(new Set([...selectedOverrideCodes, ...codes]));
+                              else setSelectedOverrideCodes(new Set([...selectedOverrideCodes].filter((s) => !codes.includes(s))));
+                            }}
+                            className="size-3.5 accent-[var(--primary)]" />
+                          <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">SKU 编码</span>
+                          <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">计算方式</span>
+                          <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">值</span>
+                          <span />
+                        </div>
+                      )}
 
                       {/* 配置行 */}
                       <div className="max-h-64 divide-y divide-[var(--border-subtle)] overflow-y-auto bg-[var(--surface)]">
                         {filteredSkuOverrideConfigs.length > 0 ? (
-                          filteredSkuOverrideConfigs.map(({ cfg, originalIdx }) => (
-                            <div key={originalIdx} className="grid grid-cols-[minmax(0,2fr)_160px_120px_32px] items-center gap-2 px-3 py-1.5">
-                              <span className="min-w-0 truncate font-mono text-[12px] font-medium text-[var(--foreground)]">{cfg.skuCode}</span>
-                              <select
-                                value={cfg.overrideType}
-                                onChange={(e) => {
-                                  const next = [...form.skuLevelConfigs];
-                                  next[originalIdx] = { ...next[originalIdx], overrideType: e.target.value as SkuLevelConfig['overrideType'] };
-                                  set('skuLevelConfigs', next);
-                                }}
-                                className="h-8 rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2 text-[11px] outline-none focus:border-[var(--primary)]">
-                                <option value="ratio">同步比例（%）</option>
-                                <option value="fixed">固定数量（件）</option>
-                                <option value="deduct">扣减数量（件）</option>
-                              </select>
-                              <div className="relative">
-                                <input
-                                  type="number"
-                                  value={cfg.value}
+                          filteredSkuOverrideConfigs.map(({ cfg, originalIdx }) => {
+                            const allocUsed    = MOCK_SKU_ALLOCATIONS[cfg.skuCode] ?? 0;
+                            const allocVal     = parseFloat(cfg.allocationRatio) || 0;
+                            const availableCap = 100 - allocUsed;
+                            // 实际生效比例：有差异化填值就用填值，否则用全局比例
+                            const effectiveVal = cfg.allocationRatio ? allocVal : (parseFloat(form.ratio) || 0);
+                            const allocOver    = form.allocationConstraint && effectiveVal > availableCap;
+                            const globalLabel  = `${form.ratio || '?'}%`;
+
+                            return form.allocationConstraint ? (
+                              /* ── 约束模式：checkbox | SKU | 预估余量 | 分配比例 | × ── */
+                              <div key={originalIdx}
+                                onClick={(e) => { if (['INPUT','BUTTON'].includes((e.target as HTMLElement).tagName)) return; setSelectedOverrideCodes((prev) => { const next = new Set(prev); next.has(cfg.skuCode) ? next.delete(cfg.skuCode) : next.add(cfg.skuCode); return next; }); }}
+                                className={cn('grid grid-cols-[20px_minmax(0,1fr)_100px_100px_32px] items-center gap-2 px-3 py-1.5 cursor-pointer',
+                                allocOver ? 'bg-red-100 ring-1 ring-inset ring-red-200' :
+                                selectedOverrideCodes.has(cfg.skuCode) ? 'bg-[var(--primary-soft)]' : 'hover:bg-[var(--surface-subtle)]')}>
+                                <input type="checkbox" checked={selectedOverrideCodes.has(cfg.skuCode)}
+                                  onChange={() => setSelectedOverrideCodes((prev) => { const next = new Set(prev); next.has(cfg.skuCode) ? next.delete(cfg.skuCode) : next.add(cfg.skuCode); return next; })}
+                                  className="size-3.5 accent-[var(--primary)]" />
+                                <div className="min-w-0">
+                                  <div className="truncate font-mono text-[12px] font-medium text-[var(--foreground)]">{cfg.skuCode}</div>
+                                  <div className="text-[10px] text-[var(--muted)]">整体规则：{globalLabel} · 其他已分配 {allocUsed}%</div>
+                                </div>
+                                {/* 预估余量 = 100 - 其他规则已占用，始终显示，超出标红 */}
+                                <span className={cn('text-right text-[11px] font-medium tabular-nums pr-4',
+                                  allocOver          ? 'text-red-600 font-semibold' :
+                                  availableCap <= 0  ? 'text-red-600' :
+                                  availableCap <= 10 ? 'text-amber-600' : 'text-green-600')}>
+                                  {availableCap}%
+                                </span>
+                                {/* 分配比例 */}
+                                <div className="relative">
+                                  <input type="number" min="0" max="100" value={cfg.allocationRatio}
+                                    onChange={(e) => {
+                                      const next = [...form.skuLevelConfigs];
+                                      next[originalIdx] = { ...next[originalIdx], allocationRatio: e.target.value };
+                                      set('skuLevelConfigs', next);
+                                    }}
+                                    placeholder={globalLabel}
+                                    className={cn('h-8 w-full rounded-lg border px-2 pr-6 text-[11px] tabular-nums outline-none transition-colors',
+                                      allocOver ? 'border-red-400 bg-red-50 text-red-700 focus:border-red-500'
+                                               : 'border-[var(--border)] bg-[var(--surface-subtle)] focus:border-[var(--primary)]')} />
+                                  <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-[var(--muted)]">%</span>
+                                </div>
+                                <button type="button"
+                                  onClick={() => { set('skuLevelConfigs', form.skuLevelConfigs.filter((_, idx) => idx !== originalIdx)); setSelectedOverrideCodes((prev) => { const next = new Set(prev); next.delete(cfg.skuCode); return next; }); }}
+                                  className="flex size-8 items-center justify-center rounded-lg text-[var(--muted)] hover:text-red-500">
+                                  <X className="size-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              /* ── 计算覆盖模式：checkbox | SKU | 计算方式 | 值 | × ── */
+                              <div key={originalIdx}
+                                onClick={(e) => { if (['SELECT','INPUT','BUTTON'].includes((e.target as HTMLElement).tagName)) return; setSelectedOverrideCodes((prev) => { const next = new Set(prev); next.has(cfg.skuCode) ? next.delete(cfg.skuCode) : next.add(cfg.skuCode); return next; }); }}
+                                className={cn('grid grid-cols-[20px_minmax(0,2fr)_160px_100px_32px] items-center gap-2 px-3 py-1.5 cursor-pointer',
+                                  selectedOverrideCodes.has(cfg.skuCode) ? 'bg-[var(--primary-soft)]' : 'hover:bg-[var(--surface-subtle)]')}>
+                                <input type="checkbox" checked={selectedOverrideCodes.has(cfg.skuCode)}
+                                  onChange={() => setSelectedOverrideCodes((prev) => { const next = new Set(prev); next.has(cfg.skuCode) ? next.delete(cfg.skuCode) : next.add(cfg.skuCode); return next; })}
+                                  className="size-3.5 accent-[var(--primary)]" />
+                                <span className="min-w-0 truncate font-mono text-[12px] font-medium text-[var(--foreground)]">{cfg.skuCode}</span>
+                                <select value={cfg.overrideType}
                                   onChange={(e) => {
                                     const next = [...form.skuLevelConfigs];
-                                    next[originalIdx] = { ...next[originalIdx], value: e.target.value };
+                                    next[originalIdx] = { ...next[originalIdx], overrideType: e.target.value as SkuLevelConfig['overrideType'] };
                                     set('skuLevelConfigs', next);
                                   }}
-                                  placeholder={cfg.overrideType === 'ratio' ? '80' : '50'}
-                                  className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2 pr-6 text-[11px] outline-none focus:border-[var(--primary)]"
-                                />
-                                {cfg.overrideType === 'ratio' && (
-                                  <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-[var(--muted)]">%</span>
+                                  className="h-8 rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2 text-[11px] outline-none focus:border-[var(--primary)]">
+                                  <option value="">整体规则</option>
+                                  <option value="ratio">同步比例（%）</option>
+                                  <option value="fixed">固定数量（件）</option>
+                                  <option value="deduct">扣减数量（件）</option>
+                                </select>
+                                {/* 值：整体规则时显示全局值 */}
+                                {cfg.overrideType ? (
+                                  <div className="relative">
+                                    <input type="number" value={cfg.value}
+                                      onChange={(e) => {
+                                        const next = [...form.skuLevelConfigs];
+                                        next[originalIdx] = { ...next[originalIdx], value: e.target.value };
+                                        set('skuLevelConfigs', next);
+                                      }}
+                                      placeholder="请输入"
+                                      className="h-8 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-2 pr-6 text-[11px] outline-none focus:border-[var(--primary)]" />
+                                    {cfg.overrideType === 'ratio' && <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-[var(--muted)]">%</span>}
+                                  </div>
+                                ) : (
+                                  <div className="flex h-8 items-center rounded-lg border border-[var(--border-subtle)] px-2 text-[11px] text-[var(--muted)]">
+                                    {(() => {
+                                      const val = form.syncValueType === 'ratio' ? `${form.ratio || '?'}%` : `${form.fixedQty || '?'} 件`;
+                                      return form.qtyMode === 'deduct' ? `扣减 ${val}` : val;
+                                    })()}
+                                  </div>
                                 )}
+                                <button type="button"
+                                  onClick={() => { set('skuLevelConfigs', form.skuLevelConfigs.filter((_, idx) => idx !== originalIdx)); setSelectedOverrideCodes((prev) => { const next = new Set(prev); next.delete(cfg.skuCode); return next; }); }}
+                                  className="flex size-8 items-center justify-center rounded-lg text-[var(--muted)] hover:text-red-500">
+                                  <X className="size-3.5" />
+                                </button>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => set('skuLevelConfigs', form.skuLevelConfigs.filter((_, idx) => idx !== originalIdx))}
-                                className="flex size-8 items-center justify-center rounded-lg text-[var(--muted)] transition-colors hover:text-red-500">
-                                <X className="size-3.5" />
-                              </button>
-                            </div>
-                          ))
+                            );
+                          })
                         ) : (
                           <div className="px-3 py-4 text-center text-[11px] text-[var(--muted)]">
                             {skuOverrideSearch ? `没有包含"${skuOverrideSearch}"的 SKU` : '暂无配置'}

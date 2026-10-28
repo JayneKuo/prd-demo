@@ -138,6 +138,7 @@ export const merchantNavigationGroups: NavGroup[] = [
     items: [
       { title: { 'zh-CN': '履约规则', 'en-US': 'Fulfillment Rules' }, href: '/dashboard/rules/fulfillment', capabilities: ['orders:write'], icon: 'git-branch' },
       { title: { 'zh-CN': '库存同步规则', 'en-US': 'Inventory Sync' }, href: '/dashboard/rules/inventory-sync', capabilities: ['inventory:write'], icon: 'refresh-cw' },
+      { title: { 'zh-CN': '库存分配账本', 'en-US': 'Allocation Ledger' }, href: '/dashboard/inventory-allocation', capabilities: ['inventory:write'], icon: 'sliders' },
       { title: { 'zh-CN': '补货规则', 'en-US': 'Replenishment Rules' }, href: '/dashboard/rules/replenishment', capabilities: ['inventory:write'], icon: 'archive-restore' },
       { title: { 'zh-CN': '价格规则', 'en-US': 'Pricing Rules' }, href: '/dashboard/rules/pricing', capabilities: ['orders:write'], icon: 'percent' }
     ]
