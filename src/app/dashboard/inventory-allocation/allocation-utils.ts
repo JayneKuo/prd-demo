@@ -6,9 +6,19 @@ export type AllocationSku = {
 
 export type AllocationRetailer = {
   retailer: { id: string };
+  ownerId?: string;
+  warehouseIds?: string[];
   enabled: boolean;
   skus: AllocationSku[];
 };
+
+export function allocationKey(ownerId: string, warehouseId: string, skuCode: string) {
+  return JSON.stringify([ownerId, warehouseId, skuCode]);
+}
+
+export function allocatedTotal(totals: Record<string, number>, entry: AllocationRetailer, skuCode: string) {
+  return Math.max(0, ...(entry.warehouseIds ?? []).map(id => totals[allocationKey(entry.ownerId ?? '', id, skuCode)] ?? 0));
+}
 
 export function isValidRatio(ratio: string) {
   if (!ratio.trim()) return false;
@@ -25,7 +35,10 @@ export function allocationTotals(data: AllocationRetailer[]) {
   data.forEach(entry => {
     if (!entry.enabled) return;
     entry.skus.forEach(sku => {
-      totals[sku.skuCode] = (totals[sku.skuCode] ?? 0) + Math.round(allocationValue(sku) * 100);
+      for (const warehouseId of entry.warehouseIds ?? []) {
+        const key = allocationKey(entry.ownerId ?? '', warehouseId, sku.skuCode);
+        totals[key] = (totals[key] ?? 0) + Math.round(allocationValue(sku) * 100);
+      }
     });
   });
   return Object.fromEntries(Object.entries(totals).map(([code, value]) => [code, value / 100]));

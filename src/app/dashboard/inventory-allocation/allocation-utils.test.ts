@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { allocationTotals, allocationValue, isValidRatio, otherAllocation, parseSkuCodes, matchSkuSearch, matchSkuStatus } from './allocation-utils';
+import { allocatedTotal, allocationTotals, allocationValue, isValidRatio, otherAllocation, parseSkuCodes, matchSkuSearch, matchSkuStatus } from './allocation-utils';
 
 const sku = (ratio: string, excluded = false) => ({ skuCode: 'SKU-1', ratio, excluded });
 const retailer = (id: string, ratio: string, enabled = true, excluded = false) => ({
-  retailer: { id }, enabled, skus: [sku(ratio, excluded)],
+  retailer: { id }, ownerId: 'OWN-001', warehouseIds: ['wh-lax'], enabled, skus: [sku(ratio, excluded)],
 });
 
 describe('bulk SKU search', () => {
@@ -52,16 +52,29 @@ describe('inventory allocation', () => {
   it('only counts enabled retailers and non-excluded SKU allocations', () => {
     expect(allocationTotals([
       retailer('a', '40'), retailer('b', '30'), retailer('c', '90', false), retailer('d', '100', true, true),
-    ])).toEqual({ 'SKU-1': 70 });
+    ])).toEqual({ '["OWN-001","wh-lax","SKU-1"]': 70 });
   });
 
   it('recomputes totals after updates and exposes over-allocation', () => {
-    expect(allocationTotals([retailer('a', '60'), retailer('b', '50')])['SKU-1']).toBe(110);
-    expect(allocationTotals([retailer('a', '40'), retailer('b', '50')])['SKU-1']).toBe(90);
+    expect(allocationTotals([retailer('a', '60'), retailer('b', '50')])['["OWN-001","wh-lax","SKU-1"]']).toBe(110);
+    expect(allocationTotals([retailer('a', '40'), retailer('b', '50')])['["OWN-001","wh-lax","SKU-1"]']).toBe(90);
   });
 
   it('avoids floating point false positives at exactly 100 percent', () => {
-    expect(allocationTotals([retailer('a', '33.33'), retailer('b', '33.33'), retailer('c', '33.34')])['SKU-1']).toBe(100);
+    expect(allocationTotals([retailer('a', '33.33'), retailer('b', '33.33'), retailer('c', '33.34')])['["OWN-001","wh-lax","SKU-1"]']).toBe(100);
+  });
+
+  it('separates owners and warehouses but catches partially overlapping warehouse sets', () => {
+    const data = [
+      { ...retailer('a', '60'), warehouseIds: ['wh-lax', 'wh-ewr'] },
+      { ...retailer('b', '50'), warehouseIds: ['wh-ewr', 'wh-dfw'] },
+      { ...retailer('c', '75'), warehouseIds: ['wh-lax'], ownerId: 'OWN-002' },
+    ];
+    const totals = allocationTotals(data);
+    expect(allocatedTotal(totals, data[0], 'SKU-1')).toBe(110);
+    expect(allocatedTotal(totals, data[1], 'SKU-1')).toBe(110);
+    expect(allocatedTotal(totals, data[2], 'SKU-1')).toBe(75);
+    expect(Object.values(totals).sort((a, b) => a - b)).toEqual([50, 60, 75, 110]);
   });
 
   it('calculates other retailer usage without subtracting disabled or excluded entries', () => {

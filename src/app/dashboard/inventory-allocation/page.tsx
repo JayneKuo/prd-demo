@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ChevronDown, Info, Plus, RefreshCw, Save, Search, Settings2, ShieldCheck, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { allocationTotals, allocationValue, formatRatio, isValidRatio, otherAllocation, parseSkuCodes, matchSkuSearch, matchSkuStatus, type SkuStatusFilter } from './allocation-utils';
+import { allocationKey, allocatedTotal, allocationTotals, allocationValue, formatRatio, isValidRatio, otherAllocation, parseSkuCodes, matchSkuSearch, matchSkuStatus, type SkuStatusFilter } from './allocation-utils';
 
 type RetailerType = 'EDI' | '平台授权' | '文件传输' | '自定义';
 type Sku = { skuCode: string; skuName: string };
@@ -12,11 +12,34 @@ type RetailerAlloc = {
   retailer: { id: string; name: string; type: RetailerType };
   enabled: boolean;
   defaultRatio: string;
+  ownerId: string;
+  warehouseIds: string[];
   syncMode: 'realtime' | 'daily' | 'scheduled';
   dailyTimes: string[];
   syncTimes: string[];
   skus: SkuEntry[];
 };
+
+const OWNERS = [
+  { id: 'OWN-001', name: '货主 A（品牌方）' },
+  { id: 'OWN-002', name: '货主 B（代工厂）' },
+  { id: 'OWN-003', name: '货主 C（分销商）' },
+  { id: 'OWN-004', name: '华南品牌代理' },
+  { id: 'OWN-005', name: '北美直营仓' },
+  { id: 'OWN-006', name: '欧盟认证货主' },
+  { id: 'OWN-007', name: '跨境直发供应商' },
+];
+
+const WAREHOUSES = [
+  { id: 'wh-lax', name: 'US 西部仓（洛杉矶）' },
+  { id: 'wh-ewr', name: 'US 东部仓（纽约）' },
+  { id: 'wh-dfw', name: 'US 中部仓（达拉斯）' },
+  { id: 'wh-sg', name: '新加坡仓' },
+  { id: 'wh-3pla', name: '谷仓（三方仓）' },
+  { id: 'wh-3plb', name: '万邑通（三方仓）' },
+  { id: 'wh-fba', name: 'Amazon FBA' },
+  { id: 'wh-drop', name: '供应商直发' },
+];
 
 const SKU_POOL: Sku[] = [
   { skuCode: 'SKU-A001', skuName: '红色圆领T恤 S码' },
@@ -32,7 +55,7 @@ const SKU_POOL: Sku[] = [
 ];
 
 function makeEntry(id: string, name: string, type: RetailerType, ratios: Record<string, string>, defaultRatio = '', enabled = true): RetailerAlloc {
-  return { retailer: { id, name, type }, enabled, defaultRatio, syncMode: 'scheduled', dailyTimes: [], syncTimes: [],
+  return { retailer: { id, name, type }, enabled, defaultRatio, ownerId: 'OWN-001', warehouseIds: ['wh-lax'], syncMode: 'scheduled', dailyTimes: [], syncTimes: [],
     skus: SKU_POOL.map(sku => ({ ...sku, ratio: ratios[sku.skuCode] ?? '', excluded: false })) };
 }
 
@@ -137,6 +160,17 @@ export default function InventoryAllocationPage() {
   const [retailerDropdownOpen, setRetailerDropdownOpen] = useState(false);
   const [newType, setNewType] = useState<RetailerType>('EDI');
   const [rowSkuSelection, setRowSkuSelection] = useState<Record<string, string[]>>({});
+  const [sourceId, setSourceId] = useState<string | null>(null);
+  const [sourceOwnerId, setSourceOwnerId] = useState('');
+  const [sourceWarehouseIds, setSourceWarehouseIds] = useState<string[]>([]);
+  const [sourceError, setSourceError] = useState('');
+  const sourceDialog = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    if (sourceId) sourceDialog.current?.showModal();
+    else sourceDialog.current?.close();
+  }, [sourceId]);
+
   const [scheduleId, setScheduleId] = useState<string | null>(null);
   const [scheduleDraft, setScheduleDraft] = useState<string[]>([]);
   const [scheduleMode, setScheduleMode] = useState<RetailerAlloc['syncMode']>('scheduled');
@@ -165,7 +199,16 @@ export default function InventoryAllocationPage() {
   const totals = useMemo(() => allocationTotals(data), [data]);
   const conflicts = Object.keys(totals).filter(code => totals[code] > 100);
   const active = data.filter(entry => entry.enabled);
-  const defaultTotal = formatRatio(active.reduce((sum, entry) => sum + (isValidRatio(entry.defaultRatio) ? Number(entry.defaultRatio) : 0), 0));
+  const defaultTotals = active.reduce((totals, entry) => {
+    for (const warehouseId of entry.warehouseIds) {
+      const key = allocationKey(entry.ownerId, warehouseId, 'DEFAULT');
+      totals[key] = formatRatio((totals[key] ?? 0) + (isValidRatio(entry.defaultRatio) ? Number(entry.defaultRatio) : 0));
+    }
+    return totals;
+  }, {} as Record<string, number>);
+  const overDefaultPools = Object.entries(defaultTotals).filter(([, total]) => total > 100);
+  const maxDefaultTotal = Math.max(0, ...Object.values(defaultTotals));
+  const defaultPoolCount = Object.keys(defaultTotals).length;
   const invalidDefaults = data.some(entry => entry.defaultRatio !== '' && !isValidRatio(entry.defaultRatio));
   const invalidRatios = data.some(entry => entry.skus.some(sku => !sku.excluded && sku.ratio !== '' && !isValidRatio(sku.ratio)));
   const scheduleErrors = data.flatMap(entry => {
@@ -182,11 +225,12 @@ export default function InventoryAllocationPage() {
     if (entry.syncTimes.some(time => !original.includes(time) && new Date(time).getTime() <= Date.now())) errors.push(`${entry.retailer.name}：新增同步时间必须晚于当前时间`);
     return errors;
   });
-  const blocked = invalidDefaults || invalidRatios || scheduleErrors.length > 0 || (enforceCap && (conflicts.length > 0 || defaultTotal > 100));
+  const invalidSources = data.some(entry => !entry.ownerId || !entry.warehouseIds.length);
+  const blocked = invalidSources || invalidDefaults || invalidRatios || scheduleErrors.length > 0 || (enforceCap && (conflicts.length > 0 || overDefaultPools.length > 0));
   const dirty = JSON.stringify({ data, enforceCap }) !== JSON.stringify(saved);
   const visibleRetailers = data.filter(entry => entry.retailer.name.toLowerCase().includes(retailerSearch.trim().toLowerCase())
     && (filter === 'all' || (filter === 'enabled' && entry.enabled) || (filter === 'disabled' && !entry.enabled)
-      || (filter === 'conflict' && entry.enabled && entry.skus.some(sku => !sku.excluded && allocationValue(sku) > 0 && totals[sku.skuCode] > 100))));
+      || (filter === 'conflict' && entry.enabled && entry.skus.some(sku => !sku.excluded && allocationValue(sku) > 0 && allocatedTotal(totals, entry, sku.skuCode) > 100))));
   const selectableRetailers = visibleRetailers.filter(entry => entry.enabled);
   const batchSkus = catalog.filter(sku => matchSkuSearch(sku, batchSearch, batchCodes));
   const selectedActive = active.filter(entry => selectedRetailers.has(entry.retailer.id));
@@ -207,7 +251,7 @@ export default function InventoryAllocationPage() {
   const drawerTotals = allocationTotals(drawerData);
   const drawerChanged = drawerDraft !== null && JSON.stringify(drawerDraft) !== JSON.stringify(data.find(entry => entry.retailer.id === expandedId));
   const drawerInvalidCount = drawerDraft?.skus.filter(sku => !sku.excluded && sku.ratio !== '' && !isValidRatio(sku.ratio)).length ?? 0;
-  const drawerOverCount = drawerDraft?.enabled ? drawerDraft.skus.filter(sku => allocationValue(sku) > 0 && drawerTotals[sku.skuCode] > 100).length : 0;
+  const drawerOverCount = drawerDraft?.enabled ? drawerDraft.skus.filter(sku => allocationValue(sku) > 0 && allocatedTotal(drawerTotals, drawerDraft, sku.skuCode) > 100).length : 0;
   const drawerBlocked = drawerInvalidCount > 0 || (enforceCap && drawerOverCount > 0);
 
   function openDrawer(entry: RetailerAlloc) {
@@ -226,7 +270,7 @@ export default function InventoryAllocationPage() {
     // 确认时重新使用完整账本校验，不能只累加当前渠道。
     const totals = allocationTotals(data.map(entry => entry.retailer.id === drawerDraft.retailer.id ? drawerDraft : entry));
     if (drawerDraft.skus.some(sku => !sku.excluded && sku.ratio !== '' && !isValidRatio(sku.ratio))
-      || (enforceCap && drawerDraft.enabled && drawerDraft.skus.some(sku => allocationValue(sku) > 0 && totals[sku.skuCode] > 100))) return;
+      || (enforceCap && drawerDraft.enabled && drawerDraft.skus.some(sku => allocationValue(sku) > 0 && allocatedTotal(totals, drawerDraft, sku.skuCode) > 100))) return;
     setData(previous => previous.map(entry => entry.retailer.id === drawerDraft.retailer.id ? drawerDraft : entry));
     closeDrawer(false);
     setNotice('SKU 修改已应用，请保存全部更改。');
@@ -245,7 +289,7 @@ export default function InventoryAllocationPage() {
       ...entry, skus: entry.skus.map(sku => selectedSkus.has(sku.skuCode) ? { ...sku, ratio: batchRatios[entry.retailer.id], excluded: false } : sku),
     });
     const nextTotals = allocationTotals(next);
-    const over = [...selectedSkus].filter(code => nextTotals[code] > 100);
+    const over = [...selectedSkus].filter(code => next.some(entry => selectedRetailers.has(entry.retailer.id) && allocatedTotal(nextTotals, entry, code) > 100));
     return { next, totals: nextTotals, over };
   })();
 
@@ -256,9 +300,10 @@ export default function InventoryAllocationPage() {
       ...entry, skus: entry.skus.map(sku => selected.has(sku.skuCode) ? { ...sku, ratio: drawerRatio, excluded: false } : sku),
     });
     const nextTotals = allocationTotals(next);
-    const over = [...selected].filter(code => nextTotals[code] > 100);
+    const target = next.find(entry => entry.retailer.id === id)!;
+    const over = [...selected].filter(code => allocatedTotal(nextTotals, target, code) > 100);
     if (enforceCap && over.length) {
-      setDrawerError('应用后超配：' + over.map(code => code + '（' + nextTotals[code] + '%）').join('、'));
+      setDrawerError('应用后超配：' + over.map(code => code + '（' + allocatedTotal(nextTotals, target, code) + '%）').join('、'));
       return;
     }
     setDrawerDraft(next.find(entry => entry.retailer.id === id) ?? null); setDrawerError('');
@@ -283,7 +328,7 @@ export default function InventoryAllocationPage() {
     // 执行时再次校验已保存的完整账本，不能只检查选中渠道。
     const savedTotals = allocationTotals(saved.data);
     const invalid = saved.data.some(entry => entry.enabled && entry.skus.some(sku => !sku.excluded && sku.ratio !== '' && !isValidRatio(sku.ratio)));
-    if (dirty || invalid || (saved.enforceCap && Object.values(savedTotals).some(total => total > 100))) {
+    if (dirty || invalid || saved.data.some(entry => entry.enabled && (!entry.ownerId || !entry.warehouseIds.length)) || (saved.enforceCap && Object.values(savedTotals).some(total => total > 100))) {
       setSyncOpen(false);
       setNotice('无法立即同步：请先处理比例校验问题并保存全部更改。');
       return;
@@ -296,6 +341,18 @@ export default function InventoryAllocationPage() {
       setNotice(`模拟同步完成：${syncTargets.length} 个 Retailer，${syncConfigured} 项配置，跳过 ${syncSkipped} 项。`);
       syncTimer.current = null;
     }, 1200);
+  }
+
+  function applySource() {
+    if (!sourceOwnerId || !sourceWarehouseIds.length) {
+      setSourceError('请选择货主和至少一个 WMS 来源仓库。');
+      return;
+    }
+    setData(previous => previous.map(entry => entry.retailer.id === sourceId ? {
+      ...entry, ownerId: sourceOwnerId, warehouseIds: sourceWarehouseIds,
+    } : entry));
+    setSourceId(null);
+    setNotice('库存来源已更新，请保存更改。');
   }
 
   function applySchedule() {
@@ -338,7 +395,7 @@ export default function InventoryAllocationPage() {
       setNotice('Retailer 名称已存在，请使用其他名称。'); return;
     }
     setData(previous => [...previous, {
-      retailer: { id: `custom-${Date.now()}`, name, type: selectedType }, enabled: true, defaultRatio: '', syncMode: 'scheduled', dailyTimes: [], syncTimes: [],
+      retailer: { id: `custom-${Date.now()}`, name, type: selectedType }, enabled: true, defaultRatio: '', ownerId: '', warehouseIds: [], syncMode: 'scheduled', dailyTimes: [], syncTimes: [],
       skus: catalog.map(sku => ({ ...sku, ratio: '', excluded: false })),
     }]);
     setNewName(''); setRetailerDropdownOpen(false); setNewType('EDI'); setShowAdd(false);
@@ -356,6 +413,15 @@ export default function InventoryAllocationPage() {
         <button className={buttonClass} onClick={() => setShowAdd(value => !value)}><Plus className="size-4" />新增 Retailer</button>
       </div>
     </header>
+
+    <dialog ref={sourceDialog} aria-labelledby="source-title" onCancel={() => setSourceId(null)} onClose={() => setSourceId(null)} className="fixed inset-0 m-auto max-h-[85vh] w-[min(560px,calc(100vw-32px))] overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 text-[var(--foreground)] shadow-2xl backdrop:bg-slate-950/40">
+      <h2 id="source-title" className="text-lg font-semibold">{data.find(entry => entry.retailer.id === sourceId)?.retailer.name} · 库存来源</h2>
+      <p className="mt-2 text-xs text-[var(--muted)]">选择货主及 WMS 来源仓库。同步时先汇总所选仓库该货主的 SKU 可用库存，再乘以分配比例。</p>
+      <label className="mt-5 flex flex-col gap-2 text-xs font-medium">货主<select className={inputClass} value={sourceOwnerId} onChange={event => { setSourceOwnerId(event.target.value); setSourceError(''); }}><option value="">选择货主</option>{OWNERS.map(owner => <option key={owner.id} value={owner.id}>{owner.name} · {owner.id}</option>)}</select></label>
+      <div className="mt-5"><div className="text-xs font-medium">WMS 来源仓库（多选）</div><div className="mt-2 grid gap-1 sm:grid-cols-2">{WAREHOUSES.map(warehouse => <label key={warehouse.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-xs hover:bg-[var(--surface-subtle)]"><input type="checkbox" className="size-4 accent-[var(--primary)]" checked={sourceWarehouseIds.includes(warehouse.id)} onChange={event => { setSourceWarehouseIds(previous => event.target.checked ? [...previous, warehouse.id] : previous.filter(value => value !== warehouse.id)); setSourceError(''); }} />{warehouse.name}</label>)}</div></div>
+      {sourceError && <p role="alert" className="mt-3 text-xs text-red-700">{sourceError}</p>}
+      <div className="mt-5 flex justify-end gap-2 border-t border-[var(--border)] pt-4"><button className={buttonClass} onClick={() => setSourceId(null)}>取消</button><button className={primaryClass} onClick={applySource}>确认</button></div>
+    </dialog>
 
     <dialog ref={scheduleDialog} aria-labelledby="schedule-title" onCancel={() => setScheduleId(null)} onClose={() => setScheduleId(null)} className="fixed inset-0 m-auto max-h-[85vh] w-[min(560px,calc(100vw-32px))] overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 text-[var(--foreground)] shadow-2xl backdrop:bg-slate-950/40">
       <div className="flex items-center justify-between gap-3"><h2 id="schedule-title" className="text-lg font-semibold">{data.find(entry => entry.retailer.id === scheduleId)?.retailer.name} · 同步时间</h2><button aria-label="关闭同步时间设置" onClick={() => setScheduleId(null)}><X className="size-4" /></button></div>
@@ -395,20 +461,21 @@ export default function InventoryAllocationPage() {
         <div className="flex gap-3">
           <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]"><ShieldCheck className="size-5" /></div>
           <div><h2 className="text-sm font-semibold text-[var(--foreground)]">跨 Retailer 分配总量约束</h2>
-            <p className="mt-1 text-xs leading-5 text-[var(--muted)]">同一 SKU 在已启用、未排除的渠道中，分配比例合计不超过 100%。</p></div>
+            <p className="mt-1 text-xs leading-5 text-[var(--muted)]">同货主、同来源仓库的 SKU 分配比例合计不超过 100%；多仓库先汇总库存，再按比例同步。</p></div>
         </div>
         <div className="flex shrink-0 items-center gap-2"><span className="text-xs text-[var(--muted)]">{enforceCap ? '已开启' : '已关闭'}</span><Switch checked={enforceCap} onChange={() => setEnforceCap(value => !value)} label="限制同一 SKU 跨 Retailer 合计不超过 100%" /></div>
       </div>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-3 text-xs text-[var(--muted)]">
-        <span>新 SKU 默认比例合计 <strong className="ml-1 text-[var(--foreground)]">{defaultTotal}%</strong> · {enforceCap ? `剩余 ${formatRatio(Math.max(0, 100 - defaultTotal))}% 可分配` : '不限制跨渠道合计'}</span>
+        <span>{defaultPoolCount} 个货主／仓库库存池 · 新 SKU 默认比例最高 <strong className="ml-1 text-[var(--foreground)]">{maxDefaultTotal}%</strong> · {enforceCap ? `最高占用池剩余 ${formatRatio(Math.max(0, 100 - maxDefaultTotal))}%` : '不限制跨渠道合计'}</span>
         <span>默认比例仅用于后续新 SKU，不覆盖已有配置。</span>
       </div>
       {!enforceCap && <p className="mt-3 flex items-center gap-2 text-xs text-amber-700"><AlertTriangle className="size-4 shrink-0" />约束关闭，允许跨渠道超配。</p>}
     </section>
 
-    {(invalidDefaults || defaultTotal > 100) && <div role="alert" className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-[13px] text-amber-900">
+    {(invalidSources || invalidDefaults || overDefaultPools.length > 0) && <div role="alert" className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-[13px] text-amber-900">
       <AlertTriangle className="mt-0.5 size-4 shrink-0" /><div className="space-y-1">
-        {defaultTotal > 100 && <p>新 SKU 默认比例合计 {defaultTotal}%，{enforceCap ? '请调低默认比例。' : '已超过 100%，请注意超配风险。'}</p>}
+        {invalidSources && <p>请为每个 Retailer 选择货主和至少一个 WMS 来源仓库。</p>}
+        {overDefaultPools.length > 0 && <p>{overDefaultPools.length} 个货主／仓库库存池的新 SKU 默认比例超过 100%，{enforceCap ? '请调低默认比例。' : '请注意超配风险。'}</p>}
         {invalidDefaults && <p>新 SKU 默认比例须为 0–100%，最多两位小数。</p>}
       </div>
     </div>}
@@ -440,16 +507,18 @@ export default function InventoryAllocationPage() {
 
     {showOverview && <section className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
       <div className="flex items-center justify-between px-4 py-3"><h2 className="text-sm font-semibold text-[var(--foreground)]">SKU 跨渠道分配总览</h2><button aria-label="关闭 SKU 总览" onClick={() => setShowOverview(false)}><X className="size-4" /></button></div>
-      <div className="max-h-80 overflow-auto"><table className="w-full min-w-[650px] text-left text-xs">
-        <thead className="sticky top-0 bg-[var(--surface-subtle)] text-[var(--muted)]"><tr><th className="px-4 py-2.5">SKU / 商品</th><th className="px-4 py-2.5">已启用 Retailer 分配</th><th className="px-4 py-2.5 text-right">合计</th><th className="px-4 py-2.5 text-right">状态</th></tr></thead>
-        <tbody className="divide-y divide-[var(--border-subtle)]">{catalog.map(sku => {
-          const total = totals[sku.skuCode] ?? 0;
-          return <tr key={sku.skuCode}><td className="px-4 py-3"><div className="font-mono font-medium">{sku.skuCode}</div><div className="mt-1 text-[var(--muted)]">{sku.skuName}</div></td>
-            <td className="px-4 py-3"><div className="flex flex-wrap gap-1.5">{active.flatMap(entry => {
-              const allocation = entry.skus.find(item => item.skuCode === sku.skuCode);
-              return allocation && !allocation.excluded && isValidRatio(allocation.ratio) ? [<span key={entry.retailer.id} className="rounded bg-[var(--surface-subtle)] px-2 py-1">{entry.retailer.name} {allocation.ratio}%</span>] : [];
-            })}</div></td><td className="px-4 py-3 text-right font-semibold tabular-nums">{total}%</td>
-            <td className="whitespace-nowrap px-4 py-3 text-right">{total > 100 ? <span className="inline-flex items-center gap-1 text-red-700"><AlertTriangle className="size-3" />超出 {formatRatio(total - 100)}%</span> : total === 100 ? '已满配' : `剩余 ${formatRatio(100 - total)}%`}</td></tr>;
+      <div className="max-h-80 overflow-auto"><table className="w-full min-w-[760px] text-left text-xs">
+        <thead className="sticky top-0 bg-[var(--surface-subtle)] text-[var(--muted)]"><tr><th className="px-4 py-2.5">库存池（货主 / 来源仓库）</th><th className="px-4 py-2.5">SKU</th><th className="px-4 py-2.5">各渠道分配</th><th className="px-4 py-2.5 text-right">合计</th><th className="px-4 py-2.5 text-right">状态</th></tr></thead>
+        <tbody className="divide-y divide-[var(--border-subtle)]">{Object.entries(totals).map(([key, total]) => {
+          const [ownerId, warehouseId, skuCode] = JSON.parse(key) as [string, string, string];
+          const allocations = active.filter(entry => entry.ownerId === ownerId && entry.warehouseIds.includes(warehouseId)).flatMap(entry => {
+            const sku = entry.skus.find(item => item.skuCode === skuCode);
+            return sku && !sku.excluded && isValidRatio(sku.ratio) ? [entry.retailer.name + ' ' + sku.ratio + '%'] : [];
+          });
+          return <tr key={key}><td className="px-4 py-3">{OWNERS.find(owner => owner.id === ownerId)?.name ?? ownerId} / {WAREHOUSES.find(warehouse => warehouse.id === warehouseId)?.name ?? warehouseId}</td>
+            <td className="px-4 py-3 font-mono">{skuCode}</td><td className="px-4 py-3">{allocations.join("、") || "未分配"}</td>
+            <td className="px-4 py-3 text-right font-semibold tabular-nums">{total}%</td>
+            <td className="px-4 py-3 text-right">{total > 100 ? <span className="text-red-700">超出 {formatRatio(total - 100)}%</span> : total === 100 ? "已满配" : `剩余 ${formatRatio(100 - total)}%`}</td></tr>;
         })}</tbody>
       </table></div>
     </section>}
@@ -496,23 +565,25 @@ export default function InventoryAllocationPage() {
             <p className="text-xs text-[var(--muted)]">比例范围 0–100%，最多两位小数。</p>
             <p className="text-xs leading-5 text-[var(--muted)]">将覆盖 {selectedCount * selectedSkus.size} 项配置，并取消所选项的排除状态。</p>
             {batchPreview && batchPreview.over.length > 0 && <p className="text-xs leading-5">{batchPreview.over.length ? `${batchPreview.over.length} 个 SKU 应用后将超配${enforceCap ? '，禁止应用。' : '，约束关闭，允许应用。'}` : '已通过跨渠道总量校验。'}</p>}
-            {batchPreview && batchPreview.over.length > 0 && <div className="max-h-24 overflow-auto text-xs text-red-700">{batchPreview.over.map(code => <p key={code}>{code}：{batchPreview.totals[code]}%</p>)}</div>}
+            {batchPreview && batchPreview.over.length > 0 && <div className="max-h-24 overflow-auto text-xs text-red-700">{batchPreview.over.map(code => <p key={code}>{code}：{Math.max(...batchPreview.next.filter(entry => selectedRetailers.has(entry.retailer.id)).map(entry => allocatedTotal(batchPreview.totals, entry, code)))}%</p>)}</div>}
             <button className={cn(primaryClass, 'w-full')} disabled={!batchPreview || (enforceCap && batchPreview.over.length > 0)} onClick={applyBatch}>应用</button>
             <button className={cn(buttonClass, 'w-full')} onClick={() => setBatchOpen(false)}>取消</button>
           </div>
         </div>
       </dialog>
 
-      <div className="overflow-x-auto"><table className="w-full min-w-[1000px] text-left text-[13px]">
-        <thead className="bg-[var(--surface-subtle)] text-xs text-[var(--muted)]"><tr><th className="w-12 px-4 py-3" aria-label="选择" /><th className="px-3 py-3">Retailer</th><th className="px-3 py-3">同步状态</th><th className="px-3 py-3 text-right">总 SKU</th><th className="px-3 py-3 text-right">已配置 / 待配置</th><th className="px-3 py-3 text-right">超配 SKU</th><th className="px-5 py-3">新 SKU 默认比例</th><th className="px-3 py-3">同步时间</th><th className="px-3 py-3">操作</th></tr></thead>
+      <div className="overflow-x-auto"><table className="w-full min-w-[1320px] text-left text-[13px]">
+        <thead className="bg-[var(--surface-subtle)] text-xs text-[var(--muted)]"><tr><th className="w-12 px-4 py-3" aria-label="选择" /><th className="px-3 py-3">Retailer</th><th className="px-3 py-3">货主</th><th className="px-3 py-3">WMS 来源仓库</th><th className="px-3 py-3">同步状态</th><th className="px-3 py-3 text-right">总 SKU</th><th className="px-3 py-3 text-right">已配置 / 待配置</th><th className="px-3 py-3 text-right">超配 SKU</th><th className="px-5 py-3">新 SKU 默认比例</th><th className="px-3 py-3">同步时间</th><th className="px-3 py-3">操作</th></tr></thead>
         <tbody className="divide-y divide-[var(--border-subtle)]">{visibleRetailers.map(entry => {
           const id = entry.retailer.id;
           const configured = entry.skus.filter(sku => !sku.excluded && isValidRatio(sku.ratio)).length;
           const pending = entry.skus.filter(sku => !sku.excluded && !sku.ratio).length;
-          const over = entry.enabled ? entry.skus.filter(sku => allocationValue(sku) > 0 && totals[sku.skuCode] > 100).length : 0;
+          const over = entry.enabled ? entry.skus.filter(sku => allocationValue(sku) > 0 && allocatedTotal(totals, entry, sku.skuCode) > 100).length : 0;
           return <tr key={id} className={cn('transition hover:bg-[var(--surface-subtle)]', selectedRetailers.has(id) && 'bg-[var(--primary-soft)]')}>
               <td className="px-4 py-4"><input aria-label={`选择 ${entry.retailer.name}`} type="checkbox" disabled={!entry.enabled} checked={selectedRetailers.has(id)} onChange={() => setSelectedRetailers(previous => toggleSelection(previous, id))} className="size-4 accent-[var(--primary)]" /></td>
               <td className="px-3 py-4"><button className="text-left" aria-haspopup="dialog" onClick={() => { openDrawer(entry); }}><div className="font-semibold">{entry.retailer.name}</div><div className="mt-1 text-[11px] text-[var(--muted)]">{entry.retailer.type}</div></button></td>
+              <td className="px-3 py-4"><button className="text-left text-xs text-[var(--primary)] hover:underline" onClick={() => { setSourceOwnerId(entry.ownerId); setSourceWarehouseIds([...entry.warehouseIds]); setSourceError(''); setSourceId(id); }}>{OWNERS.find(owner => owner.id === entry.ownerId)?.name ?? '选择货主'}</button></td>
+              <td className="px-3 py-4"><button className="max-w-52 text-left text-xs text-[var(--primary)] hover:underline" onClick={() => { setSourceOwnerId(entry.ownerId); setSourceWarehouseIds([...entry.warehouseIds]); setSourceError(''); setSourceId(id); }}><span className="block truncate">{entry.warehouseIds.length ? entry.warehouseIds.map(value => WAREHOUSES.find(warehouse => warehouse.id === value)?.name ?? value).join('、') : '选择仓库'}</span></button></td>
               <td className="px-3 py-4"><div className="flex items-center gap-2"><Switch checked={entry.enabled} onChange={() => toggleRetailer(id)} label={`${entry.retailer.name} 同步状态`} /><span className="text-xs text-[var(--muted)]">{entry.enabled ? '已启用' : '已停用'}</span></div></td>
               <td className="px-3 py-4 text-right tabular-nums">{entry.skus.length}</td><td className="px-3 py-4 text-right tabular-nums">{configured} <span className="text-[var(--muted)]">/ {pending}</span></td>
               <td className="px-3 py-4 text-right tabular-nums">{over > 0 ? <span className="inline-flex items-center gap-1 text-red-700"><AlertTriangle className="size-3" />{over}</span> : '—'}</td>
@@ -522,7 +593,7 @@ export default function InventoryAllocationPage() {
               </button></td>
               <td className="px-3 py-4"><button className="whitespace-nowrap text-xs font-medium text-[var(--primary)] hover:underline" aria-haspopup="dialog" onClick={() => { openDrawer(entry); }}>配置 SKU</button></td>
             </tr>;
-        })}{!visibleRetailers.length && <tr><td colSpan={9} className="py-12 text-center text-[var(--muted)]">没有匹配的 Retailer，请调整筛选条件。</td></tr>}</tbody>
+        })}{!visibleRetailers.length && <tr><td colSpan={11} className="py-12 text-center text-[var(--muted)]">没有匹配的 Retailer，请调整筛选条件。</td></tr>}</tbody>
       </table></div>
       <footer className="flex flex-wrap justify-between gap-2 border-t border-[var(--border)] px-4 py-3 text-xs text-[var(--muted)]"><span>显示 {visibleRetailers.length} / {data.length} 个 Retailer · {catalog.length} 个 SKU</span></footer>
     </section>
@@ -535,9 +606,9 @@ export default function InventoryAllocationPage() {
           const statusFilter = skuStatusFilters[id] ?? 'all';
           const searchedSkus = entry.skus.filter(sku => matchSkuSearch(sku, skuSearch, skuCodes));
           const skuTabs = ([['all', '全部'], ['pending', '未配置'], ['over', '超配'], ['excluded', '已排除']] as const).map(([value, label]) => ({
-            value, label, count: searchedSkus.filter(sku => matchSkuStatus(sku, value, entry.enabled, totals[sku.skuCode] ?? 0)).length,
+            value, label, count: searchedSkus.filter(sku => matchSkuStatus(sku, value, entry.enabled, allocatedTotal(totals, entry, sku.skuCode))).length,
           }));
-          const filteredSkus = searchedSkus.filter(sku => matchSkuStatus(sku, statusFilter, entry.enabled, totals[sku.skuCode] ?? 0));
+          const filteredSkus = searchedSkus.filter(sku => matchSkuStatus(sku, statusFilter, entry.enabled, allocatedTotal(totals, entry, sku.skuCode)));
 
         return <div key={id} className="flex h-full flex-col">
           <header className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--border)] px-6 py-4">
@@ -566,9 +637,9 @@ export default function InventoryAllocationPage() {
               <div className="overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface)]"><table className="w-full min-w-[800px] text-xs">
                 <thead className="sticky top-0 bg-[var(--surface-subtle)] text-[var(--muted)]"><tr><th className="w-10 px-4 py-2.5" aria-label="选择 SKU" /><th className="px-4 py-2.5">SKU / 商品名称</th><th className="px-3 py-2.5">本渠道比例</th><th className="px-3 py-2.5 text-right">其他渠道占用</th><th className="px-3 py-2.5 text-right">本渠道可分配上限</th><th className="px-3 py-2.5 text-center">状态</th><th className="px-4 py-2.5 text-right">操作</th></tr></thead>
                 <tbody className="divide-y divide-[var(--border-subtle)]">{filteredSkus.map(sku => {
-                  const other = otherAllocation(totals[sku.skuCode] ?? 0, entry.enabled, sku);
+                  const other = otherAllocation(allocatedTotal(totals, entry, sku.skuCode), entry.enabled, sku);
                   const invalid = !sku.excluded && sku.ratio !== '' && !isValidRatio(sku.ratio);
-                  const isOver = entry.enabled && !sku.excluded && isValidRatio(sku.ratio) && Number(sku.ratio) > 0 && totals[sku.skuCode] > 100;
+                  const isOver = entry.enabled && !sku.excluded && isValidRatio(sku.ratio) && Number(sku.ratio) > 0 && allocatedTotal(totals, entry, sku.skuCode) > 100;
                   return <tr key={sku.skuCode} className={cn(invalid || (enforceCap && isOver) ? 'bg-red-50/50' : '')}>
                     <td className="px-4 py-3"><input type="checkbox" aria-label={`选择 ${entry.retailer.name} ${sku.skuCode}`} disabled={!entry.enabled} className="size-4 accent-[var(--primary)]" checked={(rowSkuSelection[id] ?? []).includes(sku.skuCode)} onChange={() => setRowSkuSelection(previous => ({ ...previous, [id]: [...toggleSelection(new Set(previous[id] ?? []), sku.skuCode)] }))} /></td>
                     <td className="px-4 py-3"><div className="font-mono font-medium">{sku.skuCode}</div><div className="mt-1 text-[var(--muted)]">{sku.skuName}</div></td>
