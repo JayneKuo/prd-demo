@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allocatedTotal, allocationTotals, allocationValue, isValidRatio, otherAllocation, parseSkuCodes, matchSkuSearch, matchSkuStatus } from './allocation-utils';
+import { allocatedTotal, allocationTotals, allocationValue, isValidRatio, otherAllocation, parseSkuCodes, matchSkuSearch, matchSkuStatus, introducedConflicts, updateWarehouses } from './allocation-utils';
 
 const sku = (ratio: string, excluded = false) => ({ skuCode: 'SKU-1', ratio, excluded });
 const retailer = (id: string, ratio: string, enabled = true, excluded = false) => ({
@@ -21,6 +21,22 @@ describe('bulk SKU search', () => {
     expect(matchSkuSearch(product, '红色', [])).toBe(true);
     expect(matchSkuSearch(product, 'sku-a', [])).toBe(true);
     expect(matchSkuSearch(product, '', ['MISSING'])).toBe(false);
+  });
+});
+
+describe('bulk warehouse updates', () => {
+  it('replaces, adds without duplicating, and removes only selected warehouses', () => {
+    expect(updateWarehouses(['wh-lax', 'wh-ewr'], ['wh-ewr', 'wh-dfw'], 'replace')).toEqual(['wh-ewr', 'wh-dfw']);
+    expect(updateWarehouses(['wh-lax', 'wh-ewr'], ['wh-ewr', 'wh-dfw'], 'add')).toEqual(['wh-lax', 'wh-ewr', 'wh-dfw']);
+    expect(updateWarehouses(['wh-lax', 'wh-ewr'], ['wh-ewr', 'wh-dfw'], 'remove')).toEqual(['wh-lax']);
+    expect(updateWarehouses(['wh-ewr'], ['wh-ewr'], 'remove')).toEqual([]);
+  });
+});
+
+describe('source change warnings', () => {
+  it('reports only newly introduced or increased conflicts', () => {
+    expect(introducedConflicts({ a: 110, b: 90 }, { a: 110, b: 120, c: 130 })).toEqual([['b', 120], ['c', 130]]);
+    expect(introducedConflicts({ a: 110 }, { a: 105 })).toEqual([]);
   });
 });
 

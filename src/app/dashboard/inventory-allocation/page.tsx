@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ChevronDown, Info, Plus, RefreshCw, Save, Search, Settings2, ShieldCheck, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { allocationKey, allocatedTotal, allocationTotals, allocationValue, formatRatio, isValidRatio, otherAllocation, parseSkuCodes, matchSkuSearch, matchSkuStatus, type SkuStatusFilter } from './allocation-utils';
+import { allocationKey, allocatedTotal, allocationTotals, allocationValue, formatRatio, isValidRatio, otherAllocation, parseSkuCodes, matchSkuSearch, matchSkuStatus, introducedConflicts, updateWarehouses, type SkuStatusFilter, type WarehouseUpdateMode } from './allocation-utils';
 
 type RetailerType = 'EDI' | '平台授权' | '文件传输' | '自定义';
 type Sku = { skuCode: string; skuName: string };
@@ -160,6 +160,18 @@ export default function InventoryAllocationPage() {
   const [retailerDropdownOpen, setRetailerDropdownOpen] = useState(false);
   const [newType, setNewType] = useState<RetailerType>('EDI');
   const [rowSkuSelection, setRowSkuSelection] = useState<Record<string, string[]>>({});
+  const [bulkSourceOpen, setBulkSourceOpen] = useState(false);
+  const [bulkOwnerId, setBulkOwnerId] = useState('');
+  const [bulkWarehouseIds, setBulkWarehouseIds] = useState<string[]>([]);
+  const [bulkWarehouseMode, setBulkWarehouseMode] = useState<WarehouseUpdateMode>('add');
+  const [bulkSourceError, setBulkSourceError] = useState('');
+  const bulkSourceDialog = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    if (bulkSourceOpen) bulkSourceDialog.current?.showModal();
+    else bulkSourceDialog.current?.close();
+  }, [bulkSourceOpen]);
+
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [sourceOwnerId, setSourceOwnerId] = useState('');
   const [sourceWarehouseIds, setSourceWarehouseIds] = useState<string[]>([]);
@@ -170,6 +182,18 @@ export default function InventoryAllocationPage() {
     if (sourceId) sourceDialog.current?.showModal();
     else sourceDialog.current?.close();
   }, [sourceId]);
+
+  const [bulkScheduleOpen, setBulkScheduleOpen] = useState(false);
+  const [bulkScheduleMode, setBulkScheduleMode] = useState<RetailerAlloc['syncMode']>('realtime');
+  const [bulkDailyTimes, setBulkDailyTimes] = useState<string[]>([]);
+  const [bulkSyncTimes, setBulkSyncTimes] = useState<string[]>([]);
+  const [bulkScheduleError, setBulkScheduleError] = useState('');
+  const bulkScheduleDialog = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    if (bulkScheduleOpen) bulkScheduleDialog.current?.showModal();
+    else bulkScheduleDialog.current?.close();
+  }, [bulkScheduleOpen]);
 
   const [scheduleId, setScheduleId] = useState<string | null>(null);
   const [scheduleDraft, setScheduleDraft] = useState<string[]>([]);
@@ -343,6 +367,41 @@ export default function InventoryAllocationPage() {
     }, 1200);
   }
 
+  const bulkSourcePreview = (() => {
+    const selected = data.filter(entry => entry.enabled && selectedRetailers.has(entry.retailer.id));
+    if (!selected.length || (!bulkWarehouseIds.length && !bulkOwnerId)) return null;
+    const next = data.map(entry => !entry.enabled || !selectedRetailers.has(entry.retailer.id) ? entry : {
+      ...entry,
+      ownerId: bulkOwnerId || entry.ownerId,
+      warehouseIds: updateWarehouses(entry.warehouseIds, bulkWarehouseIds, bulkWarehouseMode),
+    });
+    const invalid = next.filter(entry => selectedRetailers.has(entry.retailer.id) && (!entry.ownerId || !entry.warehouseIds.length));
+    const nextTotals = allocationTotals(next);
+    const skuConflicts = introducedConflicts(totals, nextTotals);
+    const nextDefaultTotals: Record<string, number> = {};
+    next.forEach(entry => {
+      if (!entry.enabled || !isValidRatio(entry.defaultRatio)) return;
+      entry.warehouseIds.forEach(warehouseId => {
+        const key = allocationKey(entry.ownerId, warehouseId, 'DEFAULT');
+        nextDefaultTotals[key] = formatRatio((nextDefaultTotals[key] ?? 0) + Number(entry.defaultRatio));
+      });
+    });
+    const defaultConflicts = introducedConflicts(defaultTotals, nextDefaultTotals);
+    return { selected, next, invalid, skuConflicts, defaultConflicts };
+  })();
+
+  function applyBulkSource() {
+    const preview = bulkSourcePreview;
+    if (!preview || preview.invalid.length) {
+      setBulkSourceError('请选择货主和至少一个来源仓库；移除后每个渠道仍须保留至少一个仓库。');
+      return;
+    }
+    setData(preview.next);
+    setBulkSourceOpen(false);
+    setBulkSourceError('');
+    setNotice(`已更新 ${preview.selected.length} 个 Retailer 的库存来源。${enforceCap && (preview.skuConflicts.length || preview.defaultConflicts.length) ? '请在保存前处理 SKU 或默认比例超配。' : '请保存更改。'}`);
+  }
+
   function applySource() {
     if (!sourceOwnerId || !sourceWarehouseIds.length) {
       setSourceError('请选择货主和至少一个 WMS 来源仓库。');
@@ -353,6 +412,26 @@ export default function InventoryAllocationPage() {
     } : entry));
     setSourceId(null);
     setNotice('库存来源已更新，请保存更改。');
+  }
+
+  function applyBulkSchedule() {
+    if (!selectedCount) return;
+    if (bulkScheduleMode === 'daily' && (!bulkDailyTimes.length || bulkDailyTimes.some(time => !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) || new Set(bulkDailyTimes).size !== bulkDailyTimes.length)) {
+      setBulkScheduleError('请填写至少一个有效的每日时间点，且不能重复。');
+      return;
+    }
+    if (bulkScheduleMode === 'scheduled' && (!bulkSyncTimes.length || bulkSyncTimes.some(time => !time || !Number.isFinite(new Date(time).getTime()) || new Date(time).getTime() <= Date.now()) || new Set(bulkSyncTimes).size !== bulkSyncTimes.length)) {
+      setBulkScheduleError('请填写至少一个未过期的指定日期时间，且不能重复。');
+      return;
+    }
+    setData(previous => previous.map(entry => !entry.enabled || !selectedRetailers.has(entry.retailer.id) ? entry : {
+      ...entry, syncMode: bulkScheduleMode,
+      dailyTimes: bulkScheduleMode === 'daily' ? [...bulkDailyTimes].sort() : entry.dailyTimes,
+      syncTimes: bulkScheduleMode === 'scheduled' ? [...bulkSyncTimes].sort() : entry.syncTimes,
+    }));
+    setBulkScheduleOpen(false);
+    setBulkScheduleError('');
+    setNotice(`已更新 ${selectedCount} 个 Retailer 的同步时间，请保存更改。`);
   }
 
   function applySchedule() {
@@ -413,6 +492,35 @@ export default function InventoryAllocationPage() {
         <button className={buttonClass} onClick={() => setShowAdd(value => !value)}><Plus className="size-4" />新增 Retailer</button>
       </div>
     </header>
+
+    <dialog ref={bulkScheduleDialog} aria-labelledby="bulk-schedule-title" onCancel={() => setBulkScheduleOpen(false)} onClose={() => setBulkScheduleOpen(false)} className="fixed inset-0 m-auto max-h-[85vh] w-[min(560px,calc(100vw-32px))] overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 text-[var(--foreground)] shadow-2xl backdrop:bg-slate-950/40">
+      <h2 id="bulk-schedule-title" className="text-lg font-semibold">设置同步时间</h2>
+      <p className="mt-2 text-xs text-[var(--muted)]">应用到已选 {selectedCount} 个 Retailer；会覆盖这些渠道的当前同步模式及该模式时间点，未选渠道不变。</p>
+      <div className="my-4 flex flex-wrap gap-2" role="group" aria-label="批量同步模式">{([['realtime', '实时同步'], ['daily', '每天定时'], ['scheduled', '指定日期时间']] as const).map(([mode, label]) => <button key={mode} aria-pressed={bulkScheduleMode === mode} className={bulkScheduleMode === mode ? primaryClass : buttonClass} onClick={() => { setBulkScheduleMode(mode); setBulkScheduleError(''); }}>{label}</button>)}</div>
+      {bulkScheduleMode === 'daily' && <div className="space-y-2"><p className="text-xs text-[var(--muted)]">每天时间点（按本地时区，至少一个）</p>{bulkDailyTimes.map((time, index) => <div key={index} className="flex gap-2"><input className={cn(inputClass, 'min-w-0 flex-1')} type="time" step="60" aria-label={`批量每日第 ${index + 1} 个时间`} value={time} onChange={event => setBulkDailyTimes(previous => previous.map((value, i) => i === index ? event.target.value : value))} /><button className={buttonClass} aria-label={`删除批量每日第 ${index + 1} 个时间`} onClick={() => setBulkDailyTimes(previous => previous.filter((_, i) => i !== index))}><X className="size-4" /></button></div>)}<button className={buttonClass} onClick={() => setBulkDailyTimes(previous => [...previous, ''])}><Plus className="size-4" />添加时间点</button></div>}
+      {bulkScheduleMode === 'scheduled' && <div className="space-y-2"><p className="text-xs text-[var(--muted)]">指定日期时间（至少一个未来时间）</p>{bulkSyncTimes.map((time, index) => <div key={index} className="flex gap-2"><input className={cn(inputClass, 'min-w-0 flex-1')} type="datetime-local" step="60" aria-label={`批量第 ${index + 1} 个预约时间`} value={time} onChange={event => setBulkSyncTimes(previous => previous.map((value, i) => i === index ? event.target.value : value))} /><button className={buttonClass} aria-label={`删除批量第 ${index + 1} 个预约时间`} onClick={() => setBulkSyncTimes(previous => previous.filter((_, i) => i !== index))}><X className="size-4" /></button></div>)}<button className={buttonClass} onClick={() => setBulkSyncTimes(previous => [...previous, ''])}><Plus className="size-4" />添加预约时间</button></div>}
+      {bulkScheduleError && <p role="alert" className="mt-3 text-xs text-red-700">{bulkScheduleError}</p>}
+      <div className="mt-5 flex justify-end gap-2 border-t border-[var(--border)] pt-4"><button className={buttonClass} onClick={() => setBulkScheduleOpen(false)}>取消</button><button className={primaryClass} onClick={applyBulkSchedule}>应用到页面</button></div>
+    </dialog>
+
+    <dialog ref={bulkSourceDialog} aria-labelledby="bulk-source-title" onCancel={() => setBulkSourceOpen(false)} onClose={() => setBulkSourceOpen(false)} className="fixed inset-0 m-auto max-h-[85vh] w-[min(780px,calc(100vw-32px))] overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 text-[var(--foreground)] shadow-2xl backdrop:bg-slate-950/40">
+      <h2 id="bulk-source-title" className="text-lg font-semibold">批量设置库存来源</h2>
+      <p className="mt-1 text-xs text-[var(--muted)]">仅修改所选已启用 Retailer。货主不选则保留原值；仓库按所选操作更新。</p>
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <label className="flex flex-col gap-2 text-xs font-medium">货主<select className={inputClass} value={bulkOwnerId} onChange={event => { setBulkOwnerId(event.target.value); setBulkSourceError(''); }}><option value="">不修改货主</option>{OWNERS.map(owner => <option key={owner.id} value={owner.id}>{owner.name} · {owner.id}</option>)}</select></label>
+        <label className="flex flex-col gap-2 text-xs font-medium">仓库操作<select className={inputClass} value={bulkWarehouseMode} onChange={event => { setBulkWarehouseMode(event.target.value as WarehouseUpdateMode); setBulkSourceError(''); }}><option value="add">追加所选仓库</option><option value="replace">替换为所选仓库</option><option value="remove">移除所选仓库</option></select></label>
+      </div>
+      <div className="mt-5"><div className="text-xs font-medium">选择 WMS 来源仓库</div><div className="mt-2 grid gap-1 sm:grid-cols-2">{WAREHOUSES.map(warehouse => <label key={warehouse.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-xs hover:bg-[var(--surface-subtle)]"><input type="checkbox" className="size-4 accent-[var(--primary)]" checked={bulkWarehouseIds.includes(warehouse.id)} onChange={event => { setBulkWarehouseIds(previous => event.target.checked ? [...previous, warehouse.id] : previous.filter(id => id !== warehouse.id)); setBulkSourceError(''); }} />{warehouse.name}</label>)}</div></div>
+      <div className="mt-5 rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] p-3"><h3 className="text-xs font-semibold">变更预览</h3>
+        <div className="mt-2 max-h-40 space-y-2 overflow-y-auto text-xs">{bulkSourcePreview?.selected.map(entry => {
+          const changed = bulkSourcePreview.next.find(item => item.retailer.id === entry.retailer.id)!;
+          return <div key={entry.retailer.id} className="flex flex-wrap gap-x-2"><span className="font-medium">{entry.retailer.name}</span><span>{OWNERS.find(owner => owner.id === entry.ownerId)?.name ?? '未设置'} → {OWNERS.find(owner => owner.id === changed.ownerId)?.name ?? '未设置'}</span><span>仓库 {entry.warehouseIds.length} → {changed.warehouseIds.length}：{changed.warehouseIds.map(id => WAREHOUSES.find(warehouse => warehouse.id === id)?.name ?? id).join('、') || '无'}</span></div>;
+        })}</div>
+      </div>
+      {bulkSourcePreview && (bulkSourcePreview.invalid.length > 0 || bulkSourcePreview.skuConflicts.length > 0 || bulkSourcePreview.defaultConflicts.length > 0) && <p role="status" className="mt-3 text-xs text-amber-700">缺少货主／仓库 {bulkSourcePreview.invalid.length} 个 · SKU 超配库存池 {bulkSourcePreview.skuConflicts.length} 个 · 新 SKU 默认比例超配库存池 {bulkSourcePreview.defaultConflicts.length} 个，可先应用库存来源，再调整 SKU 比例后保存。</p>}
+      {bulkSourceError && <p role="alert" className="mt-2 text-xs text-red-700">{bulkSourceError}</p>}
+      <div className="mt-5 flex justify-end gap-2 border-t border-[var(--border)] pt-4"><button className={buttonClass} onClick={() => setBulkSourceOpen(false)}>取消</button><button className={primaryClass} disabled={!bulkSourcePreview || !!bulkSourcePreview.invalid.length} onClick={applyBulkSource}>应用到页面</button></div>
+    </dialog>
 
     <dialog ref={sourceDialog} aria-labelledby="source-title" onCancel={() => setSourceId(null)} onClose={() => setSourceId(null)} className="fixed inset-0 m-auto max-h-[85vh] w-[min(560px,calc(100vw-32px))] overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 text-[var(--foreground)] shadow-2xl backdrop:bg-slate-950/40">
       <h2 id="source-title" className="text-lg font-semibold">{data.find(entry => entry.retailer.id === sourceId)?.retailer.name} · 库存来源</h2>
@@ -537,6 +645,8 @@ export default function InventoryAllocationPage() {
           onChange={event => setSelectedRetailers(previous => { const next = new Set(previous); selectableRetailers.forEach(entry => event.target.checked ? next.add(entry.retailer.id) : next.delete(entry.retailer.id)); return next; })} />全选当前已启用渠道</label>
         <span className="text-[var(--muted)]">已选 {selectedCount} 个 Retailer</span>
         <button className={cn(buttonClass, 'ml-auto')} title={!selectedCount ? '请先勾选 Retailer' : '仅同步选中的 Retailer'} disabled={!selectedCount || syncing} onClick={() => setSyncOpen(true)}><RefreshCw className={cn('size-4', syncing && 'animate-spin')} />{syncing ? '模拟同步中…' : `立即同步${selectedCount ? `（${selectedCount}）` : ''}`}</button>
+        <button className={buttonClass} disabled={!selectedCount} onClick={() => { setBulkScheduleMode('realtime'); setBulkDailyTimes([]); setBulkSyncTimes([]); setBulkScheduleError(''); setBulkScheduleOpen(true); }}>设置同步时间</button>
+        <button className={buttonClass} disabled={!selectedCount} onClick={() => { setBulkOwnerId(''); setBulkWarehouseIds([]); setBulkWarehouseMode('add'); setBulkSourceError(''); setBulkSourceOpen(true); }}>设置库存来源</button>
         <button className={primaryClass} disabled={!selectedCount} onClick={() => { setBatchOpen(true); setBatchSearch(''); setBatchCodes([]); setBatchRatios(Object.fromEntries(selectedActive.map(entry => [entry.retailer.id, '']))); }}>设置 SKU 比例<ChevronDown className="size-3.5" /></button>
         {selectedCount > 0 && <button className="text-[var(--muted)]" onClick={() => { setSelectedRetailers(new Set()); setBatchOpen(false); }}>清空选择</button>}
       </div>

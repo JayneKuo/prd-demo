@@ -44,6 +44,18 @@ export function allocationTotals(data: AllocationRetailer[]) {
   return Object.fromEntries(Object.entries(totals).map(([code, value]) => [code, value / 100]));
 }
 
+export type WarehouseUpdateMode = 'replace' | 'add' | 'remove';
+
+export function introducedConflicts(before: Record<string, number>, after: Record<string, number>) {
+  return Object.entries(after).filter(([key, total]) => total > 100 && total > (before[key] ?? 0));
+}
+
+export function updateWarehouses(current: string[], selected: string[], mode: WarehouseUpdateMode) {
+  if (mode === 'replace') return [...new Set(selected)];
+  if (mode === 'add') return [...new Set([...current, ...selected])];
+  return current.filter(id => !selected.includes(id));
+}
+
 export function otherAllocation(total: number, enabled: boolean, sku: AllocationSku) {
   return Math.round((total - (enabled ? allocationValue(sku) : 0)) * 100) / 100;
 }
