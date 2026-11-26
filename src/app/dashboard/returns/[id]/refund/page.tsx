@@ -347,7 +347,7 @@ function RefundPageInner({ returnId }: { returnId: string }) {
                 <tbody className="divide-y divide-[var(--border-subtle)]">
                   <tr>
                     <td className="py-2.5 text-[var(--muted)]">原单实付</td>
-                    <td className="py-2.5 text-right font-medium">{fmt(state.originalPaidAmount, state.currency)}</td>
+                    <td className="py-2.5 text-right font-medium">{state.originalPaidAmount === undefined ? '—' : fmt(state.originalPaidAmount, state.currency)}</td>
                   </tr>
                   <tr>
                     <td className="py-2.5 text-[var(--muted)]">客户申请退款</td>

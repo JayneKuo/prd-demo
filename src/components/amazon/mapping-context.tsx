@@ -82,7 +82,7 @@ function MappingPanel({ kind, companyId, merchantScope, connectionId, businessId
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const field = selectedFields[kind];
-  const module = modules.find(item => item.kind === kind)!;
+  const mappingModule = modules.find(item => item.kind === kind)!;
   const returnHref = `/dashboard/apps/amazon?${new URLSearchParams({ connection: connectionId, business: businessId, configure: '1', step: '2' })}`;
   const query = new URLSearchParams({ amazonConnection: connectionId, amazonBusiness: businessId, returnTo: 'amazon' });
   const canManage = hasCapability(currentUserRole, 'apps:manage');
@@ -121,7 +121,7 @@ function MappingPanel({ kind, companyId, merchantScope, connectionId, businessId
 
   return <section aria-label="Amazon 业务映射" className="mb-5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-[13px] text-[var(--foreground)]">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><h2 className="font-semibold">Amazon 配置 · {module.title}</h2><p className="mt-1 text-[12px] text-[var(--muted)]">{connection?.name ?? connectionId} / {business?.name ?? businessId} · {connection?.businesses[businessId as BusinessId]?.site || '站点待配置'}</p></div>
+      <div><h2 className="font-semibold">Amazon 配置 · {mappingModule.title}</h2><p className="mt-1 text-[12px] text-[var(--muted)]">{connection?.name ?? connectionId} / {business?.name ?? businessId} · {connection?.businesses[businessId as BusinessId]?.site || '站点待配置'}</p></div>
       <Link href={returnHref} className="text-[var(--primary)] hover:underline">返回 Amazon 业务配置</Link>
     </div>
     <p className="my-3 text-[12px] text-[var(--muted)]">关联 OMS 内部资料与 Amazon 外部标识。映射仅作用于当前商家、账号和业务。</p>

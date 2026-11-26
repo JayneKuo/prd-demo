@@ -300,6 +300,60 @@ export type OutboundOrder = Entity & { number: string; outboundPlanId: string; i
 
 export type ReplenishmentPluginTask = Entity & { operation: PluginTaskOperation; inboundPlanId: string; provider: ReplenishmentDestinationType; status: 'queued' | 'running' | 'succeeded' | 'failed'; idempotencyKey: string; requestedAt: string; completedAt?: string; request?: unknown; response?: unknown; error?: string };
 
+// ─── Unis 3PL 预约系统 ───────────────────────────────────────────────────────
+
+export type UnisAppointmentStatus =
+  | 'new'                 // 预约已创建
+  | 'not_confirmed'       // 司机链接已发送
+  | 'pending_dispatch'    // 司机已打开链接
+  | 'waiting_for_driver'  // 司机已填写车辆信息
+  | 'pre_check_in_complete' // 司机已填写司机信息，等待入场
+  | 'checked_in'          // 司机已到达园区 & 入场
+  | 'in_progress'         // 窗口已分配，收货进行中
+  | 'completed'           // 收货完成
+  | 'cancelled';
+
+export type UnisDeliveryType = 'live_delivery' | 'drop_off_delivery';
+
+export type UnisAppointment = Entity & {
+  number: string;
+  inboundOrderId: string;
+  inboundPlanId: string;
+  warehouseId: string;
+  carrier: string;
+  deliveryType: UnisDeliveryType;
+  appointmentDate: string;  // YYYY-MM-DD
+  appointmentTime: string;  // HH:MM
+  referenceNo: string;      // = 入库单号
+  status: UnisAppointmentStatus;
+  driverLinkToken?: string;
+  driverLinkSentAt?: string;
+  driverLinkOpenedAt?: string;
+  vehicleInfo?: {
+    vehicleType: string;
+    licensePlate: string;
+    tractorCarrier?: string;
+    usdot?: string;
+    mcNumber?: string;
+  };
+  driverInfo?: {
+    phoneNumber: string;
+    licenseNumber: string;
+    firstName: string;
+    lastName: string;
+    middleName?: string;
+  };
+  dockAssigned?: string;
+  entryId?: string;        // Window Check-in Entry
+  receiptTaskId?: string;  // Receipt Task
+  purchaseOrderNo?: string;
+  containerNo?: string;
+  sealNo?: string;
+  createdAt: string;
+  checkedInAt?: string;
+  completedAt?: string;
+};
+
 export type ReplenishmentSnapshot = {
   replenishmentPlans?: ReplenishmentPlan[];
   transferOrders?: TransferOrder[];

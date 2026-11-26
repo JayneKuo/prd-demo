@@ -23,6 +23,7 @@ import { BoxingWorkstation, PackingGroupBoxingWorkstation } from './boxing-works
 import { PackingOptionsWorkstation } from './packing-options-workstation';
 import { PlacementWorkstation } from './placement-workstation';
 import { TransportWorkstation } from './transport-workstation';
+import { UnisAppointmentSection } from './unis-appointment-workstation';
 
 // ─── Labels ───────────────────────────────────────────────────────────────────
 
@@ -1283,8 +1284,9 @@ function InboundDetail({ plan, snapshot, execute }: {
   // ── 操作按钮可见性 ─────────────────────────────────────────────────────────
   const canSubmit = plan.status === 'draft';
   const canApprove = plan.status === 'pending_approval';
-  // approved + preparing 合并为「申请入库计划」
-  const canApply = plan.status === 'approved' || plan.status === 'preparing';
+  const canApply = plan.status === 'approved';
+  // 旧 fixture 中 preparing 状态兼容（不再产生新的 preparing，但历史数据可能存在）
+  const canConfirmDest = plan.status === 'preparing';
   const canRequestPlatform = plan.status === 'awaiting_platform'
     && plan.platformStage !== 'request_submitted' && plan.platformStage !== 'request_confirmed';
   const canQueryPlatform = plan.status === 'awaiting_platform' && plan.platformStage === 'request_submitted';
@@ -1296,11 +1298,7 @@ function InboundDetail({ plan, snapshot, execute }: {
     'platform_confirmed', 'ready_for_execution'].includes(plan.status);
 
   const handleApply = () => {
-    if (plan.status === 'approved') {
-      void run({ type: 'inbound_start_processing', inboundPlanId: plan.id }, '已提交申请，正在办理…');
-    } else if (plan.status === 'preparing') {
-      void run({ type: 'inbound_confirm_destination', inboundPlanId: plan.id }, '已确认目标仓，正在推进…');
-    }
+    void run({ type: 'inbound_start_processing', inboundPlanId: plan.id }, isFba ? '已提交 FBA 入仓申请…' : '已申请入库，单据即将生成…');
   };
 
   return (
@@ -1329,7 +1327,13 @@ function InboundDetail({ plan, snapshot, execute }: {
               onClick={() => setConfirmAction({ title: '提交审批', description: `将入库计划 ${plan.number} 提交审批。`, confirmLabel: '提交', onConfirm: () => run({ type: 'inbound_submit', inboundPlanId: plan.id }, '已提交审批') })}>提交审批</ActionButton>}
             {canApprove && <ActionButton variant="primary" loading={busy}
               onClick={() => setConfirmAction({ title: '审批通过', description: `批准入库计划 ${plan.number}？`, confirmLabel: '批准', onConfirm: () => run({ type: 'inbound_approve', inboundPlanId: plan.id }, '已审批通过') })}>审批通过</ActionButton>}
-            {canApply && <ActionButton variant="primary" loading={busy} onClick={handleApply}>申请入库计划</ActionButton>}
+            {canApply && <ActionButton variant="primary" loading={busy} onClick={handleApply}>
+              {isFba ? '申请 FBA 入仓' : '申请入库计划'}
+            </ActionButton>}
+            {canConfirmDest && <ActionButton variant="primary" loading={busy}
+              onClick={() => void run({ type: 'inbound_confirm_destination', inboundPlanId: plan.id }, '已确认目标仓')}>
+              确认收货目标
+            </ActionButton>}
             {canRequestPlatform && <ActionButton variant="primary" loading={busy}
               onClick={() => run({ type: 'inbound_request_platform', inboundPlanId: plan.id }, '入仓申请已发送')}>{isFba ? '申请 FBA 入仓' : '请求平台入仓'}</ActionButton>}
             {canQueryPlatform && <ActionButton loading={busy}
@@ -1401,6 +1405,9 @@ function InboundDetail({ plan, snapshot, execute }: {
 
       {/* ── 发货发运（非平台类入库计划）── */}
       {!isFba && <DispatchSection plan={plan} snapshot={snapshot} run={run} busy={busy} />}
+
+      {/* ── Unis 预约（OMS 仓库）── */}
+      <UnisAppointmentSection inboundPlan={plan} snapshot={snapshot} />
 
       {/* ── 操作记录 ── */}
       <EventLog plan={plan} snapshot={snapshot} />

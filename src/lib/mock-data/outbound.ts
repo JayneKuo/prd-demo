@@ -1,6 +1,7 @@
 import type { TableColumn } from '@/components/admin/data-table-shell';
 
 export type OutboundRow = {
+  shipByDate?: string;
   id: string;
   /** 出库单号 (内部) */
   outboundNo: string;

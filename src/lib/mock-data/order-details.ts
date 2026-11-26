@@ -491,6 +491,7 @@ export type OrderDetail = {
   status: string;
   financialStatus: string;
   fulfillmentStatus: string;
+  deliveryParty?: string;
   riskLevel?: string;
   exception?: string;
 

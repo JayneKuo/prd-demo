@@ -29,7 +29,13 @@ export type ReplenishmentCommand =
   | { type: 'inbound_record_direct_dispatch'; inboundPlanId: string; reference: string; carrier: string; trackingNumber: string; shippedAt?: string }
   | { type: 'inbound_receive'; inboundOrderId: string; received: number; damaged: number; reference: string }
   | { type: 'outbound_request_labels'; outboundOrderId: string; kind: 'platform_box' | 'platform_item' | 'oms_carton' | 'packing_list' }
-  | { type: 'outbound_mark_dispatched'; outboundOrderId: string; carrier: string; trackingNumber: string };
+  | { type: 'outbound_mark_dispatched'; outboundOrderId: string; carrier: string; trackingNumber: string }
+  | { type: 'unis_create_appointment'; inboundOrderId: string; inboundPlanId: string; warehouseId: string; carrier: string; deliveryType: 'live_delivery' | 'drop_off_delivery'; appointmentDate: string; appointmentTime: string }
+  | { type: 'unis_send_driver_link'; appointmentId: string }
+  | { type: 'unis_submit_vehicle_info'; appointmentId: string; vehicleInfo: { vehicleType: string; licensePlate: string; tractorCarrier?: string; usdot?: string; mcNumber?: string } }
+  | { type: 'unis_submit_driver_info'; appointmentId: string; driverInfo: { phoneNumber: string; licenseNumber: string; firstName: string; lastName: string; middleName?: string } }
+  | { type: 'unis_update_appointment_time'; appointmentId: string; appointmentDate: string; appointmentTime: string }
+  | { type: 'unis_sync_yms_status'; appointmentId: string };
 
 const entity = (s: OmsSnapshot, id: string): Entity => ({ tenantId: s.tenantId, companyId: s.companyId, merchantId: s.merchantId, id, revision: 1 });
 const fail = (message: string): never => { throw new Error(message); };
@@ -44,7 +50,7 @@ export function executeReplenishment(current: OmsSnapshot, command: Replenishmen
   if (current.commandIds.includes(context.id)) return current;
   const s = structuredClone(current);
   s.replenishmentPlans ??= []; s.transferOrders ??= []; s.purchaseOrders ??= []; s.inboundPlansV2 ??= []; s.platformAllocations ??= [];
-  s.outboundPlans ??= []; s.inboundOrders ??= []; s.outboundOrdersV2 ??= []; s.replenishmentPluginTasks ??= [];
+  s.outboundPlans ??= []; s.inboundOrders ??= []; s.outboundOrdersV2 ??= []; s.replenishmentPluginTasks ??= []; s.unisAppointments ??= [];
   let target = '';
   if (command.type === 'inbound_create') {
     const p = command.plan;
@@ -67,14 +73,15 @@ export function executeReplenishment(current: OmsSnapshot, command: Replenishmen
     const inbound = inboundFor(s, command.inboundPlanId); target = inbound.id;
     if (inbound.status !== 'approved') fail('只有已审批的入库计划可以开始办理');
     if (destinationNeedsPlatform(inbound.destinationType)) {
-      // 平台类目标：直接合并「开始办理」+「申请入仓」两步，一次点击完成
+      // FBA / TikTok / Walmart：合并「开始办理」+「申请入仓」，一次点击完成
       inbound.status = 'awaiting_platform';
       inbound.platformStage = 'request_submitted';
       inbound.platformOperationId = `op-${inbound.number}-request`;
       inbound.platform = { provider: inbound.destinationType, externalStatus: 'request_submitted', syncedAt: nowIso(context) };
       inbound.pluginStatus = 'submitting';
     } else {
-      inbound.status = 'preparing';
+      // OMS 自营仓 / 三方仓：无需申请平台，直接进入待执行状态
+      inbound.status = 'ready_for_execution';
     }
     inbound.revision++;
   } else if (command.type === 'inbound_confirm_destination') {
@@ -529,6 +536,64 @@ export function executeReplenishment(current: OmsSnapshot, command: Replenishmen
       if (inboundOrder && inboundOrder.status === 'planned') { inboundOrder.status = 'shipped'; inboundOrder.revision++; }
       if (inboundOrder) { const inbound = inboundFor(s, inboundOrder.inboundPlanId); if (['executing', 'ready_for_execution'].includes(inbound.status)) { inbound.status = 'receiving'; inbound.revision++; } }
     }
+  } else if (command.type === 'unis_create_appointment') {
+    const inboundOrder = s.inboundOrders?.find(o => o.id === command.inboundOrderId) ?? fail('入库单不存在');
+    s.unisAppointments ??= [];
+    if (s.unisAppointments.some(a => a.inboundOrderId === command.inboundOrderId && a.status !== 'cancelled')) fail('该入库单已存在有效预约');
+    const apptNum = `APPT-${nowIso(context).slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    const appt: import('./replenishment').UnisAppointment = {
+      ...entity(s, `unis:${context.id}`),
+      number: apptNum, inboundOrderId: command.inboundOrderId, inboundPlanId: command.inboundPlanId,
+      warehouseId: command.warehouseId, carrier: command.carrier, deliveryType: command.deliveryType,
+      appointmentDate: command.appointmentDate, appointmentTime: command.appointmentTime,
+      referenceNo: inboundOrder.number, status: 'new', createdAt: nowIso(context),
+    };
+    s.unisAppointments.push(appt); target = appt.id;
+  } else if (command.type === 'unis_send_driver_link') {
+    const appt = s.unisAppointments?.find(a => a.id === command.appointmentId) ?? fail('预约不存在'); target = appt.id;
+    if (appt.status !== 'new') fail('只有 New 状态可以发送司机链接');
+    appt.status = 'not_confirmed';
+    appt.driverLinkToken = `driver-link-${appt.id.slice(-8)}`;
+    appt.driverLinkSentAt = nowIso(context); appt.revision++;
+  } else if (command.type === 'unis_submit_vehicle_info') {
+    const appt = s.unisAppointments?.find(a => a.id === command.appointmentId) ?? fail('预约不存在'); target = appt.id;
+    if (['in_progress', 'completed', 'cancelled'].includes(appt.status)) fail('当前状态不可修改车辆信息');
+    if (!command.vehicleInfo.vehicleType.trim() || !command.vehicleInfo.licensePlate.trim()) fail('车辆类型和车牌号为必填');
+    appt.vehicleInfo = command.vehicleInfo;
+    if (!appt.driverLinkOpenedAt) appt.driverLinkOpenedAt = nowIso(context);
+    // 仅首次填写时推进状态
+    if (['new', 'not_confirmed', 'pending_dispatch'].includes(appt.status)) appt.status = 'waiting_for_driver';
+    appt.revision++;
+  } else if (command.type === 'unis_submit_driver_info') {
+    const appt = s.unisAppointments?.find(a => a.id === command.appointmentId) ?? fail('预约不存在'); target = appt.id;
+    if (['in_progress', 'completed', 'cancelled'].includes(appt.status)) fail('当前状态不可修改司机信息');
+    if (!command.driverInfo.firstName.trim() || !command.driverInfo.lastName.trim() || !command.driverInfo.licenseNumber.trim()) fail('司机姓名和驾照号为必填');
+    appt.driverInfo = command.driverInfo;
+    // 仅首次填写时推进状态（已有车辆信息才能推进）
+    if (appt.vehicleInfo && ['waiting_for_driver', 'not_confirmed', 'pending_dispatch', 'new'].includes(appt.status)) appt.status = 'pre_check_in_complete';
+    appt.revision++;
+  } else if (command.type === 'unis_update_appointment_time') {
+    const appt = s.unisAppointments?.find(a => a.id === command.appointmentId) ?? fail('预约不存在'); target = appt.id;
+    if (['checked_in', 'in_progress', 'completed', 'cancelled'].includes(appt.status)) fail('司机已入场，不可修改预约时间');
+    if (!command.appointmentDate || !command.appointmentTime) fail('请选择日期和时间');
+    appt.appointmentDate = command.appointmentDate; appt.appointmentTime = command.appointmentTime; appt.revision++;
+  } else if (command.type === 'unis_sync_yms_status') {
+    // 模拟从 YMS 查询预约状态并同步（OMS 不主动 Check In，YMS 自动推进）
+    const appt = s.unisAppointments?.find(a => a.id === command.appointmentId) ?? fail('预约不存在'); target = appt.id;
+    if (!['pre_check_in_complete', 'checked_in'].includes(appt.status)) fail('当前预约状态无需同步');
+    if (appt.status === 'pre_check_in_complete') {
+      appt.status = 'checked_in'; appt.checkedInAt = nowIso(context);
+    } else if (appt.status === 'checked_in') {
+      const docks = ['Dock-1', 'Dock-3', 'Dock-5', 'Dock-7', 'Dock-9'];
+      appt.dockAssigned = docks[Math.floor(docks.length / 2)];
+      appt.entryId = `ENTRY-${nowIso(context).slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+      appt.receiptTaskId = `RT-${nowIso(context).slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+      appt.status = 'in_progress';
+      const io = s.inboundOrders?.find(o => o.id === appt.inboundOrderId);
+      if (io && ['planned', 'shipped'].includes(io.status)) { io.status = 'receiving'; io.revision++; }
+      if (io) { const ip = s.inboundPlansV2?.find(p => p.id === appt.inboundPlanId); if (ip && ['executing', 'ready_for_execution'].includes(ip.status)) { ip.status = 'receiving'; ip.revision++; } }
+    }
+    appt.revision++;
   } else if (command.type === 'inbound_receive') {
     const order = s.inboundOrders!.find(v => v.id === command.inboundOrderId) ?? fail('入库单不存在'); target = order.id;
     if (!['shipped', 'receiving', 'in_progress'].includes(order.status)) fail('入库单尚未发运');

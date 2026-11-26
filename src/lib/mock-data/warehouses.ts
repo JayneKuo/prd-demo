@@ -90,6 +90,14 @@ export const warehouses: Warehouse[] = [
     active: true, operator: 'ShipBob UK',
   },
   {
+    id: 'wh_unis_lax', code: 'UNIS-LAX', name: 'Unis Logistics · Los Angeles',
+    region: 'US-West', country: 'US', city: 'Compton, CA',
+    address: '19800 S Alameda St, Compton, CA 90221',
+    timezone: 'America/Los_Angeles',
+    supportedCarriers: ['ACE CRANE SERVICE INC', 'UPS', 'FedEx', 'XPO Logistics', 'Werner Enterprises', 'Schneider National'],
+    active: true, operator: 'Unis',
+  },
+  {
     id: 'wh_sg', code: 'SG-Central', name: 'Singapore Central Warehouse',
     region: 'SG', country: 'SG', city: 'Singapore',
     address: '1 Changi Business Park Ave 1, Singapore 486058',

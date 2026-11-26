@@ -28,6 +28,8 @@ export type OrderRow = {
   payment: string;
   /** 履约进度 */
   fulfillment: string;
+  fulfillmentChannel?: 'AFN' | 'MFN';
+  deliveryParty?: string;
   /** 异常标记 (空表示正常) */
   exception: string;
   /** 下单时间 */

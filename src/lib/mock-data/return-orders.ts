@@ -1,3 +1,5 @@
+import { warehouses } from './warehouses';
+
 // 退货单（Return Order / RMA）数据模型
 
 // ─── 核心类型 ─────────────────────────────────────────────────────────────────
@@ -93,6 +95,11 @@ export type ReturnEvent = {
 };
 
 /** 退货单主体 */
+export type ReturnAddress = {
+  recipientName: string; company?: string; addressLine1: string; addressLine2?: string;
+  city: string; state?: string; postalCode?: string; countryCode: string; country: string; phone?: string;
+};
+
 export type ReturnOrder = {
   id: string;
   /** 退货单号 */
@@ -114,6 +121,8 @@ export type ReturnOrder = {
   /** 客户 */
   customerName: string;
   customerEmail: string;
+  customerCompany?: string;
+  originalShippingAddress?: ReturnAddress;
   /** 申请时间 */
   createdAt: string;
   /** 最后更新 */
@@ -480,3 +489,271 @@ export function getReturnsByOrderId(orderId: string): ReturnOrder[] {
 export function getReturnById(id: string): ReturnOrder | undefined {
   return returnOrders.find((r) => r.id === id);
 }
+
+
+// 退货流程使用同一组退货单生成关联的演示质检、入库和退款记录。
+export const qcTypeLabels = { rma: '退货质检', inbound: '入库质检', outbound: '出库质检', other: '其他质检' };
+export type QCType = keyof typeof qcTypeLabels;
+export const qcTypeColors: Record<QCType, string> = {
+  rma: 'bg-blue-50 text-blue-700 ring-blue-200',
+  inbound: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  outbound: 'bg-violet-50 text-violet-700 ring-violet-200',
+  other: 'bg-slate-50 text-slate-700 ring-slate-200',
+};
+
+const status = (label: string, style: typeof returnStatusConfig.pending) => ({ ...style, label });
+export const qcPriorityConfig = {
+  low: status('低', returnStatusConfig.completed),
+  normal: status('普通', returnStatusConfig.authorized),
+  high: status('高', returnStatusConfig.pending),
+  urgent: status('紧急', returnStatusConfig.rejected),
+};
+export type QCPriority = keyof typeof qcPriorityConfig;
+
+export const qcStatusConfig = {
+  draft: status('草稿', returnStatusConfig.completed),
+  in_progress: returnStatusConfig.inspecting,
+  pending_review: status('待复核', returnStatusConfig.pending),
+  completed: returnStatusConfig.completed,
+  disputed: status('有争议', returnStatusConfig.rejected),
+  cancelled: returnStatusConfig.cancelled,
+};
+
+export const checklistCategoryLabels = {
+  identity: '商品核对', visual: '外观', packaging: '包装', functional: '功能', label: '标签', accessory: '配件', dimension: '尺寸', custom: '自定义',
+};
+export type ChecklistCategory = keyof typeof checklistCategoryLabels;
+export type ChecklistItem = {
+  id: string;
+  item: string;
+  category: ChecklistCategory;
+  requirement?: string;
+  result?: 'pass' | 'fail' | 'na';
+  note?: string;
+};
+export const checklistTemplates: { id: string; name: string; description?: string; items: Omit<ChecklistItem, 'id'>[] }[] = [
+  { id: 'rma_standard', name: '退货标准质检', items: [
+    { category: 'identity', item: '核对商品及数量', requirement: '与退货单一致' },
+    { category: 'visual', item: '检查外观', requirement: '记录破损、污渍和使用痕迹' },
+    { category: 'packaging', item: '检查包装及配件', requirement: '核对配件是否齐全' },
+    { category: 'functional', item: '检查功能', requirement: '记录无法正常工作的功能' },
+  ] },
+];
+
+export const qcStaffList: { id: string; name: string; role: 'inspector' | 'supervisor' | 'manager'; warehouseCodes?: string[] }[] = [
+  { id: 'qc_zhang', name: 'Zhang Wei', role: 'inspector', warehouseCodes: ['US-West-SEA'] },
+  { id: 'qc_chen', name: 'Chen Gang', role: 'inspector', warehouseCodes: ['US-East-EWR'] },
+  { id: 'qc_wang', name: 'Wang Lei', role: 'supervisor' },
+];
+
+export type QCPhotoScope = 'overall_arrival' | 'line_item';
+export type QCPhoto = {
+  id: string;
+  scope: QCPhotoScope;
+  url: string;
+  caption?: string;
+  lineItemId?: string;
+  uploadedAt: string;
+  uploadedBy: string;
+};
+export type QCLineItem = Pick<ReturnLineItem, 'id' | 'lineItemId' | 'sku' | 'title' | 'variantTitle'> & {
+  expectedQty: number;
+  receivedQty: number;
+  goodQty: number;
+  defectiveQty: number;
+  wrongItemQty: number;
+  missingQty: number;
+  disposition: 'restock' | 'scrap' | 'return_to_vendor' | 'repair' | 'quarantine';
+  restockQty: number;
+  scrapQty: number;
+  photos?: string[];
+  defectDescription?: string;
+  restockLocation?: string;
+  dispositionNote?: string;
+};
+export type QCBarcodeEntry = Pick<ReturnLineItem, 'lineItemId' | 'sku' | 'title'> & {
+  expectedQty: number;
+  barcodeType: 'UPC' | 'EAN' | 'SKU';
+  expectedBarcodes: string[];
+  scannedBarcodes?: string[];
+  scanStatus: 'pending' | 'matched' | 'mismatch' | 'extra';
+  scannedBy?: string;
+  scannedAt?: string;
+};
+export type QCOrder = {
+  id: string;
+  qcNo: string;
+  qcType: QCType;
+  returnOrderId: string;
+  receiptOrderId: string;
+  status: keyof typeof qcStatusConfig;
+  lineItems: QCLineItem[];
+  barcodes?: QCBarcodeEntry[];
+  checklist?: ChecklistItem[];
+  photos?: QCPhoto[];
+  sourceDoc?: { type: 'rma' | 'po' | 'transfer' | 'manual'; docId: string; docNo: string; linkPath?: string };
+  warehouseInfo?: { warehouseCode: string; warehouseName: string; qcZone?: string; tempStorageLocation?: string };
+  task?: { taskNo: string; priority: QCPriority; createdAt: string; assignedTo?: string; deadline?: string; instructions?: string };
+  conclusion?: 'pass' | 'partial_pass' | 'fail';
+  inspector?: string;
+  reviewer?: string;
+  startedAt?: string;
+  submittedAt?: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  reviewNote?: string;
+  completedAt?: string;
+  cancelledAt?: string;
+  cancelReason?: string;
+  overallNote?: string;
+  refundRecommendation?: { fullRefund: boolean; recommendedRate: number; recommendedAmount: number; reason: string };
+};
+
+export const qcOrders: QCOrder[] = returnOrders.filter(order => order.inspectedAt).map(order => {
+  const lineItems: QCLineItem[] = order.lineItems.map(line => {
+    const goodQty = line.inspectionResult === 'resaleable' ? line.quantity : 0;
+    const defectiveQty = line.inspectionResult === 'damaged' ? line.quantity : 0;
+    const wrongItemQty = line.inspectionResult === 'wrong_item' ? line.quantity : 0;
+    return {
+      id: line.id, lineItemId: line.lineItemId, sku: line.sku, title: line.title, variantTitle: line.variantTitle,
+      expectedQty: line.quantity, receivedQty: line.quantity, goodQty, defectiveQty, wrongItemQty, missingQty: 0,
+      disposition: goodQty ? 'restock' : 'quarantine', restockQty: goodQty, scrapQty: defectiveQty + wrongItemQty,
+      defectDescription: line.inspectionNote, photos: [],
+    };
+  });
+  const good = lineItems.reduce((total, line) => total + line.goodQty, 0);
+  const received = lineItems.reduce((total, line) => total + line.receivedQty, 0);
+  return {
+    id: `qc_${order.id}`, qcNo: `QC-${order.returnNo}`, qcType: 'rma', returnOrderId: order.id,
+    receiptOrderId: `receipt_${order.id}`, status: 'completed', lineItems,
+    sourceDoc: { type: 'rma', docId: order.id, docNo: order.returnNo, linkPath: `/dashboard/returns/${order.id}` },
+    warehouseInfo: order.returnWarehouseCode ? {
+      warehouseCode: order.returnWarehouseCode, warehouseName: order.returnWarehouse ?? order.returnWarehouseCode,
+    } : undefined,
+    inspector: order.inspectedBy, completedAt: order.inspectedAt, overallNote: order.inspectionNote,
+    conclusion: good === 0 ? 'fail' : good === received ? 'pass' : 'partial_pass',
+  };
+});
+
+export function getQCByReturnId(returnId: string): QCOrder | undefined {
+  return qcOrders.find(order => order.returnOrderId === returnId);
+}
+
+export const refundStatusConfig = {
+  draft: qcStatusConfig.draft,
+  pending_approval: status('待审批', returnStatusConfig.pending),
+  approved: status('已审批', returnStatusConfig.authorized),
+  processing: status('打款中', returnStatusConfig.refund_processing),
+  partial_paid: status('部分打款', returnStatusConfig.refund_processing),
+  paid: returnStatusConfig.completed,
+  void: status('已作废', returnStatusConfig.cancelled),
+};
+export type PaymentTransaction = {
+  id: string;
+  txNo: string;
+  method: 'original_payment' | 'bank_transfer' | 'store_credit' | 'credit_memo' | 'check';
+  status: 'pending' | 'processing' | 'success' | 'failed' | 'cancelled';
+  amount: number;
+  currency: string;
+  initiatedAt: string;
+  completedAt?: string;
+  gatewayName?: string;
+  gatewayTxId?: string;
+  bankName?: string;
+  bankAccount?: string;
+  failureReason?: string;
+  note?: string;
+};
+export type RefundDocument = {
+  id: string;
+  refundNo: string;
+  returnOrderId: string;
+  status: keyof typeof refundStatusConfig;
+  currency: string;
+  originalPaidAmount?: number;
+  requestedAmount: number;
+  approvedAmount: number;
+  restockingFee: number;
+  shippingDeduction: number;
+  otherDeductions: number;
+  netRefundAmount: number;
+  paidAmount: number;
+  transactions: PaymentTransaction[];
+  createdAt: string;
+  updatedAt: string;
+  approvedAt?: string;
+  approvedBy?: string;
+  approvalNote?: string;
+  refundBasis?: string;
+  qcConclusion?: QCOrder['conclusion'];
+  creditMemoNo?: string;
+  creditMemoIssuedAt?: string;
+  creditMemoAppliedAt?: string;
+  voidReason?: string;
+};
+
+export const refundDocuments: RefundDocument[] = returnOrders.flatMap(order => {
+  if (!order.refundedAt) return [];
+  const amount = order.totalRefundAmount;
+  return [{
+    id: `refund_${order.id}`, refundNo: `RF-${order.returnNo}`, returnOrderId: order.id,
+    status: 'paid', currency: order.currency, requestedAmount: amount, approvedAmount: amount,
+    restockingFee: 0, shippingDeduction: 0, otherDeductions: 0, netRefundAmount: amount, paidAmount: amount,
+    createdAt: order.createdAt, updatedAt: order.refundedAt, qcConclusion: getQCByReturnId(order.id)?.conclusion,
+    transactions: [{
+      id: `tx_${order.id}`, txNo: `TX-${order.returnNo}`, method: 'original_payment', status: 'success',
+      amount, currency: order.currency, initiatedAt: order.refundedAt, completedAt: order.refundedAt,
+      gatewayTxId: order.refundTransactionId,
+    }],
+  }];
+});
+
+export function getRefundByReturnId(returnId: string): RefundDocument | undefined {
+  return refundDocuments.find(order => order.returnOrderId === returnId);
+}
+
+export const receiptStatusConfig = {
+  pending: status('待入库', returnStatusConfig.pending),
+  stocked_in: status('已入库', returnStatusConfig.inspection_passed),
+  closed: status('已关闭', returnStatusConfig.completed),
+};
+export type ReceiptLineItem = Pick<ReturnLineItem, 'lineItemId' | 'sku' | 'title' | 'variantTitle'> & {
+  qcGood: number;
+  qcDamaged: number;
+  restockLocation?: string;
+  dispositionNote?: string;
+};
+export type ReturnReceiptOrder = {
+  id: string;
+  receiptNo: string;
+  returnOrderId: string;
+  status: keyof typeof receiptStatusConfig;
+  lineItems: ReceiptLineItem[];
+  receivedBy?: string;
+  stockedInAt?: string;
+};
+export const returnReceiptOrders: ReturnReceiptOrder[] = qcOrders.map(qc => ({
+  id: qc.receiptOrderId, receiptNo: `RCPT-${qc.sourceDoc?.docNo ?? qc.qcNo}`, returnOrderId: qc.returnOrderId,
+  status: 'pending',
+  lineItems: qc.lineItems.map(line => ({
+    lineItemId: line.lineItemId, sku: line.sku, title: line.title, variantTitle: line.variantTitle,
+    qcGood: line.goodQty, qcDamaged: line.defectiveQty,
+    restockLocation: line.restockLocation, dispositionNote: line.dispositionNote,
+  })),
+}));
+
+export const shipMethodLabels = {
+  prepaid_label: '预付退货面单',
+  self_ship: '客户自行寄回',
+  pickup: '上门取件',
+  no_return_needed: '无需寄回',
+};
+export type ReturnShipMethod = keyof typeof shipMethodLabels;
+
+export const warehouseReturnAddresses: Record<string, {
+  recipientName: string; company?: string; addressLine1: string; addressLine2?: string;
+  city: string; state?: string; postalCode?: string; country: string; phone?: string;
+}> = Object.fromEntries(warehouses.map(warehouse => [warehouse.code, {
+  recipientName: warehouse.name, company: warehouse.operator, addressLine1: warehouse.address,
+  city: warehouse.city, country: warehouse.country,
+}]));

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -178,7 +178,7 @@ function PlanDetail({ snapshot, plan, domain }: { snapshot: FbaSnapshot; plan: I
 function ShipmentDetail({ snapshot, shipment, domain }: { snapshot: FbaSnapshot; shipment: InboundShipment; domain: FbaDomain }) {
   const [received, setReceived] = useState<Record<string, number>>({}); const [damaged, setDamaged] = useState<Record<string, number>>({});
   const [reference, setReference] = useState(''); const [reason, setReason] = useState(''); const [claimLine, setClaimLine] = useState(shipment.lines[0]?.lineId ?? ''); const [claimQty, setClaimQty] = useState(1);
-  const plan = snapshot.inboundPlans?.find(p => p.id === shipment.planId)!;
+  const plan = snapshot.inboundPlans?.find(p => p.id === shipment.planId);
   const [windowStart, setWindowStart] = useState(shipment.deliveryWindow?.start.slice(0, 16) ?? '');
   const [windowEnd, setWindowEnd] = useState(shipment.deliveryWindow?.end.slice(0, 16) ?? '');
   const [appointmentId, setAppointmentId] = useState(shipment.appointment?.id ?? '');
@@ -188,6 +188,7 @@ function ShipmentDetail({ snapshot, shipment, domain }: { snapshot: FbaSnapshot;
   const packages = snapshot.packages.filter(p => p.fulfillmentId === shipment.fulfillmentId);
   const issue = fbaConnectionIssue(domain.configs[snapshot.merchantId]?.find(c => c.id === shipment.connectionId), shipment.site);
   const disabled = domain.busy || !domain.writable || !!issue;
+  if (!plan) return <p role="alert">找不到此货件关联的入库计划。</p>
   const canReceive = !disabled && canReceiveFbaShipment(snapshot, shipment.id);
   const send = (command: FbaCommand) => domain.execute(snapshot, command, shipment.connectionId);
   return <div className="space-y-4"><section className={panel}><h2 className="font-semibold">{shipment.destination} · {shipmentLabels[shipment.status]}</h2><p className="text-sm">Seller {sellerName(domain, snapshot.merchantId, shipment.connectionId)} / {shipment.site} · <Link className="text-[var(--primary)]" href={`/dashboard/fba/plans/${encodeURIComponent(plan.id)}`}>{plan.number}</Link></p><p className="text-sm">来源履约：{task ? ({ allocated: '待拣货', submitted: '待处理', unknown: '待核实', picking: '拣货中', packed: '已打包', withdraw_pending: '撤回中', cancelled: '已取消', shipped: '已发货', delivered: '已送达' })[task.status] : plan.sourceType === 'supplier' ? '供应商直发（无仓库出库单）' : '待处理'} {task && <> · <Link className="text-[var(--primary)]" href={`/dashboard/outbound/${encodeURIComponent(shipment.outboundId)}`}>打开关联出库单，使用仓库发货操作</Link></>}</p>{packages.map(p => <p key={p.id} className="text-sm">发货包裹 {p.number} · {p.carrier} / {p.tracking} · {p.shippedAt}</p>)}{issue && <p role="alert">{issue}</p>}</section>

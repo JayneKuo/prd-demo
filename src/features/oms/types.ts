@@ -45,6 +45,7 @@ export type OmsSnapshot = Scope & {
   inboundOrders?: import('./replenishment').InboundOrder[];
   outboundOrdersV2?: import('./replenishment').OutboundOrder[];
   replenishmentPluginTasks?: import('./replenishment').ReplenishmentPluginTask[];
+  unisAppointments?: import('./replenishment').UnisAppointment[];
   amazonPluginTasks?: import('./fba').AmazonPluginTask[];
   warehouseRecords?: WarehouseRecord[];
   fulfillmentWarehouses?: FulfillmentWarehouse[];

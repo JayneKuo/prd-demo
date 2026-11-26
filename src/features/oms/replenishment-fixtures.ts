@@ -17,7 +17,7 @@ function mkLine(
 // ─── 主入口 ───────────────────────────────────────────────────────────────────
 
 export function ensureReplenishmentDemo(snapshot: OmsSnapshot): OmsSnapshot {
-  if (snapshot.merchantId !== 'merchant_us_amazon' || snapshot.migratedSources.includes('replenishment-demo-v6')) return snapshot;
+  if (snapshot.merchantId !== 'merchant_us_amazon' || snapshot.migratedSources.includes('replenishment-demo-v7')) return snapshot;
   const s = structuredClone(snapshot);
   const e = { tenantId: s.tenantId, companyId: s.companyId, merchantId: s.merchantId, revision: 1 };
   const now = '2026-11-17T00:00:00Z';
@@ -79,9 +79,9 @@ export function ensureReplenishmentDemo(snapshot: OmsSnapshot): OmsSnapshot {
   const to_D: TransferOrder = { ...e, id: 'to:demo:D', number: 'TR-20261115-004', replenishmentPlanId: D, sourceWarehouseId: 'wh_ewr', destinationWarehouseId: 'platform-amazon-fba-us', lines: Dlines, status: 'in_progress', reservedAt: '2026-11-14T09:00:00Z' };
   const alloc_D1: PlatformAllocation = { ...e, id: 'alloc:demo:D:1', inboundPlanId: 'ip:demo:D', externalShipmentId: 'FBA-SHIP-D-PHX-001', destinationCode: 'AMAZON-FC-PHX', destinationName: 'Amazon FC Phoenix (PHX7)', lines: [{ lineId: `${D}:L1`, quantity: 120 }, { lineId: `${D}:L2`, quantity: 60 }], status: 'confirmed', sourceExecutionIds: [] };
   const alloc_D2: PlatformAllocation = { ...e, id: 'alloc:demo:D:2', inboundPlanId: 'ip:demo:D', externalShipmentId: 'FBA-SHIP-D-ORD-001', destinationCode: 'AMAZON-FC-ORD', destinationName: 'Amazon FC Chicago (ORD4)', lines: [{ lineId: `${D}:L1`, quantity: 80 }, { lineId: `${D}:L2`, quantity: 40 }], status: 'confirmed', sourceExecutionIds: [] };
-  const ip_D: InboundPlan = { ...e, id: 'ip:demo:D', number: 'IP-20261115-004', replenishmentPlanId: D, sourceType: 'transfer', destinationType: 'amazon_fba', connectionId: 'amz-northwind-seller-na', site: 'US', lines: Dlines, status: 'platform_confirmed', platformStage: 'placement_confirmed', sourceLabel: 'EWR Distribution Hub', sourceAddress: { name: 'EWR Distribution Hub', address1: '500 Logistics Way', city: 'Newark', country: 'US' }, platform: { provider: 'amazon_fba', externalPlanId: 'FBA-PLAN-D-001', externalStatus: 'confirmed', syncedAt: '2026-11-15T16:00:00Z' }, allocationIds: [alloc_D1.id, alloc_D2.id], inboundOrderIds: [], outboundPlanIds: [], createdAt: '2026-11-14T09:10:00Z', confirmedAt: '2026-11-15T16:00:00Z' };
+  const ip_D: InboundPlan = { ...e, id: 'ip:demo:D', number: 'IP-20261115-004', replenishmentPlanId: D, sourceType: 'transfer', destinationType: 'amazon_fba', connectionId: 'amz-northwind-seller-na', site: 'US', lines: Dlines, status: 'transport_preparing', platformStage: 'placement_confirmed', sourceLabel: 'EWR Distribution Hub', sourceAddress: { name: 'EWR Distribution Hub', address1: '500 Logistics Way', city: 'Newark', country: 'US' }, platform: { provider: 'amazon_fba', externalPlanId: 'FBA-PLAN-D-001', externalStatus: 'placement_confirmed', syncedAt: '2026-11-15T16:00:00Z' }, allocationIds: [alloc_D1.id, alloc_D2.id], inboundOrderIds: [], outboundPlanIds: [], createdAt: '2026-11-14T09:10:00Z', confirmedAt: '2026-11-15T16:00:00Z' };
   transferOrders.push(to_D); allocations.push(alloc_D1, alloc_D2); inboundPlans.push(ip_D);
-  plans.push({ ...e, id: D, number: 'RP-20261115-004', sourceType: 'transfer', destinationType: 'amazon_fba', reason: 'seasonal', shippingWarehouseId: 'wh_ewr', sourceWarehouseId: 'wh_ewr', receivingWarehouseId: 'platform-amazon-fba-us', destinationWarehouseId: 'platform-amazon-fba-us', connectionId: 'amz-northwind-seller-na', site: 'US', lines: Dlines, status: 'inbound_planning', transferOrderId: to_D.id, inboundPlanId: ip_D.id, plannedShipDate: '2026-11-16', createdAt: '2026-11-14T08:00:00Z', approvedAt: '2026-11-14T09:00:00Z', note: '季节性备货，平台已分仓，待生成出入库执行单。' });
+  plans.push({ ...e, id: D, number: 'RP-20261115-004', sourceType: 'transfer', destinationType: 'amazon_fba', reason: 'seasonal', shippingWarehouseId: 'wh_ewr', sourceWarehouseId: 'wh_ewr', receivingWarehouseId: 'platform-amazon-fba-us', destinationWarehouseId: 'platform-amazon-fba-us', connectionId: 'amz-northwind-seller-na', site: 'US', lines: Dlines, status: 'inbound_planning', transferOrderId: to_D.id, inboundPlanId: ip_D.id, plannedShipDate: '2026-11-16', createdAt: '2026-11-14T08:00:00Z', approvedAt: '2026-11-14T09:00:00Z', note: '季节性备货，分仓已确认，请为每票货件选择配送服务方案。' });
 
   // ══════════════════════════════════════════════════════════════════════════
   // E: 执行中 — Amazon FBA 调拨，2 分仓，部分已发运
@@ -189,10 +189,10 @@ export function ensureReplenishmentDemo(snapshot: OmsSnapshot): OmsSnapshot {
   const Osl = [mkLine(`${O}:L1`,'WEP-BLK-001','var_001_1',250,'NW-WEP-BLK-US','B0C8NW4P21','X004NWEP01','WEP-BLK-001'), mkLine(`${O}:L2`,'TP-BLK-MINI','var_002_2',100,'NW-TP-BLK-MINI','B0C8NW4P25','X004NWTP02','TP-BLK-MINI')];
   inboundPlans.push({ ...e, id: O, number: 'IP-20261117-015', sourceType: 'own_warehouse', destinationType: 'amazon_fba', connectionId: 'amz-northwind-seller-na', site: 'US', sourceLabel: 'SEA Distribution Center', sourceWarehouseId: 'wh_sea', sourceAddress: { name: 'Seattle Distribution Center', address1: '1900 1st Ave S', city: 'Seattle', country: 'US' }, inboundReason: 'platform_stocking', lines: Osl, status: 'approved', platformStage: 'not_started', allocationIds: [], inboundOrderIds: [], outboundPlanIds: [], createdAt: '2026-11-17T12:00:00Z', confirmedAt: '2026-11-17T12:30:00Z' });
 
-  // P: 准备中 — OMS仓库（可确认收货目标）
+  // P: 已审批 → 一键申请 → ready_for_execution — OMS自营仓，演示直达效果
   const P = 'ip:standalone:P';
   const Psl = [mkLine(`${P}:L1`,'DC16-ONG','var_003_3',150)];
-  inboundPlans.push({ ...e, id: P, number: 'IP-20261117-016', sourceType: 'own_warehouse', destinationType: 'oms_warehouse', destinationWarehouseId: 'wh_ewr', sourceLabel: 'LAX Fulfillment Center', sourceWarehouseId: 'wh_lax', sourceAddress: { name: 'LAX Fulfillment Center', address1: '1200 Warehouse Blvd', city: 'Los Angeles', country: 'US' }, inboundReason: 'transfer', lines: Psl, status: 'preparing', platformStage: 'not_started', allocationIds: [], inboundOrderIds: [], outboundPlanIds: [], createdAt: '2026-11-17T13:00:00Z', confirmedAt: '2026-11-17T13:30:00Z' });
+  inboundPlans.push({ ...e, id: P, number: 'IP-20261117-016', sourceType: 'own_warehouse', destinationType: 'oms_warehouse', destinationWarehouseId: 'wh_ewr', sourceLabel: 'LAX Fulfillment Center', sourceWarehouseId: 'wh_lax', sourceAddress: { name: 'LAX Fulfillment Center', address1: '1200 Warehouse Blvd', city: 'Los Angeles', country: 'US' }, inboundReason: 'transfer', lines: Psl, status: 'approved', platformStage: 'not_started', allocationIds: [], inboundOrderIds: [], outboundPlanIds: [], createdAt: '2026-11-17T13:00:00Z', confirmedAt: '2026-11-17T13:30:00Z' });
 
   // Q: 待确认包装方案 — Amazon FBA（packing_options_ready，可确认包装）
   const Q = 'ip:standalone:Q';
@@ -265,7 +265,17 @@ export function ensureReplenishmentDemo(snapshot: OmsSnapshot): OmsSnapshot {
 
   // X: 已取消（独立）
   const X = 'ip:standalone:X';
-  const Xsl = [mkLine(`${X}:L1`,'WEP-BLK-001','var_001_1',100,'NW-WEP-BLK-US','B0C8NW4P21','X004NWEP01','WEP-BLK-001')];
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // UNIS: Unis 自营仓示例（执行中，含入库单，可创建预约）
+  // ══════════════════════════════════════════════════════════════════════════
+  const UNIS = 'ip:standalone:UNIS';
+  const UNISsl = [mkLine(`${UNIS}:L1`,'TP-BLK-STD','var_002_1',200), mkLine(`${UNIS}:L2`,'TP-GRY-STD','var_002_3',100)];
+  const op_UNIS: OutboundPlan = { ...e, id:`op:${UNIS}:1`, number:'OP-20261126-UNIS-1', inboundPlanId:UNIS, sourceType:'own_warehouse', sourceWarehouseId:'wh_lax', lines:UNISsl.map(l=>({lineId:l.id,quantity:l.quantity})), status:'planned', outboundOrderIds:[`out:${UNIS}:1`] };
+  const oo_UNIS: OutboundOrder = { ...e, id:`out:${UNIS}:1`, number:'OUT-20261126-UNIS-1', outboundPlanId:op_UNIS.id, inboundOrderId:`in:${UNIS}:1`, sourceWarehouseId:'wh_lax', destinationCode:'wh_unis_lax', lines:UNISsl.map(l=>({lineId:l.id,quantity:l.quantity})), status:'planned', packageIds:[], labels:[{ id:`lbl:${UNIS}:pl`, kind:'packing_list', provider:'oms_warehouse', fileName:'OUT-20261126-UNIS-1-packing_list.pdf', status:'ready', readyAt:'2026-11-26T08:00:00Z', downloadUrl:'/demo-labels/OUT-20261126-UNIS-1-packing_list.pdf' }] };
+  const io_UNIS: InboundOrder = { ...e, id:`in:${UNIS}:1`, number:'IN-20261126-UNIS-1', inboundPlanId:UNIS, destinationCode:'wh_unis_lax', lines:UNISsl.map(l=>({lineId:l.id,quantity:l.quantity})), status:'planned', expectedQuantity:300, receivedQuantity:0, damagedQuantity:0, shortQuantity:0 };
+  outboundPlans.push(op_UNIS); outboundOrds.push(oo_UNIS); inboundOrders.push(io_UNIS);
+  inboundPlans.push({ ...e, id:UNIS, number:'IP-20261126-UNIS', sourceType:'own_warehouse', destinationType:'oms_warehouse', destinationWarehouseId:'wh_unis_lax', sourceLabel:'LAX Fulfillment Center', sourceWarehouseId:'wh_lax', sourceAddress:{name:'LAX Fulfillment Center',address1:'1200 Warehouse Blvd',city:'Los Angeles',country:'US'}, inboundReason:'platform_stocking', lines:UNISsl, status:'executing', platformStage:'not_started', allocationIds:[], inboundOrderIds:[io_UNIS.id], outboundPlanIds:[op_UNIS.id], createdAt:'2026-11-26T07:00:00Z', confirmedAt:'2026-11-26T07:30:00Z', plannedShipDate:'2026-11-27', plannedArrivalDate:'2026-11-28' });  const Xsl = [mkLine(`${X}:L1`,'WEP-BLK-001','var_001_1',100,'NW-WEP-BLK-US','B0C8NW4P21','X004NWEP01','WEP-BLK-001')];
   inboundPlans.push({ ...e, id: X, number: 'IP-20261116-024', sourceType: 'own_warehouse', destinationType: 'amazon_fba', connectionId: 'amz-northwind-seller-na', site: 'US', sourceLabel: 'EWR Distribution Hub', sourceWarehouseId: 'wh_ewr', sourceAddress: { name: 'EWR Distribution Hub', address1: '100 Haynes Ave', city: 'Newark', country: 'US' }, inboundReason: 'platform_stocking', lines: Xsl, status: 'cancelled', platformStage: 'not_started', allocationIds: [], inboundOrderIds: [], outboundPlanIds: [], createdAt: '2026-11-16T10:00:00Z' });
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -423,6 +433,6 @@ export function ensureReplenishmentDemo(snapshot: OmsSnapshot): OmsSnapshot {
   s.inboundOrders = inboundOrders;
   s.outboundOrdersV2 = outboundOrds;
   s.replenishmentPluginTasks = pluginTasks;
-  s.migratedSources = [...s.migratedSources.filter(x => !['replenishment-demo-v2','replenishment-demo-v3','replenishment-demo-v4','replenishment-demo-v5'].includes(x)), 'replenishment-demo-v6'];
+  s.migratedSources = [...s.migratedSources.filter(x => !['replenishment-demo-v2','replenishment-demo-v3','replenishment-demo-v4','replenishment-demo-v5','replenishment-demo-v6'].includes(x)), 'replenishment-demo-v7'];
   return s;
 }

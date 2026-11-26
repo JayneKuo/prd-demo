@@ -45,7 +45,7 @@ const collections = ['orders', 'fulfillments', 'outbounds', 'reservations', 'mov
  */
 export function ensureAmazonDomainScenarios(current: OmsSnapshot): OmsSnapshot {
   if (current.companyId !== 'company_northwind' || current.merchantId !== 'merchant_us_amazon' || current.migratedSources.includes(PREFIX)) return current;
-  let state = structuredClone(current);
+  const state = structuredClone(current);
   const now = Date.now();
   const scope = { tenantId: current.tenantId, companyId: current.companyId, merchantId: current.merchantId };
   const templates = ensureVendorFixtures(emptySnapshot(scope));
