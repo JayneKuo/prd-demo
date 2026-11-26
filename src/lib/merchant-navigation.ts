@@ -46,6 +46,7 @@ export const merchantNavigationGroups: NavGroup[] = [
     icon: 'warehouse',
     defaultOpen: true,
     items: [
+      { title: { 'zh-CN': '入库计划', 'en-US': 'Inbound Plans' }, href: '/dashboard/inbound-plans', capabilities: ['inventory:read'], icon: 'clipboard-list' },
       { title: { 'zh-CN': '入库单', 'en-US': 'Inbound' }, href: '/dashboard/inbound', capabilities: ['inventory:read'], icon: 'package-plus' },
       { title: { 'zh-CN': '出库单', 'en-US': 'Outbound' }, href: '/dashboard/outbound', capabilities: ['inventory:read'], icon: 'package-minus' },
       { title: { 'zh-CN': '库存', 'en-US': 'Inventory' }, href: '/dashboard/inventory', capabilities: ['inventory:read'], icon: 'boxes' },
